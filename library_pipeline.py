@@ -374,14 +374,22 @@ def load_cache(cache_path: Path) -> dict[str, dict]:
 
 def save_cache(cache_path: Path, cache: dict[str, dict]) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    with cache_path.open("w", encoding="utf-8") as handle:
+    tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as handle:
         json.dump(cache, handle, indent=2, sort_keys=True)
+    tmp_path.replace(cache_path)
 
 
 def openlibrary_lookup(isbn: str) -> dict:
+    return openlibrary_lookup_many([isbn]).get(isbn, {})
+
+
+def openlibrary_lookup_many(isbns: list[str]) -> dict[str, dict]:
+    if not isbns:
+        return {}
     params = urllib.parse.urlencode(
         {
-            "bibkeys": f"ISBN:{isbn}",
+            "bibkeys": ",".join(f"ISBN:{isbn}" for isbn in isbns),
             "jscmd": "data",
             "format": "json",
         }
@@ -391,7 +399,7 @@ def openlibrary_lookup(isbn: str) -> dict:
     context = ssl.create_default_context(cafile=ca_bundle_path())
     with urllib.request.urlopen(request, timeout=30, context=context) as response:
         data = json.load(response)
-    return data.get(f"ISBN:{isbn}", {})
+    return {isbn: data.get(f"ISBN:{isbn}", {}) for isbn in isbns}
 
 
 def openlibrary_search_title(title: str, limit: int = 5) -> dict:
@@ -551,6 +559,7 @@ def resolve_row(row: dict[str, str], isbn_cache: dict[str, dict], search_cache: 
     query = title_query(row)
     if query:
         if query not in search_cache:
+            print(f"Open Library title fallback: {query}", file=sys.stderr)
             search_cache[query] = openlibrary_search_title(query)
             time.sleep(delay)
         docs = search_cache[query].get("docs", [])
@@ -669,21 +678,57 @@ def build_book_metadata_rows(
     search_cache_path: Path | None = None,
 ) -> list[dict[str, str]]:
     rows = []
-    for isbn13, group in grouped_purchases(purchases).items():
+    groups = grouped_purchases(purchases)
+    fetch_missing_isbn_cache(list(groups), isbn_cache, isbn_cache_path=isbn_cache_path, delay=delay)
+    prepared_rows = []
+    isbn10_fallbacks = []
+    for isbn13, group in groups.items():
         summary = purchase_summary(group)
-        if isbn13 not in isbn_cache:
-            isbn_cache[isbn13] = openlibrary_lookup(isbn13)
-            if isbn_cache_path:
-                save_cache(isbn_cache_path, isbn_cache)
-            time.sleep(delay)
         enriched = enrich_row(summary, isbn_cache[isbn13])
+        prepared_rows.append((summary, enriched))
+        if enriched.get("openlibrary_status") != "matched" and summary.get("isbn10"):
+            isbn10_fallbacks.append(summary["isbn10"])
+
+    fetch_missing_isbn_cache(
+        isbn10_fallbacks,
+        isbn_cache,
+        isbn_cache_path=isbn_cache_path,
+        delay=delay,
+    )
+
+    for summary, enriched in prepared_rows:
+        search_cache_count = len(search_cache)
+        isbn_cache_count = len(isbn_cache)
         resolved = resolve_row(enriched, isbn_cache, search_cache, delay)
-        if isbn_cache_path:
+        if isbn_cache_path and len(isbn_cache) != isbn_cache_count:
             save_cache(isbn_cache_path, isbn_cache)
-        if search_cache_path:
+        if search_cache_path and len(search_cache) != search_cache_count:
             save_cache(search_cache_path, search_cache)
         rows.append(metadata_row(summary, resolved))
     return sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
+
+
+def fetch_missing_isbn_cache(
+    isbns: list[str],
+    isbn_cache: dict[str, dict],
+    isbn_cache_path: Path | None = None,
+    delay: float = 0.25,
+    batch_size: int = 50,
+) -> None:
+    missing = [isbn for isbn in isbns if isbn and isbn not in isbn_cache]
+    if not missing:
+        print("ISBN cache already has all required Open Library lookups.", file=sys.stderr)
+        return
+    print(f"Fetching {len(missing)} missing Open Library ISBN lookups in batches of {batch_size}.", file=sys.stderr)
+    for start in range(0, len(missing), batch_size):
+        batch = missing[start : start + batch_size]
+        batch_number = start // batch_size + 1
+        batch_count = (len(missing) + batch_size - 1) // batch_size
+        print(f"Open Library batch {batch_number}/{batch_count}: {len(batch)} ISBNs", file=sys.stderr)
+        isbn_cache.update(openlibrary_lookup_many(batch))
+        if isbn_cache_path:
+            save_cache(isbn_cache_path, isbn_cache)
+        time.sleep(delay)
 
 
 def grouped_purchases(purchases: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
