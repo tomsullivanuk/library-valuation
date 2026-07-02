@@ -1,0 +1,46 @@
+from library_pipeline import (
+    book_candidate_from_row,
+    classify_asin,
+    is_valid_isbn10,
+    is_valid_isbn13,
+    isbn10_to_isbn13,
+)
+
+
+def test_isbn10_validation_and_conversion():
+    assert is_valid_isbn10("006157127X")
+    assert isbn10_to_isbn13("006157127X") == "9780061571275"
+
+
+def test_isbn13_validation():
+    assert is_valid_isbn13("9780061571275")
+    assert not is_valid_isbn13("9780061571276")
+
+
+def test_classify_amazon_asin_vs_book_isbn():
+    assert classify_asin("B07RG97YN6") == "amazon_asin"
+    assert classify_asin("0198786220") == "isbn10"
+
+
+def test_book_candidate_excludes_private_fields():
+    row = {
+        "ASIN": "0198786220",
+        "Billing Address": "private",
+        "Shipping Address": "private",
+        "Carrier Name & Tracking Number": "private",
+        "Payment Method Type": "private",
+        "Order Date": "2021-10-10T22:33:42Z",
+        "Order ID": "111-1660384-0033033",
+        "Product Name": "Cognitive Neuroscience",
+        "Product Condition": "New",
+        "Original Quantity": "1",
+        "Unit Price": "11.95",
+        "Currency": "USD",
+        "Website": "Amazon.com",
+    }
+
+    candidate = book_candidate_from_row(row)
+
+    assert candidate["isbn13"] == "9780198786221"
+    assert "Billing Address" not in candidate
+    assert "Payment Method Type" not in candidate
