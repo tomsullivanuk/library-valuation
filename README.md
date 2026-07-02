@@ -79,3 +79,16 @@ Analyze enrichment coverage:
 python3 library_pipeline.py analyze-enrichment \
   --input output/book_enriched_openlibrary.csv
 ```
+
+Resolve rows that Open Library did not find by exact ISBN:
+
+```bash
+python3 library_pipeline.py resolve-missing \
+  --input output/book_enriched_openlibrary.csv \
+  --output output/book_resolved_openlibrary.csv
+```
+
+This keeps already matched rows intact, retries missing rows by the original
+ISBN-10, then searches Open Library by title. The output includes
+`resolution_source`, `resolution_confidence`, `resolution_notes`, and
+`resolved_query`.

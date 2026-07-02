@@ -9,6 +9,8 @@ from library_pipeline import (
     is_valid_isbn13,
     isbn10_to_isbn13,
     paired_output_paths,
+    text_similarity,
+    title_query,
     write_table_outputs,
 )
 
@@ -95,3 +97,14 @@ def test_write_table_outputs_creates_csv_and_xlsx(tmp_path):
         sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
     assert "Cognitive neuroscience" in sheet_xml
     assert '<pane ySplit="1"' in sheet_xml
+
+
+def test_title_query_removes_trailing_series_note():
+    row = {"product_name": "Cognitive Neuroscience: A Very Short Introduction (Very Short Introductions)"}
+
+    assert title_query(row) == "Cognitive Neuroscience: A Very Short Introduction"
+
+
+def test_text_similarity_scores_overlap():
+    assert text_similarity("Cell and Psyche", "Cell and psyche") == 1.0
+    assert text_similarity("Cell and Psyche", "Elements of Logic") < 0.5

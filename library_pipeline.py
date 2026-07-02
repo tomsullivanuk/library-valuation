@@ -45,6 +45,13 @@ ENRICHED_FIELDNAMES = BOOK_FIELDNAMES + [
     "subjects",
 ]
 
+RESOLVED_FIELDNAMES = ENRICHED_FIELDNAMES + [
+    "resolution_source",
+    "resolution_confidence",
+    "resolution_notes",
+    "resolved_query",
+]
+
 
 def paired_output_paths(output_path: Path) -> tuple[Path, Path]:
     if output_path.suffix.lower() == ".xlsx":
@@ -337,6 +344,34 @@ def openlibrary_lookup(isbn: str) -> dict:
     return data.get(f"ISBN:{isbn}", {})
 
 
+def openlibrary_search_title(title: str, limit: int = 5) -> dict:
+    params = urllib.parse.urlencode(
+        {
+            "title": title,
+            "limit": str(limit),
+            "fields": ",".join(
+                [
+                    "key",
+                    "title",
+                    "author_name",
+                    "first_publish_year",
+                    "isbn",
+                    "lcc",
+                    "ddc",
+                    "lccn",
+                    "oclc",
+                    "subject",
+                ]
+            ),
+        }
+    )
+    url = f"https://openlibrary.org/search.json?{params}"
+    request = urllib.request.Request(url, headers={"User-Agent": "amazon-library-lcc/0.1"})
+    context = ssl.create_default_context(cafile=ca_bundle_path())
+    with urllib.request.urlopen(request, timeout=30, context=context) as response:
+        return json.load(response)
+
+
 def ca_bundle_path() -> str | None:
     for candidate in (
         "/etc/ssl/cert.pem",
@@ -386,6 +421,112 @@ def enrich_row(row: dict[str, str], payload: dict) -> dict[str, str]:
     return enriched
 
 
+def enrich_row_from_search_doc(row: dict[str, str], doc: dict) -> dict[str, str]:
+    enriched = dict(row)
+    enriched.update(
+        {
+            "openlibrary_status": "matched",
+            "openlibrary_url": f"https://openlibrary.org{doc.get('key', '')}" if doc.get("key") else "",
+            "title": doc.get("title", ""),
+            "authors": "; ".join(doc.get("author_name", [])[:8]),
+            "publishers": row.get("publishers", ""),
+            "publish_date": str(doc.get("first_publish_year", "")),
+            "lcc": join_doc_values(doc, "lcc"),
+            "dewey": join_doc_values(doc, "ddc"),
+            "lccn": join_doc_values(doc, "lccn"),
+            "oclc": join_doc_values(doc, "oclc"),
+            "subjects": join_doc_values(doc, "subject", limit=12),
+        }
+    )
+    return enriched
+
+
+def join_doc_values(doc: dict, key: str, limit: int = 8) -> str:
+    raw = doc.get(key, [])
+    if not isinstance(raw, list):
+        raw = [raw]
+    return "; ".join(str(value) for value in raw[:limit] if value)
+
+
+def title_query(row: dict[str, str]) -> str:
+    title = row.get("product_name") or row.get("title") or ""
+    return re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+
+
+def text_similarity(left: str, right: str) -> float:
+    left_tokens = set(re.findall(r"[a-z0-9]+", left.lower()))
+    right_tokens = set(re.findall(r"[a-z0-9]+", right.lower()))
+    if not left_tokens or not right_tokens:
+        return 0.0
+    return len(left_tokens & right_tokens) / len(left_tokens | right_tokens)
+
+
+def best_title_match(query: str, docs: list[dict]) -> tuple[dict | None, float]:
+    scored = [(doc, text_similarity(query, doc.get("title", ""))) for doc in docs]
+    scored.sort(key=lambda item: item[1], reverse=True)
+    return scored[0] if scored else (None, 0.0)
+
+
+def resolve_row(row: dict[str, str], isbn_cache: dict[str, dict], search_cache: dict[str, dict], delay: float) -> dict[str, str]:
+    resolved = {field: row.get(field, "") for field in RESOLVED_FIELDNAMES}
+    resolved.update(
+        {
+            "resolution_source": "already_matched" if row.get("openlibrary_status") == "matched" else "manual_review",
+            "resolution_confidence": "high" if row.get("openlibrary_status") == "matched" else "none",
+            "resolution_notes": "",
+            "resolved_query": "",
+        }
+    )
+    if row.get("openlibrary_status") == "matched":
+        return resolved
+
+    isbn10 = row.get("isbn10", "")
+    if isbn10:
+        if isbn10 not in isbn_cache:
+            isbn_cache[isbn10] = openlibrary_lookup(isbn10)
+            time.sleep(delay)
+        if isbn_cache[isbn10]:
+            enriched = enrich_row(row, isbn_cache[isbn10])
+            resolved.update(enriched)
+            resolved.update(
+                {
+                    "resolution_source": "openlibrary_isbn10_exact",
+                    "resolution_confidence": "high",
+                    "resolution_notes": "Resolved by retrying the original ISBN-10.",
+                    "resolved_query": isbn10,
+                }
+            )
+            return resolved
+
+    query = title_query(row)
+    if query:
+        if query not in search_cache:
+            search_cache[query] = openlibrary_search_title(query)
+            time.sleep(delay)
+        docs = search_cache[query].get("docs", [])
+        match, score = best_title_match(query, docs)
+        if match and score >= 0.65:
+            enriched = enrich_row_from_search_doc(row, match)
+            resolved.update(enriched)
+            resolved.update(
+                {
+                    "resolution_source": "openlibrary_title_search",
+                    "resolution_confidence": "medium" if score < 0.9 else "high",
+                    "resolution_notes": f"Best title-search match, similarity {score:.2f}.",
+                    "resolved_query": query,
+                }
+            )
+            return resolved
+
+    resolved.update(
+        {
+            "resolution_notes": "No ISBN-10 or title-search match met the confidence threshold.",
+            "resolved_query": query,
+        }
+    )
+    return resolved
+
+
 def enrich_openlibrary(input_path: Path, output_path: Path, cache_path: Path, delay: float, limit: int | None) -> int:
     cache = load_cache(cache_path)
     rows = []
@@ -403,6 +544,33 @@ def enrich_openlibrary(input_path: Path, output_path: Path, cache_path: Path, de
     save_cache(cache_path, cache)
     write_table_outputs(output_path, ENRICHED_FIELDNAMES, rows, "Open Library Enrichment")
     return len(rows)
+
+
+def resolve_missing(input_path: Path, output_path: Path, isbn_cache_path: Path, search_cache_path: Path, delay: float) -> dict[str, int]:
+    isbn_cache = load_cache(isbn_cache_path)
+    search_cache = load_cache(search_cache_path)
+    rows = []
+    counts = {
+        "rows": 0,
+        "already_matched": 0,
+        "openlibrary_isbn10_exact": 0,
+        "openlibrary_title_search": 0,
+        "manual_review": 0,
+    }
+    with input_path.open(newline="", encoding="utf-8-sig") as source:
+        for row in csv.DictReader(source):
+            resolved = resolve_row(row, isbn_cache, search_cache, delay)
+            rows.append(resolved)
+            counts["rows"] += 1
+            source_name = resolved.get("resolution_source", "manual_review")
+            counts[source_name] = counts.get(source_name, 0) + 1
+            save_cache(isbn_cache_path, isbn_cache)
+            save_cache(search_cache_path, search_cache)
+
+    write_table_outputs(output_path, RESOLVED_FIELDNAMES, rows, "Resolved Missing")
+    save_cache(isbn_cache_path, isbn_cache)
+    save_cache(search_cache_path, search_cache)
+    return counts
 
 
 def pct(part: int, whole: int) -> str:
@@ -477,6 +645,21 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_parser = subparsers.add_parser("analyze-enrichment")
     analyze_parser.add_argument("--input", required=True, type=Path)
 
+    resolve_parser = subparsers.add_parser("resolve-missing")
+    resolve_parser.add_argument("--input", required=True, type=Path)
+    resolve_parser.add_argument("--output", required=True, type=Path)
+    resolve_parser.add_argument(
+        "--isbn-cache",
+        type=Path,
+        default=Path("output/openlibrary_cache.json"),
+    )
+    resolve_parser.add_argument(
+        "--search-cache",
+        type=Path,
+        default=Path("output/openlibrary_search_cache.json"),
+    )
+    resolve_parser.add_argument("--delay", type=float, default=0.25)
+
     return parser
 
 
@@ -497,6 +680,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "analyze-enrichment":
         print(json.dumps(analyze_enrichment(args.input), indent=2, sort_keys=True))
+        return 0
+    if args.command == "resolve-missing":
+        counts = resolve_missing(args.input, args.output, args.isbn_cache, args.search_cache, args.delay)
+        csv_path, xlsx_path = paired_output_paths(args.output)
+        print(json.dumps(counts, indent=2, sort_keys=True))
+        print(f"Wrote resolved rows to {csv_path} and {xlsx_path}")
         return 0
     return 2
 
