@@ -1,4 +1,5 @@
 from library_pipeline import (
+    analyze_enrichment,
     book_candidate_from_row,
     classify_asin,
     is_valid_isbn10,
@@ -44,3 +45,24 @@ def test_book_candidate_excludes_private_fields():
     assert candidate["isbn13"] == "9780198786221"
     assert "Billing Address" not in candidate
     assert "Payment Method Type" not in candidate
+
+
+def test_analyze_enrichment(tmp_path):
+    path = tmp_path / "enriched.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "openlibrary_status,lcc,dewey,lccn,oclc,subjects",
+                "matched,PN1995 .A1,791,123,456,Film",
+                "not_found,,,,,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    summary = analyze_enrichment(path)
+
+    assert summary["rows"] == 2
+    assert summary["matched"] == 1
+    assert summary["with_lcc"] == 1
+    assert summary["lcc_rate"] == "50.0%"

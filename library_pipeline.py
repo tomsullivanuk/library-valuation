@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import re
+import ssl
 import sys
 import time
 import urllib.parse
@@ -179,9 +180,22 @@ def openlibrary_lookup(isbn: str) -> dict:
     )
     url = f"https://openlibrary.org/api/books?{params}"
     request = urllib.request.Request(url, headers={"User-Agent": "amazon-library-lcc/0.1"})
-    with urllib.request.urlopen(request, timeout=30) as response:
+    context = ssl.create_default_context(cafile=ca_bundle_path())
+    with urllib.request.urlopen(request, timeout=30, context=context) as response:
         data = json.load(response)
     return data.get(f"ISBN:{isbn}", {})
+
+
+def ca_bundle_path() -> str | None:
+    for candidate in (
+        "/etc/ssl/cert.pem",
+        "/etc/ssl/certs/ca-certificates.crt",
+        "/opt/homebrew/etc/ca-certificates/cert.pem",
+        "/usr/local/etc/openssl@3/cert.pem",
+    ):
+        if Path(candidate).exists():
+            return candidate
+    return None
 
 
 def names(items: list[dict], limit: int | None = None) -> str:
@@ -245,6 +259,53 @@ def enrich_openlibrary(input_path: Path, output_path: Path, cache_path: Path, de
     return written
 
 
+def pct(part: int, whole: int) -> str:
+    if whole == 0:
+        return "0.0%"
+    return f"{part / whole:.1%}"
+
+
+def analyze_enrichment(input_path: Path) -> dict[str, str | int]:
+    counts = {
+        "rows": 0,
+        "matched": 0,
+        "not_found": 0,
+        "with_lcc": 0,
+        "with_dewey": 0,
+        "with_lccn": 0,
+        "with_oclc": 0,
+        "with_subjects": 0,
+    }
+    with input_path.open(newline="", encoding="utf-8-sig") as handle:
+        for row in csv.DictReader(handle):
+            counts["rows"] += 1
+            if row.get("openlibrary_status") == "matched":
+                counts["matched"] += 1
+            else:
+                counts["not_found"] += 1
+            if row.get("lcc"):
+                counts["with_lcc"] += 1
+            if row.get("dewey"):
+                counts["with_dewey"] += 1
+            if row.get("lccn"):
+                counts["with_lccn"] += 1
+            if row.get("oclc"):
+                counts["with_oclc"] += 1
+            if row.get("subjects"):
+                counts["with_subjects"] += 1
+
+    rows = counts["rows"]
+    return {
+        **counts,
+        "matched_rate": pct(counts["matched"], rows),
+        "lcc_rate": pct(counts["with_lcc"], rows),
+        "dewey_rate": pct(counts["with_dewey"], rows),
+        "lccn_rate": pct(counts["with_lccn"], rows),
+        "oclc_rate": pct(counts["with_oclc"], rows),
+        "subjects_rate": pct(counts["with_subjects"], rows),
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -267,6 +328,9 @@ def build_parser() -> argparse.ArgumentParser:
     enrich_parser.add_argument("--delay", type=float, default=0.25)
     enrich_parser.add_argument("--limit", type=int)
 
+    analyze_parser = subparsers.add_parser("analyze-enrichment")
+    analyze_parser.add_argument("--input", required=True, type=Path)
+
     return parser
 
 
@@ -282,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "enrich-openlibrary":
         count = enrich_openlibrary(args.input, args.output, args.cache, args.delay, args.limit)
         print(f"Wrote {count} enriched rows to {args.output}")
+        return 0
+    if args.command == "analyze-enrichment":
+        print(json.dumps(analyze_enrichment(args.input), indent=2, sort_keys=True))
         return 0
     return 2
 

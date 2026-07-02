@@ -70,3 +70,10 @@ python3 library_pipeline.py enrich-openlibrary \
 
 The enrichment command uses a local JSON cache in
 `output/openlibrary_cache.json` by default.
+
+Analyze enrichment coverage:
+
+```bash
+python3 library_pipeline.py analyze-enrichment \
+  --input output/book_enriched_openlibrary.csv
+```
