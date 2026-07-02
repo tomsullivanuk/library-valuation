@@ -12,7 +12,9 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 
 BOOK_FIELDNAMES = [
@@ -42,6 +44,159 @@ ENRICHED_FIELDNAMES = BOOK_FIELDNAMES + [
     "oclc",
     "subjects",
 ]
+
+
+def paired_output_paths(output_path: Path) -> tuple[Path, Path]:
+    if output_path.suffix.lower() == ".xlsx":
+        return output_path.with_suffix(".csv"), output_path
+    if output_path.suffix.lower() == ".csv":
+        return output_path, output_path.with_suffix(".xlsx")
+    return output_path.with_suffix(".csv"), output_path.with_suffix(".xlsx")
+
+
+def write_table_outputs(output_path: Path, fieldnames: list[str], rows: list[dict[str, str]], sheet_name: str) -> tuple[Path, Path]:
+    csv_path, xlsx_path = paired_output_paths(output_path)
+    write_csv(csv_path, fieldnames, rows)
+    write_xlsx(xlsx_path, fieldnames, rows, sheet_name)
+    return csv_path, xlsx_path
+
+
+def write_csv(output_path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def write_xlsx(output_path: Path, fieldnames: list[str], rows: list[dict[str, str]], sheet_name: str) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sheet_xml = build_sheet_xml(fieldnames, rows)
+    workbook_xml = build_workbook_xml(sheet_name)
+    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", CONTENT_TYPES_XML)
+        archive.writestr("_rels/.rels", ROOT_RELS_XML)
+        archive.writestr("docProps/app.xml", APP_XML)
+        archive.writestr("docProps/core.xml", CORE_XML)
+        archive.writestr("xl/workbook.xml", workbook_xml)
+        archive.writestr("xl/_rels/workbook.xml.rels", WORKBOOK_RELS_XML)
+        archive.writestr("xl/styles.xml", STYLES_XML)
+        archive.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+
+
+def build_sheet_xml(fieldnames: list[str], rows: list[dict[str, str]]) -> str:
+    row_count = len(rows) + 1
+    col_count = len(fieldnames)
+    dimension = f"A1:{excel_col(col_count)}{row_count}"
+    widths = column_widths(fieldnames, rows)
+    cols = "".join(
+        f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
+        for index, width in enumerate(widths, start=1)
+    )
+    body = [build_row_xml(1, fieldnames, style="1")]
+    for index, row in enumerate(rows, start=2):
+        body.append(build_row_xml(index, [row.get(field, "") for field in fieldnames]))
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<dimension ref="{dimension}"/>'
+        '<sheetViews><sheetView tabSelected="1" workbookViewId="0">'
+        '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+        '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>'
+        '</sheetView></sheetViews>'
+        '<sheetFormatPr defaultRowHeight="15"/>'
+        f"<cols>{cols}</cols>"
+        f"<sheetData>{''.join(body)}</sheetData>"
+        f'<autoFilter ref="{dimension}"/>'
+        "</worksheet>"
+    )
+
+
+def build_row_xml(row_index: int, values: list[str], style: str | None = None) -> str:
+    cells = []
+    style_attr = f' s="{style}"' if style else ""
+    for col_index, value in enumerate(values, start=1):
+        cell_ref = f"{excel_col(col_index)}{row_index}"
+        text = escape(str(value or ""))
+        cells.append(f'<c r="{cell_ref}" t="inlineStr"{style_attr}><is><t>{text}</t></is></c>')
+    return f'<row r="{row_index}">{"".join(cells)}</row>'
+
+
+def column_widths(fieldnames: list[str], rows: list[dict[str, str]]) -> list[int]:
+    widths = []
+    for field in fieldnames:
+        max_len = len(field)
+        for row in rows[:1000]:
+            max_len = max(max_len, len(str(row.get(field, ""))))
+        widths.append(min(max(max_len + 2, 10), 60))
+    return widths
+
+
+def excel_col(index: int) -> str:
+    letters = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        letters = chr(65 + remainder) + letters
+    return letters
+
+
+def build_workbook_xml(sheet_name: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        "<sheets>"
+        f'<sheet name="{escape(sheet_name)}" sheetId="1" r:id="rId1"/>'
+        "</sheets>"
+        "</workbook>"
+    )
+
+
+CONTENT_TYPES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+  <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>"""
+
+ROOT_RELS_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>"""
+
+WORKBOOK_RELS_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>"""
+
+APP_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+  <Application>Amazon Library Pipeline</Application>
+</Properties>"""
+
+CORE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <dc:creator>Amazon Library Pipeline</dc:creator>
+  <dc:title>Amazon Library Export</dc:title>
+</cp:coreProperties>"""
+
+STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
+  <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>"""
 
 
 def normalize_isbn(value: str) -> str:
@@ -129,17 +284,13 @@ def book_candidate_from_row(row: dict[str, str]) -> dict[str, str] | None:
 
 
 def extract_candidates(input_path: Path, output_path: Path) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
-    with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=BOOK_FIELDNAMES)
-        writer.writeheader()
-        for row in iter_amazon_rows(input_path):
-            candidate = book_candidate_from_row(row)
-            if candidate:
-                writer.writerow(candidate)
-                count += 1
-    return count
+    candidates = []
+    for row in iter_amazon_rows(input_path):
+        candidate = book_candidate_from_row(row)
+        if candidate:
+            candidates.append(candidate)
+    write_table_outputs(output_path, BOOK_FIELDNAMES, candidates, "Book Candidates")
+    return len(candidates)
 
 
 def summarize(input_path: Path) -> dict[str, int]:
@@ -237,26 +388,21 @@ def enrich_row(row: dict[str, str], payload: dict) -> dict[str, str]:
 
 def enrich_openlibrary(input_path: Path, output_path: Path, cache_path: Path, delay: float, limit: int | None) -> int:
     cache = load_cache(cache_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    written = 0
-    with input_path.open(newline="", encoding="utf-8-sig") as source, output_path.open(
-        "w", newline="", encoding="utf-8"
-    ) as target:
+    rows = []
+    with input_path.open(newline="", encoding="utf-8-sig") as source:
         reader = csv.DictReader(source)
-        writer = csv.DictWriter(target, fieldnames=ENRICHED_FIELDNAMES)
-        writer.writeheader()
         for row in reader:
-            if limit is not None and written >= limit:
+            if limit is not None and len(rows) >= limit:
                 break
             isbn = row.get("isbn13") or row.get("isbn10") or row.get("asin")
             if isbn not in cache:
                 cache[isbn] = openlibrary_lookup(isbn)
                 save_cache(cache_path, cache)
                 time.sleep(delay)
-            writer.writerow(enrich_row(row, cache[isbn]))
-            written += 1
+            rows.append(enrich_row(row, cache[isbn]))
     save_cache(cache_path, cache)
-    return written
+    write_table_outputs(output_path, ENRICHED_FIELDNAMES, rows, "Open Library Enrichment")
+    return len(rows)
 
 
 def pct(part: int, whole: int) -> str:
@@ -341,11 +487,13 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "extract":
         count = extract_candidates(args.input, args.output)
-        print(f"Wrote {count} book candidates to {args.output}")
+        csv_path, xlsx_path = paired_output_paths(args.output)
+        print(f"Wrote {count} book candidates to {csv_path} and {xlsx_path}")
         return 0
     if args.command == "enrich-openlibrary":
         count = enrich_openlibrary(args.input, args.output, args.cache, args.delay, args.limit)
-        print(f"Wrote {count} enriched rows to {args.output}")
+        csv_path, xlsx_path = paired_output_paths(args.output)
+        print(f"Wrote {count} enriched rows to {csv_path} and {xlsx_path}")
         return 0
     if args.command == "analyze-enrichment":
         print(json.dumps(analyze_enrichment(args.input), indent=2, sort_keys=True))

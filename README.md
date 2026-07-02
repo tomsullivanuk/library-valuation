@@ -45,7 +45,8 @@ tracking number, payment method, gift fields, and other personal columns.
 
 ## Usage
 
-Extract candidate books from an Amazon order-history CSV:
+Extract candidate books from an Amazon order-history CSV. This writes both
+`book_candidates.csv` and `book_candidates.xlsx`:
 
 ```bash
 python3 library_pipeline.py extract \
@@ -60,7 +61,8 @@ python3 library_pipeline.py summarize \
   --input "/path/to/Order History.csv"
 ```
 
-Enrich candidates with Open Library:
+Enrich candidates with Open Library. This writes both
+`book_enriched_openlibrary.csv` and `book_enriched_openlibrary.xlsx`:
 
 ```bash
 python3 library_pipeline.py enrich-openlibrary \

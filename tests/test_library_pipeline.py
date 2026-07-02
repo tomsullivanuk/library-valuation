@@ -1,3 +1,6 @@
+import zipfile
+from pathlib import Path
+
 from library_pipeline import (
     analyze_enrichment,
     book_candidate_from_row,
@@ -5,6 +8,8 @@ from library_pipeline import (
     is_valid_isbn10,
     is_valid_isbn13,
     isbn10_to_isbn13,
+    paired_output_paths,
+    write_table_outputs,
 )
 
 
@@ -66,3 +71,27 @@ def test_analyze_enrichment(tmp_path):
     assert summary["matched"] == 1
     assert summary["with_lcc"] == 1
     assert summary["lcc_rate"] == "50.0%"
+
+
+def test_paired_output_paths():
+    output = Path("output/books.csv")
+    csv_path, xlsx_path = paired_output_paths(output)
+
+    assert csv_path == output
+    assert xlsx_path == Path("output/books.xlsx")
+
+
+def test_write_table_outputs_creates_csv_and_xlsx(tmp_path):
+    output = tmp_path / "books.csv"
+    rows = [{"isbn13": "9780198786221", "title": "Cognitive neuroscience"}]
+
+    csv_path, xlsx_path = write_table_outputs(output, ["isbn13", "title"], rows, "Books")
+
+    assert csv_path.exists()
+    assert xlsx_path.exists()
+    assert csv_path.read_text(encoding="utf-8").splitlines()[0] == "isbn13,title"
+    with zipfile.ZipFile(xlsx_path) as workbook:
+        assert "xl/workbook.xml" in workbook.namelist()
+        sheet_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    assert "Cognitive neuroscience" in sheet_xml
+    assert '<pane ySplit="1"' in sheet_xml
