@@ -4,6 +4,8 @@ from pathlib import Path
 from library_pipeline import (
     analyze_enrichment,
     book_candidate_from_row,
+    build_book_metadata_rows,
+    build_library_catalog_rows,
     classify_asin,
     is_valid_isbn10,
     is_valid_isbn13,
@@ -108,3 +110,68 @@ def test_title_query_removes_trailing_series_note():
 def test_text_similarity_scores_overlap():
     assert text_similarity("Cell and Psyche", "Cell and psyche") == 1.0
     assert text_similarity("Cell and Psyche", "Elements of Logic") < 0.5
+
+
+def test_build_book_metadata_rows_deduplicates_by_isbn():
+    purchases = [
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "product_condition": "New",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+            "website": "Amazon.com",
+        },
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2022-01-01T00:00:00Z",
+            "order_id": "2",
+            "product_name": "Cognitive Neuroscience",
+            "product_condition": "New",
+            "quantity": "2",
+            "unit_price": "11.95",
+            "currency": "USD",
+            "website": "Amazon.com",
+        },
+    ]
+    cache = {
+        "9780198786221": {
+            "title": "Cognitive neuroscience",
+            "authors": [{"name": "Richard Passingham"}],
+            "classifications": {"lc_classifications": ["QP360.5"]},
+        }
+    }
+
+    rows = build_book_metadata_rows(purchases, cache, {}, delay=0)
+
+    assert len(rows) == 1
+    assert rows[0]["purchase_count"] == "2"
+    assert rows[0]["total_quantity"] == "3"
+    assert rows[0]["title"] == "Cognitive neuroscience"
+    assert rows[0]["lcc"] == "QP360.5"
+
+
+def test_build_library_catalog_rows_joins_metadata():
+    purchases = [{"isbn13": "9780198786221", "isbn10": "0198786220", "product_name": "Raw title"}]
+    metadata = [
+        {
+            "isbn13": "9780198786221",
+            "title": "Cognitive neuroscience",
+            "authors": "Richard Passingham",
+            "lcc": "QP360.5",
+            "resolution_source": "already_matched",
+            "resolution_confidence": "high",
+        }
+    ]
+
+    catalog = build_library_catalog_rows(purchases, metadata)
+
+    assert catalog[0]["title"] == "Cognitive neuroscience"
+    assert catalog[0]["lcc"] == "QP360.5"

@@ -45,6 +45,24 @@ tracking number, payment method, gift fields, and other personal columns.
 
 ## Usage
 
+Monthly update from a fresh full Amazon export:
+
+```bash
+python3 library_pipeline.py update-library \
+  --amazon-input "/path/to/latest Order History.csv" \
+  --output-dir output
+```
+
+This writes:
+
+- `book_purchases.csv` / `book_purchases.xlsx`: one row per Amazon book line item
+- `book_metadata.csv` / `book_metadata.xlsx`: one row per unique ISBN-13
+- `library_catalog.csv` / `library_catalog.xlsx`: purchase rows joined to metadata for Excel browsing
+
+The update workflow reuses `output/openlibrary_cache.json` and
+`output/openlibrary_search_cache.json`, so ISBNs and title searches that already
+have answers are not requested again.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

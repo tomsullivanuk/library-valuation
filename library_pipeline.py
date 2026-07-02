@@ -52,6 +52,51 @@ RESOLVED_FIELDNAMES = ENRICHED_FIELDNAMES + [
     "resolved_query",
 ]
 
+BOOK_METADATA_FIELDNAMES = [
+    "isbn13",
+    "isbn10",
+    "asin",
+    "purchase_count",
+    "total_quantity",
+    "first_order_date",
+    "latest_order_date",
+    "representative_product_name",
+    "product_names",
+    "openlibrary_status",
+    "openlibrary_url",
+    "title",
+    "authors",
+    "publishers",
+    "publish_date",
+    "lcc",
+    "dewey",
+    "lccn",
+    "oclc",
+    "subjects",
+    "resolution_source",
+    "resolution_confidence",
+    "resolution_notes",
+    "resolved_query",
+]
+
+LIBRARY_CATALOG_FIELDNAMES = [
+    "lcc",
+    "title",
+    "authors",
+    "purchase_date",
+    "isbn13",
+    "isbn10",
+    "product_name",
+    "quantity",
+    "unit_price",
+    "currency",
+    "order_id",
+    "openlibrary_url",
+    "resolution_source",
+    "resolution_confidence",
+    "subjects",
+]
+
 
 def paired_output_paths(output_path: Path) -> tuple[Path, Path]:
     if output_path.suffix.lower() == ".xlsx":
@@ -291,13 +336,18 @@ def book_candidate_from_row(row: dict[str, str]) -> dict[str, str] | None:
 
 
 def extract_candidates(input_path: Path, output_path: Path) -> int:
+    candidates = extract_candidate_rows(input_path)
+    write_table_outputs(output_path, BOOK_FIELDNAMES, candidates, "Book Candidates")
+    return len(candidates)
+
+
+def extract_candidate_rows(input_path: Path) -> list[dict[str, str]]:
     candidates = []
     for row in iter_amazon_rows(input_path):
         candidate = book_candidate_from_row(row)
         if candidate:
             candidates.append(candidate)
-    write_table_outputs(output_path, BOOK_FIELDNAMES, candidates, "Book Candidates")
-    return len(candidates)
+    return candidates
 
 
 def summarize(input_path: Path) -> dict[str, int]:
@@ -573,6 +623,167 @@ def resolve_missing(input_path: Path, output_path: Path, isbn_cache_path: Path, 
     return counts
 
 
+def update_library(
+    amazon_input: Path,
+    output_dir: Path,
+    isbn_cache_path: Path,
+    search_cache_path: Path,
+    delay: float,
+) -> dict[str, int]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    purchases = extract_candidate_rows(amazon_input)
+    write_table_outputs(output_dir / "book_purchases.csv", BOOK_FIELDNAMES, purchases, "Book Purchases")
+
+    isbn_cache = load_cache(isbn_cache_path)
+    search_cache = load_cache(search_cache_path)
+    metadata_rows = build_book_metadata_rows(
+        purchases,
+        isbn_cache,
+        search_cache,
+        delay,
+        isbn_cache_path=isbn_cache_path,
+        search_cache_path=search_cache_path,
+    )
+    catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
+
+    write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
+    write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
+    save_cache(isbn_cache_path, isbn_cache)
+    save_cache(search_cache_path, search_cache)
+
+    return {
+        "purchase_rows": len(purchases),
+        "unique_books": len(metadata_rows),
+        "metadata_matched": sum(1 for row in metadata_rows if row.get("openlibrary_status") == "matched"),
+        "metadata_with_lcc": sum(1 for row in metadata_rows if row.get("lcc")),
+        "metadata_manual_review": sum(1 for row in metadata_rows if row.get("resolution_source") == "manual_review"),
+    }
+
+
+def build_book_metadata_rows(
+    purchases: list[dict[str, str]],
+    isbn_cache: dict[str, dict],
+    search_cache: dict[str, dict],
+    delay: float,
+    isbn_cache_path: Path | None = None,
+    search_cache_path: Path | None = None,
+) -> list[dict[str, str]]:
+    rows = []
+    for isbn13, group in grouped_purchases(purchases).items():
+        summary = purchase_summary(group)
+        if isbn13 not in isbn_cache:
+            isbn_cache[isbn13] = openlibrary_lookup(isbn13)
+            if isbn_cache_path:
+                save_cache(isbn_cache_path, isbn_cache)
+            time.sleep(delay)
+        enriched = enrich_row(summary, isbn_cache[isbn13])
+        resolved = resolve_row(enriched, isbn_cache, search_cache, delay)
+        if isbn_cache_path:
+            save_cache(isbn_cache_path, isbn_cache)
+        if search_cache_path:
+            save_cache(search_cache_path, search_cache)
+        rows.append(metadata_row(summary, resolved))
+    return sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
+
+
+def grouped_purchases(purchases: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    groups: dict[str, list[dict[str, str]]] = {}
+    for row in purchases:
+        groups.setdefault(row.get("isbn13", ""), []).append(row)
+    return {isbn: rows for isbn, rows in groups.items() if isbn}
+
+
+def purchase_summary(group: list[dict[str, str]]) -> dict[str, str]:
+    sorted_group = sorted(group, key=lambda row: row.get("order_date", ""))
+    first = sorted_group[0]
+    product_names = unique_join(row.get("product_name", "") for row in sorted_group)
+    return {
+        **first,
+        "order_date": first.get("order_date", ""),
+        "product_name": first.get("product_name", ""),
+        "quantity": str(sum(sum_int(row.get("quantity", "")) for row in sorted_group)),
+        "purchase_count": str(len(group)),
+        "total_quantity": str(sum(sum_int(row.get("quantity", "")) for row in group)),
+        "first_order_date": sorted_group[0].get("order_date", ""),
+        "latest_order_date": sorted_group[-1].get("order_date", ""),
+        "representative_product_name": first.get("product_name", ""),
+        "product_names": product_names,
+    }
+
+
+def metadata_row(summary: dict[str, str], resolved: dict[str, str]) -> dict[str, str]:
+    return {
+        "isbn13": summary.get("isbn13", ""),
+        "isbn10": summary.get("isbn10", ""),
+        "asin": summary.get("asin", ""),
+        "purchase_count": summary.get("purchase_count", ""),
+        "total_quantity": summary.get("total_quantity", ""),
+        "first_order_date": summary.get("first_order_date", ""),
+        "latest_order_date": summary.get("latest_order_date", ""),
+        "representative_product_name": summary.get("representative_product_name", ""),
+        "product_names": summary.get("product_names", ""),
+        "openlibrary_status": resolved.get("openlibrary_status", ""),
+        "openlibrary_url": resolved.get("openlibrary_url", ""),
+        "title": resolved.get("title", ""),
+        "authors": resolved.get("authors", ""),
+        "publishers": resolved.get("publishers", ""),
+        "publish_date": resolved.get("publish_date", ""),
+        "lcc": resolved.get("lcc", ""),
+        "dewey": resolved.get("dewey", ""),
+        "lccn": resolved.get("lccn", ""),
+        "oclc": resolved.get("oclc", ""),
+        "subjects": resolved.get("subjects", ""),
+        "resolution_source": resolved.get("resolution_source", ""),
+        "resolution_confidence": resolved.get("resolution_confidence", ""),
+        "resolution_notes": resolved.get("resolution_notes", ""),
+        "resolved_query": resolved.get("resolved_query", ""),
+    }
+
+
+def build_library_catalog_rows(
+    purchases: list[dict[str, str]], metadata_rows: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    metadata_by_isbn = {row.get("isbn13", ""): row for row in metadata_rows}
+    catalog = []
+    for purchase in sorted(purchases, key=lambda row: row.get("order_date", "")):
+        metadata = metadata_by_isbn.get(purchase.get("isbn13", ""), {})
+        catalog.append(
+            {
+                "lcc": metadata.get("lcc", ""),
+                "title": metadata.get("title") or purchase.get("product_name", ""),
+                "authors": metadata.get("authors", ""),
+                "purchase_date": purchase.get("order_date", ""),
+                "isbn13": purchase.get("isbn13", ""),
+                "isbn10": purchase.get("isbn10", ""),
+                "product_name": purchase.get("product_name", ""),
+                "quantity": purchase.get("quantity", ""),
+                "unit_price": purchase.get("unit_price", ""),
+                "currency": purchase.get("currency", ""),
+                "order_id": purchase.get("order_id", ""),
+                "openlibrary_url": metadata.get("openlibrary_url", ""),
+                "resolution_source": metadata.get("resolution_source", ""),
+                "resolution_confidence": metadata.get("resolution_confidence", ""),
+                "subjects": metadata.get("subjects", ""),
+            }
+        )
+    return catalog
+
+
+def sum_int(value: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def unique_join(values) -> str:
+    seen = []
+    for value in values:
+        if value and value not in seen:
+            seen.append(value)
+    return "; ".join(seen)
+
+
 def pct(part: int, whole: int) -> str:
     if whole == 0:
         return "0.0%"
@@ -660,6 +871,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     resolve_parser.add_argument("--delay", type=float, default=0.25)
 
+    update_parser = subparsers.add_parser("update-library")
+    update_parser.add_argument("--amazon-input", required=True, type=Path)
+    update_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    update_parser.add_argument(
+        "--isbn-cache",
+        type=Path,
+        default=Path("output/openlibrary_cache.json"),
+    )
+    update_parser.add_argument(
+        "--search-cache",
+        type=Path,
+        default=Path("output/openlibrary_search_cache.json"),
+    )
+    update_parser.add_argument("--delay", type=float, default=0.25)
+
     return parser
 
 
@@ -686,6 +912,11 @@ def main(argv: list[str] | None = None) -> int:
         csv_path, xlsx_path = paired_output_paths(args.output)
         print(json.dumps(counts, indent=2, sort_keys=True))
         print(f"Wrote resolved rows to {csv_path} and {xlsx_path}")
+        return 0
+    if args.command == "update-library":
+        summary = update_library(args.amazon_input, args.output_dir, args.isbn_cache, args.search_cache, args.delay)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        print(f"Wrote monthly library outputs to {args.output_dir}")
         return 0
     return 2
 
