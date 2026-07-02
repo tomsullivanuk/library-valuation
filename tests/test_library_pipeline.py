@@ -14,6 +14,7 @@ from library_pipeline import (
     text_similarity,
     title_query,
     write_table_outputs,
+    xml_safe_text,
 )
 
 
@@ -110,6 +111,10 @@ def test_title_query_removes_trailing_series_note():
 def test_text_similarity_scores_overlap():
     assert text_similarity("Cell and Psyche", "Cell and psyche") == 1.0
     assert text_similarity("Cell and Psyche", "Elements of Logic") < 0.5
+
+
+def test_xml_safe_text_removes_excel_breaking_control_chars():
+    assert xml_safe_text("Time.\x1e 0") == "Time.  0"
 
 
 def test_build_book_metadata_rows_deduplicates_by_isbn():

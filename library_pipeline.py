@@ -170,9 +170,21 @@ def build_row_xml(row_index: int, values: list[str], style: str | None = None) -
     style_attr = f' s="{style}"' if style else ""
     for col_index, value in enumerate(values, start=1):
         cell_ref = f"{excel_col(col_index)}{row_index}"
-        text = escape(str(value or ""))
+        text = escape(xml_safe_text(value))
         cells.append(f'<c r="{cell_ref}" t="inlineStr"{style_attr}><is><t>{text}</t></is></c>')
     return f'<row r="{row_index}">{"".join(cells)}</row>'
+
+
+def xml_safe_text(value: str) -> str:
+    text = str(value or "")
+    safe_chars = []
+    for char in text[:32767]:
+        codepoint = ord(char)
+        if char in "\t\n\r" or codepoint >= 32 and not (0xD800 <= codepoint <= 0xDFFF) and codepoint not in (0xFFFE, 0xFFFF):
+            safe_chars.append(char)
+        else:
+            safe_chars.append(" ")
+    return "".join(safe_chars)
 
 
 def column_widths(fieldnames: list[str], rows: list[dict[str, str]]) -> list[int]:
