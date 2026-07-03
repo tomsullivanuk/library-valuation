@@ -30,6 +30,9 @@ Source Item --------+
       |             |
       v             v
 Acquisition    Catalog Item ---- Bibliographic Work
+      |              |
+      v              v
+Owned Copy / Inventory Holding
                      |
                      v
               Research Priority
@@ -122,6 +125,8 @@ An `Acquisition` records how a physical or digital item entered the library.
 
 For Amazon, an acquisition is usually a purchase line item. For future sources,
 it may be a donation, estate item, manual entry, or unknown acquisition.
+Acquisition records preserve historical facts. They do not assert that every
+acquired copy is still currently owned.
 
 Fields:
 
@@ -134,15 +139,51 @@ Fields:
 - `unit_price`: purchase price, if known.
 - `currency`: purchase currency, if known.
 - `condition_at_acquisition`: source-provided or user-observed condition.
-- `location`: optional shelf, room, box, or collection location.
 - `provenance_notes`: user-maintained notes about origin or family context.
 
 Data classification:
 
 - Immutable: source-linked purchase facts from imported data.
-- User-maintained: `location`, `provenance_notes`, condition corrections.
+- User-maintained: `provenance_notes` and condition corrections.
 - Derived: acquisition grouping may be derived from source items.
 - Regenerated: source-derived acquisitions may be regenerated from imports.
+
+### Owned Copy / Inventory Holding
+
+An `Owned Copy` or `Inventory Holding` records the current believed inventory
+for a catalog item.
+
+This entity separates historical acquisition facts from present disposition
+reality. A book may have been purchased in multiple copies, partially given
+away, sold, donated, misplaced, retained, or combined into a collection. Current
+valuation and disposition decisions should use holdings, not raw acquisition
+quantity.
+
+Fields:
+
+- `holding_id`: stable internal identifier.
+- `catalog_item_id`: linked catalog item.
+- `acquisition_id`: optional originating acquisition, when the holding can be
+  traced to a specific acquisition.
+- `quantity_current`: current believed quantity represented by this holding.
+- `inventory_status`: owned, retained, sold, donated, given_away, missing,
+  discarded, pending_review, unknown.
+- `condition_current`: current observed condition.
+- `location`: shelf, room, box, collection, or storage location.
+- `last_verified_at`: date or timestamp when the holding was last confirmed.
+- `verified_by`: user or process that verified the holding.
+- `notes`: user-maintained inventory or disposition notes.
+
+Data classification:
+
+- Immutable: `holding_id` should not change once assigned.
+- Derived: initial holdings may be generated from acquisitions and source
+  quantity.
+- User-maintained: `quantity_current`, `inventory_status`,
+  `condition_current`, `location`, `last_verified_at`, `verified_by`, and
+  `notes`.
+- Regenerated: proposed initial holdings may be regenerated from acquisitions,
+  but verified holdings and disposition updates must not be overwritten.
 
 ### Catalog Item
 
@@ -325,6 +366,8 @@ Fields:
 
 - `valuation_estimate_id`: stable internal identifier.
 - `catalog_item_id`: linked catalog item.
+- `holding_id`: optional linked holding when condition, quantity, or location
+  affects the estimate.
 - `estimate_version`: valuation rules version.
 - `estimated_at`: timestamp.
 - `retail_low`: conservative retail estimate.
@@ -355,6 +398,8 @@ Fields:
 
 - `decision_id`: stable internal identifier.
 - `catalog_item_id`: linked catalog item.
+- `holding_id`: linked holding when the decision applies to a current owned
+  copy or quantity.
 - `valuation_estimate_id`: estimate used, when relevant.
 - `decision_type`: sell_individually, sell_as_collection, research_further,
   donate, retain, ignore_for_resale, undecided.
@@ -405,6 +450,10 @@ Core relationships:
 - One `Source Item` may produce one or more `Acquisitions`.
 - One `Acquisition` links to one `Catalog Item`.
 - One `Catalog Item` may have many `Acquisitions`.
+- One `Acquisition` may initialize one or more `Owned Copy / Inventory Holding`
+  records.
+- One `Owned Copy / Inventory Holding` links to one `Catalog Item`.
+- One `Catalog Item` may have many `Owned Copy / Inventory Holding` records.
 - One `Catalog Item` may link to one `Bibliographic Work`.
 - One `Bibliographic Work` may group many `Catalog Items`.
 - One `Catalog Item` may have many `Bibliographic Source Records`.
@@ -412,7 +461,11 @@ Core relationships:
 - One `Catalog Item` may have many `Market Observations`.
 - One `Valuation Estimate` may use many `Market Observations`.
 - One `Catalog Item` may have many historical `Valuation Estimates`.
+- One `Owned Copy / Inventory Holding` may have many historical `Valuation
+  Estimates`.
 - One `Catalog Item` may have many proposed or historical `Decisions`.
+- One `Owned Copy / Inventory Holding` may have many proposed or historical
+  `Decisions`.
 - One `Generated Artifact` may include many records from many entities.
 
 Identity rules:
@@ -423,8 +476,10 @@ Identity rules:
 - Multiple source items may refer to the same catalog item.
 - One source item may become more than one catalog item when a row represents a
   set, bundle, or ambiguous multi-volume purchase.
-- Duplicate copies should remain visible through acquisitions even when they
-  share one catalog item.
+- Duplicate copies should remain visible through holdings even when they share
+  one catalog item.
+- Acquisition quantity is historical. `quantity_current` on holdings is the
+  current believed inventory quantity used for valuation and disposition.
 
 ## Data Lifecycle
 
@@ -440,6 +495,7 @@ Examples:
 - original purchase facts from Amazon or future source imports;
 - market observations captured at a point in time;
 - historical valuation estimates used in a report;
+- verified historical changes to inventory status;
 - completed decisions.
 
 Corrections should be represented as new records, overrides, or annotations so
@@ -455,6 +511,7 @@ Examples:
 - normalized ISBNs;
 - ISBN-13 converted from ISBN-10;
 - canonical title selected from enrichment sources;
+- initial holdings generated from acquisition quantity;
 - research priority score and reasons;
 - valuation estimate ranges;
 - proposed decision recommendations.
@@ -470,7 +527,11 @@ Examples:
 
 - manual bibliographic corrections;
 - manual match confirmations;
+- current inventory quantities;
+- inventory status;
+- current condition;
 - location and shelf notes;
+- holding verification dates and verifier names;
 - family or historical significance notes;
 - comparable-quality assessment for market observations;
 - accepted decisions and decision rationale;
@@ -488,6 +549,7 @@ Examples:
 - CSV and XLSX catalog outputs;
 - valuation workbooks;
 - research queues;
+- inventory views;
 - dealer prospectuses;
 - collection reports;
 - score tables;
@@ -505,16 +567,20 @@ Expected workbook tabs can map directly to the model:
 
 - `Catalog`: current `Catalog Item` view plus acquisition summary.
 - `Acquisitions`: source-linked acquisition history.
+- `Holdings`: current believed inventory, condition, location, verification
+  state, and disposition status.
 - `Research Queue`: latest `Research Priority` per catalog item.
 - `Market Research`: editable or importable view of `Market Observations`.
-- `Valuation`: latest `Valuation Estimate` per catalog item.
-- `Decisions`: proposed and accepted `Decisions`.
+- `Valuation`: latest `Valuation Estimate` per catalog item or holding.
+- `Decisions`: proposed and accepted `Decisions`, usually tied to holdings when
+  the action concerns current inventory.
 - `Summary`: derived aggregate views by subject, LCC, value band, decision, and
   confidence.
 
 Manual edits in workbooks should not become canonical automatically. Any
 workbook import path should explicitly map edited rows back to user-maintained
-entities such as market observations, notes, overrides, or accepted decisions.
+entities such as holdings, market observations, notes, overrides, or accepted
+decisions.
 
 ## Market Research Support
 
@@ -541,6 +607,7 @@ judgment.
 The model supports:
 
 - multiple historical estimates per catalog item;
+- holding-level estimates when current quantity or condition matters;
 - explicit confidence levels;
 - separate retail and dealer ranges;
 - traceability from estimate to market observations;
@@ -568,9 +635,9 @@ Examples:
 - library exports can provide existing classifications and subject headings.
 
 The import layer should preserve source evidence while the resolution layer
-decides how records map into the canonical catalog. This allows the system to
-accept new sources without making Amazon-specific fields the permanent shape of
-the project.
+decides how records map into the canonical catalog and current holdings. This
+allows the system to accept new sources without making Amazon-specific fields
+the permanent shape of the project.
 
 ## Regeneration Rules
 
@@ -578,6 +645,8 @@ The system should follow these rules when rebuilding outputs:
 
 - Do not mutate immutable source evidence.
 - Do not overwrite user-maintained data with generated values.
+- Do not overwrite verified holding quantities, statuses, conditions, or
+  locations with regenerated acquisition-derived assumptions.
 - Preserve historical market observations and completed decisions.
 - Recompute derived fields when their rules or inputs change.
 - Regenerate artifacts from canonical data rather than editing them in place.
