@@ -1,3 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
 __pycache__/
 *.py[cod]
-.DS_Store
+.pytest_cache/
+
+# Virtual Environments
+.venv/
+venv/
+
+# Local Caches
+.cache/
+
+# Excel
+~$*.xlsx
+
+# Generated Reports
+output/reports/
