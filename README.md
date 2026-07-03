@@ -43,6 +43,23 @@ bibliographic APIs.
 The extraction step intentionally excludes billing address, shipping address,
 tracking number, payment method, gift fields, and other personal columns.
 
+## Developer Setup
+
+Create and activate the project virtual environment, then install dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Before committing, run the compile check and tests:
+
+```bash
+python -m compileall .
+pytest
+```
+
 ## Usage
 
 Monthly update from a fresh full Amazon export:
