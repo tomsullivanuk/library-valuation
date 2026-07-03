@@ -1,0 +1,18 @@
+tiers:
+  university_press:
+    weight: 1.0
+    examples:
+      - Oxford University Press
+      - Cambridge University Press
+      - University of Chicago Press
+  specialist_trade:
+    weight: 0.75
+    examples:
+      - Routledge
+      - MIT Press
+  general_trade:
+    weight: 0.45
+    examples:
+      - Penguin
+      - HarperCollins
+

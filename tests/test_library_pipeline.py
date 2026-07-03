@@ -13,6 +13,7 @@ from library_pipeline import (
     paired_output_paths,
     text_similarity,
     title_query,
+    valuation_extension_context,
     write_table_outputs,
     xml_safe_text,
 )
@@ -180,3 +181,18 @@ def test_build_library_catalog_rows_joins_metadata():
 
     assert catalog[0]["title"] == "Cognitive neuroscience"
     assert catalog[0]["lcc"] == "QP360.5"
+
+
+def test_valuation_extension_context_names_post_catalog_handoff():
+    purchases = [{"isbn13": "9780198786221"}]
+    metadata = [{"isbn13": "9780198786221", "title": "Cognitive neuroscience"}]
+    catalog = [{"isbn13": "9780198786221", "title": "Cognitive neuroscience"}]
+
+    context = valuation_extension_context(purchases, metadata, catalog)
+
+    assert context == {
+        "stage": "post_catalog_rows",
+        "purchases": purchases,
+        "metadata_rows": metadata,
+        "catalog_rows": catalog,
+    }

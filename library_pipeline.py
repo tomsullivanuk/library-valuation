@@ -97,6 +97,26 @@ LIBRARY_CATALOG_FIELDNAMES = [
     "subjects",
 ]
 
+VALUATION_EXTENSION_STAGE = "post_catalog_rows"
+
+
+def valuation_extension_context(
+    purchases: list[dict[str, str]],
+    metadata_rows: list[dict[str, str]],
+    catalog_rows: list[dict[str, str]],
+) -> dict[str, list[dict[str, str]] | str]:
+    """Return the stable handoff shape for future valuation generation.
+
+    The existing pipeline does not generate valuation outputs yet; this context
+    simply names the post-catalog extension point for a later sprint.
+    """
+    return {
+        "stage": VALUATION_EXTENSION_STAGE,
+        "purchases": purchases,
+        "metadata_rows": metadata_rows,
+        "catalog_rows": catalog_rows,
+    }
+
 
 def paired_output_paths(output_path: Path) -> tuple[Path, Path]:
     if output_path.suffix.lower() == ".xlsx":

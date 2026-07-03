@@ -1,0 +1,14 @@
+subjects:
+  B:
+    label: Philosophy, Psychology, Religion
+    valuation_signal: 0.70
+  H:
+    label: Social Sciences
+    valuation_signal: 0.60
+  P:
+    label: Language and Literature
+    valuation_signal: 0.55
+  Q:
+    label: Science
+    valuation_signal: 0.65
+
