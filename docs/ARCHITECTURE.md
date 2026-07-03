@@ -1,0 +1,215 @@
+# Architecture
+
+## Project Purpose
+
+Library Valuation is an open, reproducible system for cataloging, analyzing,
+valuing, and supporting decisions about scholarly and personal libraries.
+
+The current implementation focuses on building a privacy-conscious book catalog
+from Amazon order-history exports and enriching those rows with bibliographic
+metadata. The long-term project is broader: help identify which books deserve
+individual research, which books may be sold individually or as collections,
+which books are unlikely to justify resale effort, and which books should be
+retained for historical or family reasons.
+
+The project should preserve evidence and minimize manual effort. Human judgment
+belongs in review and decision points, not in hand-editing generated outputs.
+
+## Current Architecture
+
+The current system is a compact Python command-line pipeline implemented in
+`library_pipeline.py`, with tests in `tests/test_library_pipeline.py`.
+
+The pipeline currently handles:
+
+- Amazon order-history CSV ingestion.
+- ASIN classification.
+- ISBN-10 validation and ISBN-13 conversion.
+- Extraction of likely physical-book purchases.
+- Privacy filtering of Amazon export fields.
+- Open Library lookup by ISBN.
+- Open Library fallback resolution by ISBN-10 and title search.
+- Local JSON caching of Open Library ISBN and search responses.
+- Generation of CSV and XLSX artifacts.
+- Basic enrichment coverage analysis.
+
+At this stage, most responsibilities live in one file. That is acceptable for
+the current scale, but the code already contains natural boundaries that should
+be separated as the project grows.
+
+## Current Data Flow
+
+The current monthly workflow starts with a fresh Amazon order-history export.
+
+```text
+Amazon order-history CSV
+        |
+        v
+ASIN classification and ISBN validation
+        |
+        v
+Book purchase extraction
+        |
+        v
+Unique ISBN grouping
+        |
+        v
+Open Library enrichment
+        |
+        v
+Fallback resolution for missing records
+        |
+        v
+Normalized metadata and catalog outputs
+        |
+        v
+CSV/XLSX artifacts for browsing and review
+```
+
+The main `update-library` command writes:
+
+- `book_purchases.csv` and `book_purchases.xlsx`: one row per Amazon book line
+  item.
+- `book_metadata.csv` and `book_metadata.xlsx`: one row per unique ISBN-13.
+- `library_catalog.csv` and `library_catalog.xlsx`: purchase rows joined to
+  metadata for browsing.
+
+The workflow also reuses:
+
+- `openlibrary_cache.json` for ISBN lookups.
+- `openlibrary_search_cache.json` for title-search lookups.
+
+These caches reduce repeated external requests and help preserve reproducible
+results for a given run.
+
+## Source-of-Truth Principle
+
+The normalized catalog is the source of truth.
+
+Generated spreadsheets, reports, dashboards, and review workbooks are outputs.
+They should not become the canonical data store, and the catalog should not be
+reshaped just to make a report convenient.
+
+If a downstream artifact needs a different layout, that layout should be created
+by a transformation step. The underlying catalog should remain stable,
+normalized, and reproducible from source data plus documented enrichment inputs.
+
+## Data Separation
+
+The system should keep distinct categories of information separate:
+
+- Catalog data: bibliographic and acquisition facts such as ISBN, title,
+  authors, publishers, classifications, purchase date, and source identifiers.
+- Market research: observed listings, completed sales, dealer notes, source
+  URLs, capture dates, condition observations, and comparable-copy evidence.
+- Valuation estimates: derived retail estimates, dealer-value estimates,
+  confidence levels, and rationale.
+- Decisions: recommendations such as sell individually, group by subject,
+  donate, retain, research further, or ignore for resale.
+
+This separation matters because each layer changes at a different pace.
+Bibliographic facts should remain stable. Market observations can expire.
+Valuation estimates may change as pricing strategy improves. Decisions may
+depend on family goals, time constraints, and risk tolerance.
+
+## Planned Future Architecture
+
+The long-term architecture should evolve from a catalog generator into a
+decision-support system.
+
+```text
+Book Sources
+      |
+      v
+Normalized Library Catalog
+      |
+      v
+Analysis Engine
+      |
+      v
+Decision Engine
+      |
+      +-- Valuation Workbook
+      +-- Research Queue
+      +-- Dealer Prospectus
+      +-- Collection Analytics
+      +-- Estate Reports
+      +-- Family Retention Lists
+```
+
+Future book sources may include Amazon exports, manual intake sheets, barcode
+scans, estate inventories, dealer-provided lists, or other catalog exports.
+
+Future enrichment and valuation sources may include Open Library, Library of
+Congress, OCLC/WorldCat, AbeBooks, eBay completed sales, Bookfinder, Amazon
+Used, and other reputable secondary-market data. Each source should retain
+provenance so that users can understand where facts and estimates came from.
+
+## Expected Module Boundaries
+
+The current single-file pipeline should eventually be split along responsibility
+boundaries. Expected modules include:
+
+- Source importers: read Amazon exports and future source formats.
+- ISBN and identifier utilities: normalize, validate, classify, and convert
+  identifiers.
+- Catalog model: define normalized catalog records and schema-level behavior.
+- Bibliographic enrichment clients: query Open Library, Library of Congress,
+  OCLC/WorldCat, and other bibliographic sources.
+- Cache and provenance handling: store raw responses, source timestamps, and
+  reproducibility metadata.
+- Resolution and matching: manage exact ISBN matches, title fallbacks, duplicate
+  handling, confidence scores, and manual-review queues.
+- Market research collectors: gather and normalize market observations.
+- Valuation engine: turn market evidence and heuristics into estimates.
+- Decision engine: generate recommendations from catalog facts, market
+  evidence, valuation estimates, and user priorities.
+- Artifact writers: produce CSV, XLSX, reports, dashboards, and workbooks.
+- CLI orchestration: expose workflows without embedding business logic in
+  command handlers.
+
+Business logic should live in the relevant domain modules, not in output
+formatting code or command-line glue.
+
+## Generated Artifacts Policy
+
+Generated artifacts are useful working products, not canonical project state.
+
+CSV, XLSX, reports, dashboards, and review queues should be reproducible from
+source inputs, caches, configuration, and code. Manual edits to generated Excel
+files should not be treated as durable data unless they are imported back
+through an explicit, documented workflow.
+
+The project should distinguish between:
+
+- Source inputs that represent original evidence.
+- Caches that preserve external enrichment responses.
+- Normalized catalog data that acts as the durable project dataset.
+- Generated artifacts for browsing, analysis, review, and communication.
+
+When generated files are committed, the reason should be clear: for example,
+sample outputs, reproducibility checkpoints, or user-facing deliverables.
+
+## Testing Expectations
+
+Tests should protect the parts of the system that are most likely to corrupt
+catalog data or user trust.
+
+Current tests cover ISBN validation, ISBN conversion, ASIN classification,
+privacy filtering, enrichment analysis, XLSX generation, title-query cleanup,
+text similarity, metadata deduplication, and catalog joins.
+
+As the system grows, tests should also cover:
+
+- End-to-end workflow behavior for `update-library`.
+- Cache reads, writes, and reuse.
+- Batch lookup behavior.
+- Matching thresholds and manual-review routing.
+- Duplicate ISBN and edition ambiguity handling.
+- Schema stability for catalog, market research, valuation, and decision data.
+- Artifact generation from normalized data.
+- Failure behavior when external services are unavailable or incomplete.
+
+Network-dependent behavior should be isolated behind clients that can be tested
+with fixtures or cached responses. Core catalog, matching, valuation, and
+decision logic should be testable without live network access.
