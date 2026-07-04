@@ -1,4 +1,5 @@
 import hashlib
+import os
 import zipfile
 from pathlib import Path
 
@@ -15,7 +16,9 @@ from library_pipeline import (
     build_research_assessment,
     build_parser,
     classify_asin,
+    discover_amazon_export,
     file_sha256,
+    format_update_summary,
     format_catalog_item_id,
     is_valid_isbn10,
     is_valid_isbn13,
@@ -23,6 +26,7 @@ from library_pipeline import (
     load_acquisitions,
     load_catalog_items,
     load_research_assessments,
+    main,
     paired_output_paths,
     reconcile_research_assessments,
     reconcile_catalog_items,
@@ -852,6 +856,73 @@ def test_update_library_input_dir_is_root_input_directory():
     assert args.input_dir == Path("input")
 
 
+def test_update_library_amazon_input_is_optional():
+    args = build_parser().parse_args(["update-library"])
+
+    assert args.amazon_input is None
+
+
+def test_discover_amazon_export_finds_only_candidate(tmp_path):
+    amazon_dir = tmp_path / "input" / "amazon"
+    amazon_dir.mkdir(parents=True)
+    export = amazon_dir / "Your Orders.zip"
+    export.write_text("zip-ish", encoding="utf-8")
+
+    assert discover_amazon_export(amazon_dir) == export
+
+
+def test_discover_amazon_export_chooses_newest_candidate(tmp_path):
+    amazon_dir = tmp_path / "input" / "amazon"
+    amazon_dir.mkdir(parents=True)
+    old_export = amazon_dir / "old.csv"
+    new_export = amazon_dir / "new.zip"
+    old_export.write_text("old", encoding="utf-8")
+    new_export.write_text("new", encoding="utf-8")
+    old_time = 1_700_000_000
+    new_time = 1_700_000_100
+    old_export.touch()
+    new_export.touch()
+    os.utime(old_export, (old_time, old_time))
+    os.utime(new_export, (new_time, new_time))
+
+    assert discover_amazon_export(amazon_dir) == new_export
+
+
+def test_discover_amazon_export_raises_when_input_amazon_is_empty(tmp_path):
+    amazon_dir = tmp_path / "input" / "amazon"
+    amazon_dir.mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="No Amazon exports found"):
+        discover_amazon_export(amazon_dir)
+
+
+def test_format_update_summary_includes_selected_export_and_key_counts():
+    summary = {
+        "amazon_export": "input/amazon/Your Orders.zip",
+        "amazon_row_count": 10,
+        "purchase_rows": 4,
+        "catalog_existing": 3,
+        "catalog_new": 1,
+        "acquisition_rows": 4,
+        "research_reused": 3,
+        "research_created": 1,
+        "manifest_entries": 2,
+    }
+
+    output = format_update_summary(summary, Path("output"))
+
+    assert "Amazon export:\n  input/amazon/Your Orders.zip" in output
+    assert "Amazon rows processed:      10" in output
+    assert "Book candidates:            4" in output
+    assert "  Existing:                 3" in output
+    assert "  New:                      1" in output
+    assert "  Rebuilt:                  4" in output
+    assert "  Reused:                   3" in output
+    assert "  Created:                  1" in output
+    assert "Manifest entries:           2" in output
+    assert "output/library_catalog.xlsx" in output
+
+
 def test_write_table_outputs_creates_csv_and_xlsx(tmp_path):
     output = tmp_path / "books.csv"
     rows = [{"isbn13": "9780198786221", "title": "Cognitive neuroscience"}]
@@ -1063,6 +1134,133 @@ def test_update_library_accepts_zip_order_export_package(tmp_path):
     assert len(load_acquisitions(paths.acquisitions_path)) == 1
     manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
     assert manifest_rows[0]["filename"] == "Order History.csv"
+
+
+def test_main_update_library_auto_discovers_export_and_prints_summary(tmp_path, capsys):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    amazon_input = write_amazon_history(
+        paths.amazon_input_dir / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    isbn_cache, search_cache = write_monthly_workflow_caches(tmp_path)
+
+    result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+            "--isbn-cache",
+            str(isbn_cache),
+            "--search-cache",
+            str(search_cache),
+            "--delay",
+            "0",
+        ]
+    )
+
+    captured = capsys.readouterr().out
+    assert result == 0
+    assert f"Using Amazon export:\n  {amazon_input}" in captured
+    assert "Amazon rows processed:      1" in captured
+    assert "Book candidates:            1" in captured
+    assert "Manifest entries:           1" in captured
+    assert str(paths.output_dir / "library_catalog.xlsx") in captured
+
+
+def test_main_update_library_explicit_amazon_input_overrides_discovery(tmp_path, capsys):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    discovered = write_amazon_history(
+        paths.amazon_input_dir / "newer.csv",
+        [
+            {
+                "asin": "006157127X",
+                "order_date": "2022-01-15T12:00:00Z",
+                "order_id": "2",
+                "product_name": "The Printing Revolution in Early Modern Europe",
+                "quantity": "1",
+                "unit_price": "14.50",
+            }
+        ],
+    )
+    explicit = write_amazon_history(
+        tmp_path / "explicit.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    os.utime(discovered, (1_700_000_200, 1_700_000_200))
+    os.utime(explicit, (1_700_000_000, 1_700_000_000))
+    isbn_cache, search_cache = write_monthly_workflow_caches(tmp_path)
+
+    result = main(
+        [
+            "update-library",
+            "--amazon-input",
+            str(explicit),
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+            "--isbn-cache",
+            str(isbn_cache),
+            "--search-cache",
+            str(search_cache),
+            "--delay",
+            "0",
+        ]
+    )
+
+    captured = capsys.readouterr().out
+    assert result == 0
+    assert f"Using Amazon export:\n  {explicit}" in captured
+    assert str(discovered) not in captured
+    assert catalog_ids_by_isbn(paths) == {"9780198786221": "BK000001"}
 
 
 def test_update_library_appends_manifest_rows_for_multiple_imports(tmp_path):

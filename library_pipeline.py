@@ -792,7 +792,7 @@ def update_library(
     search_cache_path: Path,
     delay: float,
     paths: LibraryPaths | None = None,
-) -> dict[str, int]:
+) -> dict[str, int | str]:
     if paths is None:
         paths = LibraryPaths(output_dir=output_dir)
     paths.ensure_directories()
@@ -831,7 +831,8 @@ def update_library(
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
     save_cache(isbn_cache_path, isbn_cache)
     save_cache(search_cache_path, search_cache)
-    ImportManifestRepository(paths.import_manifest_path).append(
+    manifest_repository = ImportManifestRepository(paths.import_manifest_path)
+    manifest_repository.append(
         build_import_manifest_row(
             filename=manifest_source_filename,
             file_hash=manifest_source_hash,
@@ -843,13 +844,33 @@ def update_library(
             acquisitions=acquisitions,
         )
     )
+    final_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
+    assessed_catalog_item_ids = {
+        row.get("catalog_item_id", "")
+        for row in existing_assessments
+        if row.get("catalog_item_id")
+    }
+    current_metadata_catalog_item_ids = {
+        row.get("catalog_item_id", "")
+        for row in metadata_rows
+        if row.get("catalog_item_id")
+    }
+    created_assessment_count = len(current_metadata_catalog_item_ids - assessed_catalog_item_ids)
 
     return {
+        "amazon_export": str(amazon_input),
+        "amazon_row_count": amazon_row_count,
         "purchase_rows": len(purchases),
         "unique_books": len(metadata_rows),
         "metadata_matched": sum(1 for row in metadata_rows if row.get("openlibrary_status") == "matched"),
         "metadata_with_lcc": sum(1 for row in metadata_rows if row.get("lcc")),
         "metadata_manual_review": sum(1 for row in metadata_rows if row.get("resolution_source") == "manual_review"),
+        "catalog_existing": sum(1 for row in metadata_rows if row.get("catalog_item_id") in existing_catalog_item_ids),
+        "catalog_new": len(final_catalog_item_ids - existing_catalog_item_ids),
+        "acquisition_rows": len(acquisitions),
+        "research_reused": sum(1 for catalog_item_id in current_metadata_catalog_item_ids if catalog_item_id in assessed_catalog_item_ids),
+        "research_created": created_assessment_count,
+        "manifest_entries": len(manifest_repository.load()),
     }
 
 
@@ -1446,6 +1467,45 @@ def analyze_enrichment(input_path: Path) -> dict[str, str | int]:
     }
 
 
+def discover_amazon_export(amazon_input_dir: Path) -> Path:
+    if not amazon_input_dir.exists():
+        raise ValueError(f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input.")
+    candidates = sorted(
+        path
+        for path in amazon_input_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in {".csv", ".zip"}
+    )
+    if not candidates:
+        raise ValueError(f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input.")
+    if len(candidates) == 1:
+        return candidates[0]
+    return max(candidates, key=lambda path: (path.stat().st_mtime, str(path)))
+
+
+def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> str:
+    return "\n".join(
+        [
+            "Amazon export:",
+            f"  {summary.get('amazon_export', '')}",
+            f"Amazon rows processed:      {summary.get('amazon_row_count', 0)}",
+            f"Book candidates:            {summary.get('purchase_rows', 0)}",
+            "Catalog",
+            f"  Existing:                 {summary.get('catalog_existing', 0)}",
+            f"  New:                      {summary.get('catalog_new', 0)}",
+            "Acquisitions",
+            f"  Rebuilt:                  {summary.get('acquisition_rows', 0)}",
+            "Research Priority",
+            f"  Reused:                   {summary.get('research_reused', 0)}",
+            f"  Created:                  {summary.get('research_created', 0)}",
+            f"Manifest entries:           {summary.get('manifest_entries', 0)}",
+            "Outputs",
+            f"  {output_dir / 'book_purchases.xlsx'}",
+            f"  {output_dir / 'book_metadata.xlsx'}",
+            f"  {output_dir / 'library_catalog.xlsx'}",
+        ]
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1487,7 +1547,7 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_parser.add_argument("--delay", type=float, default=0.25)
 
     update_parser = subparsers.add_parser("update-library")
-    update_parser.add_argument("--amazon-input", required=True, type=Path)
+    update_parser.add_argument("--amazon-input", type=Path)
     update_parser.add_argument("--input-dir", type=Path, default=Path("input"))
     update_parser.add_argument("--data-dir", type=Path, default=Path("data"))
     update_parser.add_argument("--cache-dir", type=Path, default=Path("cache"))
@@ -1542,16 +1602,18 @@ def main(argv: list[str] | None = None) -> int:
             config_dir=args.config_dir,
             output_dir=args.output_dir,
         )
+        amazon_input = args.amazon_input or discover_amazon_export(paths.amazon_input_dir)
+        print("Using Amazon export:")
+        print(f"  {amazon_input}")
         summary = update_library(
-            args.amazon_input,
+            amazon_input,
             args.output_dir,
             args.isbn_cache,
             args.search_cache,
             args.delay,
             paths=paths,
         )
-        print(json.dumps(summary, indent=2, sort_keys=True))
-        print(f"Wrote monthly library outputs to {args.output_dir}")
+        print(format_update_summary(summary, args.output_dir))
         return 0
     return 2
 
