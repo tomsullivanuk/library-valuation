@@ -987,6 +987,148 @@ def test_update_library_appends_manifest_rows_for_multiple_imports(tmp_path):
     assert [row["catalog_matches"] for row in manifest_rows] == ["0", "1"]
 
 
+def test_update_library_monthly_incremental_workflow_regression(tmp_path):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    isbn_cache, search_cache = write_monthly_workflow_caches(tmp_path)
+    history_a = write_amazon_history(
+        paths.amazon_input_dir / "history-a.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    history_b = write_amazon_history(
+        paths.amazon_input_dir / "history-b.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            },
+            {
+                "asin": "006157127X",
+                "order_date": "2022-01-15T12:00:00Z",
+                "order_id": "2",
+                "product_name": "The Printing Revolution in Early Modern Europe",
+                "quantity": "1",
+                "unit_price": "14.50",
+            },
+        ],
+    )
+
+    update_library(history_a, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    run1_catalog_ids = catalog_ids_by_isbn(paths)
+    run1_acquisition_ids = acquisition_ids(paths)
+    run1_assessment_count = len(load_research_assessments(paths.research_priority_assessments_path))
+    assert paths.catalog_items_path.exists()
+    assert paths.acquisitions_path.exists()
+    assert paths.import_manifest_path.exists()
+    assert paths.research_priority_assessments_path.exists()
+    assert len(ImportManifestRepository(paths.import_manifest_path).load()) == 1
+    assert run1_catalog_ids == {"9780198786221": "BK000001"}
+    assert len(run1_acquisition_ids) == 1
+    assert run1_assessment_count == 1
+    assert_monthly_outputs_exist(paths)
+
+    update_library(history_a, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    assert catalog_ids_by_isbn(paths) == run1_catalog_ids
+    assert acquisition_ids(paths) == run1_acquisition_ids
+    assert len(load_research_assessments(paths.research_priority_assessments_path)) == run1_assessment_count
+    assert len(ImportManifestRepository(paths.import_manifest_path).load()) == 2
+    assert_monthly_outputs_exist(paths)
+
+    update_library(history_b, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    run3_catalog_ids = catalog_ids_by_isbn(paths)
+    run3_assessments = load_research_assessments(paths.research_priority_assessments_path)
+    assert run3_catalog_ids["9780198786221"] == run1_catalog_ids["9780198786221"]
+    assert set(run3_catalog_ids) == {"9780198786221", "9780061571275"}
+    assert run3_catalog_ids["9780061571275"] == "BK000002"
+    assert len(run3_catalog_ids) == len(run1_catalog_ids) + 1
+    assert len(run3_assessments) == run1_assessment_count + 1
+    assert len(load_acquisitions(paths.acquisitions_path)) == len(run1_acquisition_ids) + 1
+    assert len(ImportManifestRepository(paths.import_manifest_path).load()) == 3
+    assert_monthly_outputs_exist(paths)
+
+
+def write_monthly_workflow_caches(tmp_path):
+    isbn_cache = tmp_path / "output" / "openlibrary_cache.json"
+    search_cache = tmp_path / "output" / "openlibrary_search_cache.json"
+    isbn_cache.parent.mkdir()
+    isbn_cache.write_text(
+        "\n".join(
+            [
+                "{",
+                '  "9780198786221": {"title": "Cognitive neuroscience", "authors": [{"name": "Richard Passingham"}], "publishers": [{"name": "Oxford"}], "publish_date": "2016"},',
+                '  "9780061571275": {"title": "The Printing Revolution in Early Modern Europe", "authors": [{"name": "Elizabeth Eisenstein"}], "publishers": [{"name": "Cambridge"}], "publish_date": "2012"}',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    search_cache.write_text("{}", encoding="utf-8")
+    return isbn_cache, search_cache
+
+
+def write_amazon_history(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["ASIN,Order Date,Order ID,Product Name,Product Condition,Original Quantity,Unit Price,Currency,Website"]
+    for row in rows:
+        lines.append(
+            ",".join(
+                [
+                    row["asin"],
+                    row["order_date"],
+                    row["order_id"],
+                    row["product_name"],
+                    "New",
+                    row["quantity"],
+                    row["unit_price"],
+                    "USD",
+                    "Amazon.com",
+                ]
+            )
+        )
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+def catalog_ids_by_isbn(paths):
+    return {row["isbn13"]: row["catalog_item_id"] for row in load_catalog_items(paths.catalog_items_path)}
+
+
+def acquisition_ids(paths):
+    return [row["acquisition_id"] for row in load_acquisitions(paths.acquisitions_path)]
+
+
+def assert_monthly_outputs_exist(paths):
+    assert (paths.output_dir / "book_purchases.csv").exists()
+    assert (paths.output_dir / "book_purchases.xlsx").exists()
+    assert (paths.output_dir / "book_metadata.csv").exists()
+    assert (paths.output_dir / "book_metadata.xlsx").exists()
+    assert (paths.output_dir / "library_catalog.csv").exists()
+    assert (paths.output_dir / "library_catalog.xlsx").exists()
+
+
 def test_valuation_extension_context_names_post_catalog_handoff():
     purchases = [{"isbn13": "9780198786221"}]
     metadata = [{"isbn13": "9780198786221", "title": "Cognitive neuroscience"}]
