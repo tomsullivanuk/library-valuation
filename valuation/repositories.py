@@ -35,6 +35,22 @@ ACQUISITION_FIELDNAMES = [
     "isbn10",
 ]
 
+IMPORT_MANIFEST_FIELDNAMES = [
+    "import_id",
+    "filename",
+    "file_hash",
+    "imported_at",
+    "pipeline_version",
+    "schema_version",
+    "amazon_row_count",
+    "book_candidates",
+    "catalog_matches",
+    "new_catalog_items",
+    "acquisition_rows",
+    "status",
+    "notes",
+]
+
 
 class CsvRepository:
     fieldnames: list[str] = []
@@ -62,3 +78,16 @@ class CatalogRepository(CsvRepository):
 
 class AcquisitionRepository(CsvRepository):
     fieldnames = ACQUISITION_FIELDNAMES
+
+
+class ImportManifestRepository(CsvRepository):
+    fieldnames = IMPORT_MANIFEST_FIELDNAMES
+
+    def append(self, row: dict[str, str]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        should_write_header = not self.path.exists() or self.path.stat().st_size == 0
+        with self.path.open("a", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=self.fieldnames)
+            if should_write_header:
+                writer.writeheader()
+            writer.writerow({field: row.get(field, "") for field in self.fieldnames})

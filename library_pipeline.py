@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -23,6 +24,7 @@ from valuation.repositories import (
     CATALOG_ITEMS_FIELDNAMES,
     AcquisitionRepository,
     CatalogRepository,
+    ImportManifestRepository,
 )
 
 
@@ -109,6 +111,8 @@ LIBRARY_CATALOG_FIELDNAMES = [
 ]
 
 VALUATION_EXTENSION_STAGE = "post_catalog_rows"
+PIPELINE_VERSION = "0.2.0"
+SCHEMA_VERSION = "1"
 
 
 @dataclass(frozen=True)
@@ -138,6 +142,10 @@ class LibraryPaths:
     @property
     def acquisitions_path(self) -> Path:
         return self.data_dir / "acquisitions.csv"
+
+    @property
+    def import_manifest_path(self) -> Path:
+        return self.data_dir / "import_manifest.csv"
 
     def ensure_directories(self) -> None:
         for path in (
@@ -426,12 +434,19 @@ def extract_candidates(input_path: Path, output_path: Path) -> int:
 
 
 def extract_candidate_rows(input_path: Path) -> list[dict[str, str]]:
+    candidates, _row_count = extract_candidate_rows_with_count(input_path)
+    return candidates
+
+
+def extract_candidate_rows_with_count(input_path: Path) -> tuple[list[dict[str, str]], int]:
     candidates = []
+    row_count = 0
     for row in iter_amazon_rows(input_path):
+        row_count += 1
         candidate = book_candidate_from_row(row)
         if candidate:
             candidates.append(candidate)
-    return candidates
+    return candidates, row_count
 
 
 def summarize(input_path: Path) -> dict[str, int]:
@@ -728,7 +743,7 @@ def update_library(
         paths = LibraryPaths(output_dir=output_dir)
     paths.ensure_directories()
     output_dir.mkdir(parents=True, exist_ok=True)
-    purchases = extract_candidate_rows(amazon_input)
+    purchases, amazon_row_count = extract_candidate_rows_with_count(amazon_input)
     write_table_outputs(output_dir / "book_purchases.csv", BOOK_FIELDNAMES, purchases, "Book Purchases")
 
     isbn_cache = load_cache(isbn_cache_path)
@@ -744,6 +759,7 @@ def update_library(
     catalog_repository = CatalogRepository(paths.catalog_items_path)
     acquisition_repository = AcquisitionRepository(paths.acquisitions_path)
     catalog_items = catalog_repository.load()
+    existing_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
     metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
     catalog_repository.save(catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
@@ -754,6 +770,17 @@ def update_library(
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
     save_cache(isbn_cache_path, isbn_cache)
     save_cache(search_cache_path, search_cache)
+    ImportManifestRepository(paths.import_manifest_path).append(
+        build_import_manifest_row(
+            amazon_input=amazon_input,
+            amazon_row_count=amazon_row_count,
+            purchases=purchases,
+            metadata_rows=metadata_rows,
+            existing_catalog_item_ids=existing_catalog_item_ids,
+            catalog_items=catalog_items,
+            acquisitions=acquisitions,
+        )
+    )
 
     return {
         "purchase_rows": len(purchases),
@@ -768,6 +795,51 @@ def format_catalog_item_id(sequence_number: int) -> str:
     if sequence_number < 1:
         raise ValueError("Catalog item sequence number must be positive.")
     return f"BK{sequence_number:06d}"
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def build_import_manifest_row(
+    amazon_input: Path,
+    amazon_row_count: int,
+    purchases: list[dict[str, str]],
+    metadata_rows: list[dict[str, str]],
+    existing_catalog_item_ids: set[str],
+    catalog_items: list[dict[str, str]],
+    acquisitions: list[dict[str, str]],
+) -> dict[str, str]:
+    imported_at = utc_timestamp()
+    source_hash = file_sha256(amazon_input)
+    catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
+    new_catalog_item_ids = catalog_item_ids - existing_catalog_item_ids
+    catalog_matches = sum(1 for row in metadata_rows if row.get("catalog_item_id") in existing_catalog_item_ids)
+    return {
+        # import_id is unique per run, not deterministic for the same source file.
+        # Duplicate source detection should use file_hash, not import_id.
+        "import_id": stable_hash_id("IMP", [source_hash, imported_at]),
+        "filename": amazon_input.name,
+        "file_hash": source_hash,
+        "imported_at": imported_at,
+        "pipeline_version": PIPELINE_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "amazon_row_count": str(amazon_row_count),
+        "book_candidates": str(len(purchases)),
+        "catalog_matches": str(catalog_matches),
+        "new_catalog_items": str(len(new_catalog_item_ids)),
+        "acquisition_rows": str(len(acquisitions)),
+        "status": "success",
+        "notes": "",
+    }
 
 
 def load_catalog_items(path: Path) -> list[dict[str, str]]:

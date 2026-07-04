@@ -1,3 +1,4 @@
+import hashlib
 import zipfile
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from library_pipeline import (
     build_library_catalog_rows,
     build_parser,
     classify_asin,
+    file_sha256,
     format_catalog_item_id,
     is_valid_isbn10,
     is_valid_isbn13,
@@ -26,7 +28,7 @@ from library_pipeline import (
     write_table_outputs,
     xml_safe_text,
 )
-from valuation.repositories import AcquisitionRepository, CatalogRepository
+from valuation.repositories import AcquisitionRepository, CatalogRepository, ImportManifestRepository
 
 
 def test_isbn10_validation_and_conversion():
@@ -109,6 +111,7 @@ def test_library_paths_default_layout():
     assert paths.output_dir == Path("output")
     assert paths.openlibrary_isbn_cache_path == Path("cache/openlibrary/isbn.json")
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
+    assert paths.import_manifest_path == Path("data/import_manifest.csv")
 
 
 def test_catalog_repository_missing_file_returns_empty_list(tmp_path):
@@ -231,6 +234,72 @@ def test_acquisition_repository_load_fills_missing_fields(tmp_path):
     assert rows[0]["source"] == "amazon"
     assert rows[0]["source_order_id"] == ""
     assert rows[0]["isbn13"] == ""
+
+
+def test_import_manifest_repository_missing_file_returns_empty_list(tmp_path):
+    repository = ImportManifestRepository(tmp_path / "import_manifest.csv")
+
+    assert repository.load() == []
+
+
+def test_import_manifest_repository_append_creates_file(tmp_path):
+    repository = ImportManifestRepository(tmp_path / "data" / "import_manifest.csv")
+
+    repository.append(
+        {
+            "import_id": "IMP-1",
+            "filename": "orders.csv",
+            "file_hash": "abc123",
+            "imported_at": "2026-07-04T00:00:00Z",
+            "pipeline_version": "0.2.0",
+            "schema_version": "1",
+            "amazon_row_count": "2",
+            "book_candidates": "1",
+            "catalog_matches": "0",
+            "new_catalog_items": "1",
+            "acquisition_rows": "1",
+            "status": "success",
+            "notes": "ignored",
+            "ignored_extra_field": "not persisted",
+        }
+    )
+
+    assert repository.load() == [
+        {
+            "import_id": "IMP-1",
+            "filename": "orders.csv",
+            "file_hash": "abc123",
+            "imported_at": "2026-07-04T00:00:00Z",
+            "pipeline_version": "0.2.0",
+            "schema_version": "1",
+            "amazon_row_count": "2",
+            "book_candidates": "1",
+            "catalog_matches": "0",
+            "new_catalog_items": "1",
+            "acquisition_rows": "1",
+            "status": "success",
+            "notes": "ignored",
+        }
+    ]
+
+
+def test_import_manifest_repository_append_preserves_existing_rows(tmp_path):
+    repository = ImportManifestRepository(tmp_path / "import_manifest.csv")
+
+    repository.append({"import_id": "IMP-1", "filename": "first.csv"})
+    repository.append({"import_id": "IMP-2", "filename": "second.csv"})
+
+    rows = repository.load()
+    assert [row["import_id"] for row in rows] == ["IMP-1", "IMP-2"]
+    assert [row["filename"] for row in rows] == ["first.csv", "second.csv"]
+
+
+def test_file_sha256_is_deterministic(tmp_path):
+    path = tmp_path / "orders.csv"
+    path.write_text("ASIN,Product Name\n0198786220,Cognitive Neuroscience\n", encoding="utf-8")
+
+    assert file_sha256(path) == file_sha256(path)
+    assert file_sha256(path) == hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_format_catalog_item_id():
@@ -665,13 +734,14 @@ def test_build_library_catalog_rows_joins_metadata():
     assert catalog[0]["catalog_item_id"] == "BK000001"
 
 
-def test_update_library_writes_catalog_and_acquisitions_csv(tmp_path):
+def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     amazon_input = tmp_path / "orders.csv"
     amazon_input.write_text(
         "\n".join(
             [
                 "ASIN,Order Date,Order ID,Product Name,Product Condition,Original Quantity,Unit Price,Currency,Website",
                 "0198786220,2021-10-10T22:33:42Z,1,Cognitive Neuroscience,New,1,11.95,USD,Amazon.com",
+                "B07RG97YN6,2021-10-11T22:33:42Z,2,Kindle Cover,New,1,9.95,USD,Amazon.com",
             ]
         ),
         encoding="utf-8",
@@ -716,9 +786,60 @@ def test_update_library_writes_catalog_and_acquisitions_csv(tmp_path):
     assert acquisitions[0]["source"] == "amazon"
     assert acquisitions[0]["source_order_id"] == "1"
     assert acquisitions[0]["source_title"] == "Cognitive Neuroscience"
+    manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
+    assert len(manifest_rows) == 1
+    assert manifest_rows[0]["filename"] == "orders.csv"
+    assert manifest_rows[0]["file_hash"] == file_sha256(amazon_input)
+    assert manifest_rows[0]["pipeline_version"] == "0.2.0"
+    assert manifest_rows[0]["schema_version"] == "1"
+    assert manifest_rows[0]["amazon_row_count"] == "2"
+    assert manifest_rows[0]["book_candidates"] == "1"
+    assert manifest_rows[0]["catalog_matches"] == "0"
+    assert manifest_rows[0]["new_catalog_items"] == "1"
+    assert manifest_rows[0]["acquisition_rows"] == "1"
+    assert manifest_rows[0]["status"] == "success"
     assert (paths.output_dir / "book_purchases.csv").exists()
     assert (paths.output_dir / "book_metadata.csv").exists()
     assert (paths.output_dir / "library_catalog.csv").read_text(encoding="utf-8").splitlines()[0].startswith("catalog_item_id,")
+
+
+def test_update_library_appends_manifest_rows_for_multiple_imports(tmp_path):
+    amazon_input = tmp_path / "orders.csv"
+    amazon_input.write_text(
+        "\n".join(
+            [
+                "ASIN,Order Date,Order ID,Product Name,Product Condition,Original Quantity,Unit Price,Currency,Website",
+                "0198786220,2021-10-10T22:33:42Z,1,Cognitive Neuroscience,New,1,11.95,USD,Amazon.com",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    isbn_cache = tmp_path / "output" / "openlibrary_cache.json"
+    search_cache = tmp_path / "output" / "openlibrary_search_cache.json"
+    isbn_cache.parent.mkdir()
+    isbn_cache.write_text(
+        '{"9780198786221": {"title": "Cognitive neuroscience", "authors": [{"name": "Richard Passingham"}]}}',
+        encoding="utf-8",
+    )
+    search_cache.write_text("{}", encoding="utf-8")
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+
+    update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+    update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
+    assert len(manifest_rows) == 2
+    assert [row["status"] for row in manifest_rows] == ["success", "success"]
+    assert [row["new_catalog_items"] for row in manifest_rows] == ["1", "0"]
+    assert [row["catalog_matches"] for row in manifest_rows] == ["0", "1"]
 
 
 def test_valuation_extension_context_names_post_catalog_handoff():
