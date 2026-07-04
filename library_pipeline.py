@@ -10,10 +10,12 @@ import json
 import re
 import ssl
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -407,6 +409,51 @@ def iter_amazon_rows(input_path: Path):
         yield from csv.DictReader(handle)
 
 
+@contextmanager
+def resolve_amazon_order_history_input(input_path: Path):
+    if input_path.is_file() and input_path.suffix.lower() == ".csv":
+        yield input_path
+        return
+    if input_path.is_dir():
+        yield find_order_history_csv(input_path.rglob("Order History.csv"))
+        return
+    if input_path.is_file() and input_path.suffix.lower() == ".zip":
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with zipfile.ZipFile(input_path) as archive:
+                safe_extract_zip(archive, Path(temp_dir))
+            yield find_order_history_csv(Path(temp_dir).rglob("Order History.csv"))
+        return
+    raise ValueError(f"Unsupported Amazon input: {input_path}. Expected a CSV file, ZIP file, or directory.")
+
+
+def find_order_history_csv(candidates_iterable) -> Path:
+    candidates = sorted(Path(candidate) for candidate in candidates_iterable)
+    if not candidates:
+        raise ValueError("No Amazon order history CSV found. Expected a file named 'Order History.csv'.")
+    preferred = [candidate for candidate in candidates if is_preferred_order_history_path(candidate)]
+    if len(preferred) == 1:
+        return preferred[0]
+    if len(candidates) == 1:
+        return candidates[0]
+    candidate_list = "\n".join(str(candidate) for candidate in candidates)
+    raise ValueError(f"Multiple ambiguous Amazon order history CSV files found:\n{candidate_list}")
+
+
+def is_preferred_order_history_path(path: Path) -> bool:
+    parts = path.parts
+    return len(parts) >= 2 and parts[-2:] == ("Your Amazon Orders", "Order History.csv")
+
+
+def safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> None:
+    destination = destination.resolve()
+    for member in archive.infolist():
+        member_path = destination / member.filename
+        resolved_member_path = member_path.resolve()
+        if destination != resolved_member_path and destination not in resolved_member_path.parents:
+            raise ValueError(f"Unsafe path in Amazon ZIP export: {member.filename}")
+    archive.extractall(destination)
+
+
 def book_candidate_from_row(row: dict[str, str]) -> dict[str, str] | None:
     asin = normalize_isbn(row.get("ASIN", ""))
     kind = classify_asin(asin)
@@ -750,7 +797,10 @@ def update_library(
         paths = LibraryPaths(output_dir=output_dir)
     paths.ensure_directories()
     output_dir.mkdir(parents=True, exist_ok=True)
-    purchases, amazon_row_count = extract_candidate_rows_with_count(amazon_input)
+    with resolve_amazon_order_history_input(amazon_input) as order_history_input:
+        purchases, amazon_row_count = extract_candidate_rows_with_count(order_history_input)
+        manifest_source_filename = order_history_input.name
+        manifest_source_hash = file_sha256(order_history_input)
     write_table_outputs(output_dir / "book_purchases.csv", BOOK_FIELDNAMES, purchases, "Book Purchases")
 
     isbn_cache = load_cache(isbn_cache_path)
@@ -783,7 +833,8 @@ def update_library(
     save_cache(search_cache_path, search_cache)
     ImportManifestRepository(paths.import_manifest_path).append(
         build_import_manifest_row(
-            amazon_input=amazon_input,
+            filename=manifest_source_filename,
+            file_hash=manifest_source_hash,
             amazon_row_count=amazon_row_count,
             purchases=purchases,
             metadata_rows=metadata_rows,
@@ -821,7 +872,8 @@ def utc_timestamp() -> str:
 
 
 def build_import_manifest_row(
-    amazon_input: Path,
+    filename: str,
+    file_hash: str,
     amazon_row_count: int,
     purchases: list[dict[str, str]],
     metadata_rows: list[dict[str, str]],
@@ -830,16 +882,15 @@ def build_import_manifest_row(
     acquisitions: list[dict[str, str]],
 ) -> dict[str, str]:
     imported_at = utc_timestamp()
-    source_hash = file_sha256(amazon_input)
     catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
     new_catalog_item_ids = catalog_item_ids - existing_catalog_item_ids
     catalog_matches = sum(1 for row in metadata_rows if row.get("catalog_item_id") in existing_catalog_item_ids)
     return {
         # import_id is unique per run, not deterministic for the same source file.
         # Duplicate source detection should use file_hash, not import_id.
-        "import_id": stable_hash_id("IMP", [source_hash, imported_at]),
-        "filename": amazon_input.name,
-        "file_hash": source_hash,
+        "import_id": stable_hash_id("IMP", [file_hash, imported_at]),
+        "filename": filename,
+        "file_hash": file_hash,
         "imported_at": imported_at,
         "pipeline_version": PIPELINE_VERSION,
         "schema_version": SCHEMA_VERSION,

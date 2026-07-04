@@ -2,6 +2,8 @@ import hashlib
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from library_pipeline import (
     LibraryPaths,
     analyze_enrichment,
@@ -24,6 +26,7 @@ from library_pipeline import (
     paired_output_paths,
     reconcile_research_assessments,
     reconcile_catalog_items,
+    resolve_amazon_order_history_input,
     text_similarity,
     title_query,
     update_library,
@@ -121,6 +124,85 @@ def test_library_paths_default_layout():
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
     assert paths.import_manifest_path == Path("data/import_manifest.csv")
     assert paths.research_priority_assessments_path == Path("data/research_priority_assessments.csv")
+
+
+def test_resolve_amazon_order_history_input_accepts_direct_csv(tmp_path):
+    csv_path = tmp_path / "Order History.csv"
+    csv_path.write_text("ASIN\n0198786220\n", encoding="utf-8")
+
+    with resolve_amazon_order_history_input(csv_path) as resolved:
+        assert resolved == csv_path
+
+
+def test_resolve_amazon_order_history_input_finds_preferred_directory_csv(tmp_path):
+    preferred = tmp_path / "Your Orders" / "Your Amazon Orders" / "Order History.csv"
+    preferred.parent.mkdir(parents=True)
+    preferred.write_text("ASIN\n0198786220\n", encoding="utf-8")
+
+    with resolve_amazon_order_history_input(tmp_path / "Your Orders") as resolved:
+        assert resolved == preferred
+
+
+def test_resolve_amazon_order_history_input_finds_preferred_zip_csv(tmp_path):
+    zip_path = tmp_path / "Your Orders.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("Your Amazon Orders/Order History.csv", "ASIN\n0198786220\n")
+
+    with resolve_amazon_order_history_input(zip_path) as resolved:
+        assert resolved.name == "Order History.csv"
+        assert resolved.read_text(encoding="utf-8") == "ASIN\n0198786220\n"
+
+    assert not resolved.exists()
+
+
+def test_resolve_amazon_order_history_input_raises_when_no_order_history(tmp_path):
+    package = tmp_path / "Your Orders"
+    package.mkdir()
+    (package / "Other.csv").write_text("ASIN\n0198786220\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="No Amazon order history CSV found"):
+        with resolve_amazon_order_history_input(package):
+            pass
+
+
+def test_resolve_amazon_order_history_input_raises_when_zip_has_no_order_history(tmp_path):
+    zip_path = tmp_path / "Your Orders.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("Other.csv", "ASIN\n0198786220\n")
+
+    with pytest.raises(ValueError, match="No Amazon order history CSV found"):
+        with resolve_amazon_order_history_input(zip_path):
+            pass
+
+
+def test_resolve_amazon_order_history_input_raises_on_ambiguous_directory_matches(tmp_path):
+    first = tmp_path / "first" / "Order History.csv"
+    second = tmp_path / "second" / "Order History.csv"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_text("ASIN\n0198786220\n", encoding="utf-8")
+    second.write_text("ASIN\n006157127X\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Multiple ambiguous Amazon order history CSV files found") as error:
+        with resolve_amazon_order_history_input(tmp_path):
+            pass
+
+    assert str(first) in str(error.value)
+    assert str(second) in str(error.value)
+
+
+def test_resolve_amazon_order_history_input_raises_on_ambiguous_zip_matches(tmp_path):
+    zip_path = tmp_path / "Your Orders.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr("first/Order History.csv", "ASIN\n0198786220\n")
+        archive.writestr("second/Order History.csv", "ASIN\n006157127X\n")
+
+    with pytest.raises(ValueError, match="Multiple ambiguous Amazon order history CSV files found") as error:
+        with resolve_amazon_order_history_input(zip_path):
+            pass
+
+    assert "first/Order History.csv" in str(error.value)
+    assert "second/Order History.csv" in str(error.value)
 
 
 def test_catalog_repository_missing_file_returns_empty_list(tmp_path):
@@ -943,6 +1025,44 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert (paths.output_dir / "book_purchases.csv").exists()
     assert (paths.output_dir / "book_metadata.csv").exists()
     assert (paths.output_dir / "library_catalog.csv").read_text(encoding="utf-8").splitlines()[0].startswith("catalog_item_id,")
+
+
+def test_update_library_accepts_zip_order_export_package(tmp_path):
+    amazon_input = tmp_path / "Your Orders.zip"
+    with zipfile.ZipFile(amazon_input, "w") as archive:
+        archive.writestr(
+            "Your Amazon Orders/Order History.csv",
+            "\n".join(
+                [
+                    "ASIN,Order Date,Order ID,Product Name,Product Condition,Original Quantity,Unit Price,Currency,Website",
+                    "0198786220,2021-10-10T22:33:42Z,1,Cognitive Neuroscience,New,1,11.95,USD,Amazon.com",
+                ]
+            ),
+        )
+    isbn_cache = tmp_path / "output" / "openlibrary_cache.json"
+    search_cache = tmp_path / "output" / "openlibrary_search_cache.json"
+    isbn_cache.parent.mkdir()
+    isbn_cache.write_text(
+        '{"9780198786221": {"title": "Cognitive neuroscience", "authors": [{"name": "Richard Passingham"}]}}',
+        encoding="utf-8",
+    )
+    search_cache.write_text("{}", encoding="utf-8")
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+
+    update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    assert catalog_ids_by_isbn(paths) == {"9780198786221": "BK000001"}
+    assert len(load_acquisitions(paths.acquisitions_path)) == 1
+    manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
+    assert manifest_rows[0]["filename"] == "Order History.csv"
 
 
 def test_update_library_appends_manifest_rows_for_multiple_imports(tmp_path):
