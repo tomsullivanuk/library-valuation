@@ -97,6 +97,10 @@ metadata and catalog outputs. The third implementation step makes those IDs
 durable by loading and rewriting `data/catalog_items.csv` during
 `update-library`.
 
+The fourth implementation step writes `data/acquisitions.csv` from the current
+full-history Amazon export. Acquisition rows are rebuilt each run and linked to
+durable `catalog_item_id` values.
+
 Intended command:
 
 ```bash
@@ -190,6 +194,12 @@ newly created `catalog_item_id`. Other durable files also reference
 metadata for a book. `data/acquisitions.csv` represents source-linked purchase
 or acquisition facts. Acquisition rows should avoid duplicating book metadata
 except where needed for source provenance or reconciliation.
+
+Current acquisition IDs are deterministic `AMZ-...` hashes derived from
+available Amazon evidence: source, order ID, ASIN, order date, source title,
+item price, and quantity. Because the current normalized Amazon row does not
+carry a true Amazon line-item ID, truly identical same-order line items may
+collide until a richer source-item layer exists.
 
 ### Metadata Changes
 

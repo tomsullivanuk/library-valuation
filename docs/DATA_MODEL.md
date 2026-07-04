@@ -627,24 +627,29 @@ catalog-level metadata. Suggested minimum fields:
 - `created_at`
 - `updated_at`
 
-`data/acquisitions.csv` should contain source-linked purchase facts and avoid
-duplicating catalog metadata. Suggested minimum fields:
+`data/acquisitions.csv` contains source-linked purchase facts and avoids
+duplicating catalog metadata except for source evidence and reconciliation
+fields. Current fields:
 
 - `acquisition_id`
 - `catalog_item_id`
-- `source_type`
-- `source_file_hash`
-- `source_row_number`
-- `source_record_id`
-- `source_product_id`
-- `source_title`
-- `source_isbn10`
-- `source_isbn13`
-- `acquired_at`
+- `source`
+- `source_order_id`
+- `source_item_id`
+- `order_date`
 - `quantity`
-- `unit_price`
+- `item_price`
+- `item_subtotal`
 - `currency`
-- `condition_at_acquisition`
+- `source_title`
+- `source_asin`
+- `isbn13`
+- `isbn10`
+
+For Amazon rows, `acquisition_id` is currently a deterministic `AMZ-...` hash
+derived from available source evidence. `source_item_id` is also hash-derived
+because the current normalized Amazon rows do not expose a true source line-item
+identifier.
 
 `data/research_priority_assessments.csv` should contain the latest durable
 research-priority assessment per catalog item. Suggested minimum fields:

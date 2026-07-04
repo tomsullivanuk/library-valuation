@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import ssl
@@ -93,6 +94,23 @@ CATALOG_ITEMS_FIELDNAMES = [
     "match_confidence",
 ]
 
+ACQUISITION_FIELDNAMES = [
+    "acquisition_id",
+    "catalog_item_id",
+    "source",
+    "source_order_id",
+    "source_item_id",
+    "order_date",
+    "quantity",
+    "item_price",
+    "item_subtotal",
+    "currency",
+    "source_title",
+    "source_asin",
+    "isbn13",
+    "isbn10",
+]
+
 LIBRARY_CATALOG_FIELDNAMES = [
     "catalog_item_id",
     "lcc",
@@ -138,6 +156,10 @@ class LibraryPaths:
     @property
     def catalog_items_path(self) -> Path:
         return self.data_dir / "catalog_items.csv"
+
+    @property
+    def acquisitions_path(self) -> Path:
+        return self.data_dir / "acquisitions.csv"
 
     def ensure_directories(self) -> None:
         for path in (
@@ -745,6 +767,8 @@ def update_library(
     metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
     write_catalog_items(paths.catalog_items_path, catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
+    acquisitions = build_acquisitions(purchases, metadata_rows)
+    write_acquisitions(paths.acquisitions_path, acquisitions)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
@@ -775,6 +799,140 @@ def load_catalog_items(path: Path) -> list[dict[str, str]]:
 
 def write_catalog_items(path: Path, rows: list[dict[str, str]]) -> None:
     write_csv(path, CATALOG_ITEMS_FIELDNAMES, rows)
+
+
+def load_acquisitions(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        return [{field: row.get(field, "") for field in ACQUISITION_FIELDNAMES} for row in csv.DictReader(handle)]
+
+
+def write_acquisitions(path: Path, rows: list[dict[str, str]]) -> None:
+    write_csv(path, ACQUISITION_FIELDNAMES, rows)
+
+
+def build_acquisitions(purchases: list[dict[str, str]], metadata_rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    metadata_index = metadata_lookup_for_acquisitions(metadata_rows)
+    acquisitions = []
+    for purchase in purchases:
+        metadata = find_metadata_for_purchase(purchase, metadata_index)
+        source = "amazon"
+        source_order_id = purchase.get("order_id", "")
+        source_asin = purchase.get("asin", "")
+        order_date = purchase.get("order_date", "")
+        source_title = purchase.get("product_name", "")
+        item_price = purchase.get("unit_price", "")
+        quantity = purchase.get("quantity", "")
+        source_item_id = source_item_identifier(
+            source,
+            source_order_id,
+            source_asin,
+            order_date,
+            source_title,
+            item_price,
+        )
+        acquisitions.append(
+            {
+                "acquisition_id": acquisition_id(
+                    source,
+                    source_order_id,
+                    source_asin,
+                    order_date,
+                    source_title,
+                    item_price,
+                    quantity,
+                ),
+                "catalog_item_id": metadata.get("catalog_item_id", ""),
+                "source": source,
+                "source_order_id": source_order_id,
+                "source_item_id": source_item_id,
+                "order_date": order_date,
+                "quantity": quantity,
+                "item_price": item_price,
+                "item_subtotal": item_subtotal(item_price, quantity),
+                "currency": purchase.get("currency", ""),
+                "source_title": source_title,
+                "source_asin": source_asin,
+                "isbn13": purchase.get("isbn13", ""),
+                "isbn10": purchase.get("isbn10", ""),
+            }
+        )
+    return acquisitions
+
+
+def metadata_lookup_for_acquisitions(metadata_rows: list[dict[str, str]]) -> dict[str, dict[str, dict[str, str]]]:
+    index: dict[str, dict[str, dict[str, str]]] = {
+        "isbn13": {},
+        "isbn10": {},
+        "title": {},
+    }
+    for row in metadata_rows:
+        if row.get("isbn13"):
+            index["isbn13"].setdefault(row["isbn13"], row)
+        if row.get("isbn10"):
+            index["isbn10"].setdefault(row["isbn10"], row)
+        title_key = normalized_acquisition_title_key(row)
+        if title_key:
+            index["title"].setdefault(title_key, row)
+    return index
+
+
+def find_metadata_for_purchase(
+    purchase: dict[str, str], metadata_index: dict[str, dict[str, dict[str, str]]]
+) -> dict[str, str]:
+    isbn13 = purchase.get("isbn13", "")
+    if isbn13 and isbn13 in metadata_index["isbn13"]:
+        return metadata_index["isbn13"][isbn13]
+    isbn10 = purchase.get("isbn10", "")
+    if isbn10 and isbn10 in metadata_index["isbn10"]:
+        return metadata_index["isbn10"][isbn10]
+    title_key = normalized_acquisition_title_key(purchase)
+    if title_key and title_key in metadata_index["title"]:
+        return metadata_index["title"][title_key]
+    return {}
+
+
+def normalized_acquisition_title_key(row: dict[str, str]) -> str:
+    return normalize_match_text(row.get("source_title") or row.get("product_name") or row.get("title") or row.get("representative_product_name", ""))
+
+
+def source_item_identifier(
+    source: str,
+    source_order_id: str,
+    source_asin: str,
+    order_date: str,
+    source_title: str,
+    item_price: str,
+) -> str:
+    return stable_hash_id("SRC", [source, source_order_id, source_asin, order_date, source_title, item_price])
+
+
+def acquisition_id(
+    source: str,
+    source_order_id: str,
+    source_asin: str,
+    order_date: str,
+    source_title: str,
+    item_price: str,
+    quantity: str,
+) -> str:
+    return stable_hash_id("AMZ", [source, source_order_id, source_asin, order_date, source_title, item_price, quantity])
+
+
+def stable_hash_id(prefix: str, values: list[str]) -> str:
+    payload = "\x1f".join(value or "" for value in values)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16].upper()
+    return f"{prefix}-{digest}"
+
+
+def item_subtotal(item_price: str, quantity: str) -> str:
+    try:
+        price = float(item_price)
+        count = int(quantity)
+    except (TypeError, ValueError):
+        return ""
+    return f"{price * count:.2f}"
 
 
 def reconcile_catalog_items(

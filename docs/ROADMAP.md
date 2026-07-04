@@ -129,10 +129,14 @@ Implementation status:
 - Done: directory conventions and centralized path handling.
 - Done: durable `catalog_item_id` reuse from `data/catalog_items.csv`.
 - Done: `catalog_item_id` values in generated metadata and catalog outputs.
+- Done: `data/acquisitions.csv` rebuilt from the current full-history Amazon
+  export and linked to durable catalog items.
 - Follow-up: because existing nonblank catalog fields are preserved, improved
   external metadata will need an explicit refresh, override, or staleness policy.
-- Not yet done: durable acquisitions, research-priority assessments, import
-  manifest, latest-file detection, and re-evaluation modes.
+- Follow-up: acquisition IDs are deterministic hashes of available Amazon
+  evidence until a richer source-item layer exposes true source line IDs.
+- Not yet done: persistent research-priority assessments, import manifest,
+  latest-file detection, and re-evaluation modes.
 
 ## Sprint 2: Research Priority Score
 

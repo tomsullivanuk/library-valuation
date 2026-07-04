@@ -4,7 +4,9 @@ from pathlib import Path
 from library_pipeline import (
     LibraryPaths,
     analyze_enrichment,
+    acquisition_id,
     book_candidate_from_row,
+    build_acquisitions,
     build_book_metadata_rows,
     build_library_catalog_rows,
     build_parser,
@@ -13,6 +15,7 @@ from library_pipeline import (
     is_valid_isbn10,
     is_valid_isbn13,
     isbn10_to_isbn13,
+    load_acquisitions,
     load_catalog_items,
     paired_output_paths,
     reconcile_catalog_items,
@@ -119,6 +122,16 @@ def test_format_catalog_item_id_rejects_non_positive_sequence():
         assert "positive" in str(error)
     else:
         raise AssertionError("Expected non-positive catalog item sequence to fail")
+
+
+def test_acquisition_id_is_deterministic():
+    first = acquisition_id("amazon", "ORDER-1", "0198786220", "2021-10-10", "Cognitive Neuroscience", "11.95", "1")
+    second = acquisition_id("amazon", "ORDER-1", "0198786220", "2021-10-10", "Cognitive Neuroscience", "11.95", "1")
+    different = acquisition_id("amazon", "ORDER-2", "0198786220", "2021-10-10", "Cognitive Neuroscience", "11.95", "1")
+
+    assert first == second
+    assert first.startswith("AMZ-")
+    assert first != different
 
 
 def test_reconcile_catalog_items_empty_catalog_creates_new_ids():
@@ -298,6 +311,110 @@ def test_reconcile_catalog_items_title_author_fallback_requires_title_and_author
     assert [row["catalog_item_id"] for row in catalog_items] == ["BK000011", "BK000012"]
 
 
+def test_build_acquisitions_links_purchase_rows_to_catalog_items():
+    purchases = [
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "2",
+            "unit_price": "11.95",
+            "currency": "USD",
+        }
+    ]
+    metadata = [{"isbn13": "9780198786221", "catalog_item_id": "BK000001"}]
+
+    acquisitions = build_acquisitions(purchases, metadata)
+
+    assert len(acquisitions) == 1
+    assert acquisitions[0]["catalog_item_id"] == "BK000001"
+    assert acquisitions[0]["source"] == "amazon"
+    assert acquisitions[0]["source_order_id"] == "1"
+    assert acquisitions[0]["source_asin"] == "0198786220"
+    assert acquisitions[0]["item_price"] == "11.95"
+    assert acquisitions[0]["item_subtotal"] == "23.90"
+    assert acquisitions[0]["acquisition_id"].startswith("AMZ-")
+
+
+def test_build_acquisitions_allows_multiple_rows_for_same_catalog_item():
+    purchases = [
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+        },
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2022-01-01T00:00:00Z",
+            "order_id": "2",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "1",
+            "unit_price": "12.95",
+            "currency": "USD",
+        },
+    ]
+    metadata = [{"isbn13": "9780198786221", "catalog_item_id": "BK000001"}]
+
+    acquisitions = build_acquisitions(purchases, metadata)
+
+    assert len(acquisitions) == 2
+    assert {row["catalog_item_id"] for row in acquisitions} == {"BK000001"}
+    assert acquisitions[0]["acquisition_id"] != acquisitions[1]["acquisition_id"]
+
+
+def test_build_acquisitions_links_by_isbn10_when_isbn13_is_blank():
+    purchases = [
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+        }
+    ]
+    metadata = [{"isbn13": "", "isbn10": "0198786220", "catalog_item_id": "BK000001"}]
+
+    acquisitions = build_acquisitions(purchases, metadata)
+
+    assert acquisitions[0]["catalog_item_id"] == "BK000001"
+
+
+def test_build_acquisitions_links_by_title_when_isbns_are_blank():
+    purchases = [
+        {
+            "asin": "",
+            "isbn10": "",
+            "isbn13": "",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+        }
+    ]
+    metadata = [{"isbn13": "", "isbn10": "", "title": "Cognitive neuroscience", "catalog_item_id": "BK000001"}]
+
+    acquisitions = build_acquisitions(purchases, metadata)
+
+    assert acquisitions[0]["catalog_item_id"] == "BK000001"
+
+
 def test_library_paths_ensure_directories(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     paths = LibraryPaths(
@@ -425,7 +542,7 @@ def test_build_library_catalog_rows_joins_metadata():
     assert catalog[0]["catalog_item_id"] == "BK000001"
 
 
-def test_update_library_writes_catalog_items_csv(tmp_path):
+def test_update_library_writes_catalog_and_acquisitions_csv(tmp_path):
     amazon_input = tmp_path / "orders.csv"
     amazon_input.write_text(
         "\n".join(
@@ -470,6 +587,14 @@ def test_update_library_writes_catalog_items_csv(tmp_path):
             "match_confidence": "high",
         }
     ]
+    acquisitions = load_acquisitions(paths.acquisitions_path)
+    assert len(acquisitions) == 1
+    assert acquisitions[0]["catalog_item_id"] == "BK000001"
+    assert acquisitions[0]["source"] == "amazon"
+    assert acquisitions[0]["source_order_id"] == "1"
+    assert acquisitions[0]["source_title"] == "Cognitive Neuroscience"
+    assert (paths.output_dir / "book_purchases.csv").exists()
+    assert (paths.output_dir / "book_metadata.csv").exists()
     assert (paths.output_dir / "library_catalog.csv").read_text(encoding="utf-8").splitlines()[0].startswith("catalog_item_id,")
 
 

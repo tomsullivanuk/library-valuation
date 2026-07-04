@@ -90,6 +90,10 @@ The current implementation maintains durable `catalog_item_id` values in
 `data/catalog_items.csv` and includes those IDs in generated metadata and
 catalog outputs.
 
+It also rebuilds `data/acquisitions.csv` from the provided full Amazon export on
+each `update-library` run. Acquisition IDs are deterministic `AMZ-...` hashes
+derived from available Amazon purchase evidence.
+
 Version 0.2.0 should support an incremental workflow built around full-history
 Amazon exports. The user periodically downloads a full Amazon Order History CSV,
 saves it under `input/amazon/`, and runs:
