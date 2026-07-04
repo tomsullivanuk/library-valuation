@@ -19,12 +19,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from valuation.rps import DEFAULT_RPS_WEIGHTS, calculate_rps
 from valuation.repositories import (
     ACQUISITION_FIELDNAMES,
     CATALOG_ITEMS_FIELDNAMES,
     AcquisitionRepository,
     CatalogRepository,
     ImportManifestRepository,
+    ResearchAssessmentRepository,
 )
 
 
@@ -113,6 +115,7 @@ LIBRARY_CATALOG_FIELDNAMES = [
 VALUATION_EXTENSION_STAGE = "post_catalog_rows"
 PIPELINE_VERSION = "0.2.0"
 SCHEMA_VERSION = "1"
+RPS_MODEL_VERSION = "0.2.0"
 
 
 @dataclass(frozen=True)
@@ -146,6 +149,10 @@ class LibraryPaths:
     @property
     def import_manifest_path(self) -> Path:
         return self.data_dir / "import_manifest.csv"
+
+    @property
+    def research_priority_assessments_path(self) -> Path:
+        return self.data_dir / "research_priority_assessments.csv"
 
     def ensure_directories(self) -> None:
         for path in (
@@ -758,13 +765,17 @@ def update_library(
     )
     catalog_repository = CatalogRepository(paths.catalog_items_path)
     acquisition_repository = AcquisitionRepository(paths.acquisitions_path)
+    research_assessment_repository = ResearchAssessmentRepository(paths.research_priority_assessments_path)
     catalog_items = catalog_repository.load()
     existing_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
+    existing_assessments = research_assessment_repository.load()
     metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
     catalog_repository.save(catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
     acquisitions = build_acquisitions(purchases, metadata_rows)
     acquisition_repository.save(acquisitions)
+    research_assessments = reconcile_research_assessments(existing_assessments, metadata_rows)
+    research_assessment_repository.save(research_assessments)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
@@ -840,6 +851,75 @@ def build_import_manifest_row(
         "status": "success",
         "notes": "",
     }
+
+
+def load_research_assessments(path: Path) -> list[dict[str, str]]:
+    return ResearchAssessmentRepository(path).load()
+
+
+def write_research_assessments(path: Path, rows: list[dict[str, str]]) -> None:
+    ResearchAssessmentRepository(path).save(rows)
+
+
+def reconcile_research_assessments(
+    existing_assessments: list[dict[str, str]], metadata_rows: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    assessments_by_id = {
+        row.get("catalog_item_id", ""): dict(row)
+        for row in existing_assessments
+        if row.get("catalog_item_id")
+    }
+    for metadata in metadata_rows:
+        catalog_item_id = metadata.get("catalog_item_id", "")
+        if catalog_item_id and catalog_item_id not in assessments_by_id:
+            assessments_by_id[catalog_item_id] = build_research_assessment(metadata)
+    return sorted(assessments_by_id.values(), key=lambda row: row.get("catalog_item_id", ""))
+
+
+def build_research_assessment(metadata: dict[str, str]) -> dict[str, str]:
+    score = calculate_rps({})
+    return {
+        "catalog_item_id": metadata.get("catalog_item_id", ""),
+        "isbn13": metadata.get("isbn13", ""),
+        "rps_score": f"{score:.4f}",
+        "rps_band": rps_band(score),
+        "rps_reasons": "No scoring signals available yet.",
+        "rps_model_version": RPS_MODEL_VERSION,
+        "rps_config_hash": stable_json_hash(DEFAULT_RPS_WEIGHTS),
+        "assessed_at": utc_timestamp(),
+        "assessment_status": "current",
+        "assessment_method": "automatic",
+        "reviewed_by": "",
+        "metadata_snapshot_hash": metadata_snapshot_hash(metadata),
+    }
+
+
+def rps_band(score: float) -> str:
+    if score >= 0.75:
+        return "high"
+    if score >= 0.4:
+        return "medium"
+    return "low"
+
+
+def stable_json_hash(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def metadata_snapshot_hash(metadata: dict[str, str]) -> str:
+    scoring_metadata = {
+        "catalog_item_id": metadata.get("catalog_item_id", ""),
+        "isbn13": metadata.get("isbn13", ""),
+        "isbn10": metadata.get("isbn10", ""),
+        "title": metadata.get("title", ""),
+        "authors": metadata.get("authors", ""),
+        "publishers": metadata.get("publishers", ""),
+        "publish_date": metadata.get("publish_date", ""),
+        "lcc": metadata.get("lcc", ""),
+        "subjects": metadata.get("subjects", ""),
+    }
+    return stable_json_hash(scoring_metadata)
 
 
 def load_catalog_items(path: Path) -> list[dict[str, str]]:

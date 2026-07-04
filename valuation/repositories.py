@@ -51,6 +51,21 @@ IMPORT_MANIFEST_FIELDNAMES = [
     "notes",
 ]
 
+RESEARCH_ASSESSMENT_FIELDNAMES = [
+    "catalog_item_id",
+    "isbn13",
+    "rps_score",
+    "rps_band",
+    "rps_reasons",
+    "rps_model_version",
+    "rps_config_hash",
+    "assessed_at",
+    "assessment_status",
+    "assessment_method",
+    "reviewed_by",
+    "metadata_snapshot_hash",
+]
+
 
 class CsvRepository:
     fieldnames: list[str] = []
@@ -91,3 +106,7 @@ class ImportManifestRepository(CsvRepository):
             if should_write_header:
                 writer.writeheader()
             writer.writerow({field: row.get(field, "") for field in self.fieldnames})
+
+
+class ResearchAssessmentRepository(CsvRepository):
+    fieldnames = RESEARCH_ASSESSMENT_FIELDNAMES

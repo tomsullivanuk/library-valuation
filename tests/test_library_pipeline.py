@@ -10,6 +10,7 @@ from library_pipeline import (
     build_acquisitions,
     build_book_metadata_rows,
     build_library_catalog_rows,
+    build_research_assessment,
     build_parser,
     classify_asin,
     file_sha256,
@@ -19,7 +20,9 @@ from library_pipeline import (
     isbn10_to_isbn13,
     load_acquisitions,
     load_catalog_items,
+    load_research_assessments,
     paired_output_paths,
+    reconcile_research_assessments,
     reconcile_catalog_items,
     text_similarity,
     title_query,
@@ -28,7 +31,12 @@ from library_pipeline import (
     write_table_outputs,
     xml_safe_text,
 )
-from valuation.repositories import AcquisitionRepository, CatalogRepository, ImportManifestRepository
+from valuation.repositories import (
+    AcquisitionRepository,
+    CatalogRepository,
+    ImportManifestRepository,
+    ResearchAssessmentRepository,
+)
 
 
 def test_isbn10_validation_and_conversion():
@@ -112,6 +120,7 @@ def test_library_paths_default_layout():
     assert paths.openlibrary_isbn_cache_path == Path("cache/openlibrary/isbn.json")
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
     assert paths.import_manifest_path == Path("data/import_manifest.csv")
+    assert paths.research_priority_assessments_path == Path("data/research_priority_assessments.csv")
 
 
 def test_catalog_repository_missing_file_returns_empty_list(tmp_path):
@@ -300,6 +309,131 @@ def test_file_sha256_is_deterministic(tmp_path):
 
     assert file_sha256(path) == file_sha256(path)
     assert file_sha256(path) == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_research_assessment_repository_missing_file_returns_empty_list(tmp_path):
+    repository = ResearchAssessmentRepository(tmp_path / "research_priority_assessments.csv")
+
+    assert repository.load() == []
+
+
+def test_research_assessment_repository_round_trip_persistence(tmp_path):
+    repository = ResearchAssessmentRepository(tmp_path / "data" / "research_priority_assessments.csv")
+    rows = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "rps_score": "0.0000",
+            "rps_band": "low",
+            "rps_reasons": "No scoring signals available yet.",
+            "rps_model_version": "0.2.0",
+            "rps_config_hash": "abc123",
+            "assessed_at": "2026-07-04T00:00:00Z",
+            "assessment_status": "current",
+            "assessment_method": "automatic",
+            "reviewed_by": "",
+            "metadata_snapshot_hash": "def456",
+            "ignored_extra_field": "not persisted",
+        }
+    ]
+
+    repository.save(rows)
+
+    assert repository.load() == [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "rps_score": "0.0000",
+            "rps_band": "low",
+            "rps_reasons": "No scoring signals available yet.",
+            "rps_model_version": "0.2.0",
+            "rps_config_hash": "abc123",
+            "assessed_at": "2026-07-04T00:00:00Z",
+            "assessment_status": "current",
+            "assessment_method": "automatic",
+            "reviewed_by": "",
+            "metadata_snapshot_hash": "def456",
+        }
+    ]
+
+
+def test_build_research_assessment_populates_provenance():
+    assessment = build_research_assessment(
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "title": "Cognitive neuroscience",
+            "authors": "Richard Passingham",
+        }
+    )
+
+    assert assessment["catalog_item_id"] == "BK000001"
+    assert assessment["isbn13"] == "9780198786221"
+    assert assessment["rps_score"] == "0.0000"
+    assert assessment["rps_band"] == "low"
+    assert assessment["rps_model_version"] == "0.2.0"
+    assert assessment["rps_config_hash"]
+    assert assessment["assessment_status"] == "current"
+    assert assessment["assessment_method"] == "automatic"
+    assert assessment["metadata_snapshot_hash"]
+
+
+def test_reconcile_research_assessments_reuses_existing_assessment():
+    existing = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "rps_score": "0.9000",
+            "rps_band": "high",
+            "rps_reasons": "Previously reviewed.",
+            "rps_model_version": "0.1.0",
+            "rps_config_hash": "old",
+            "assessed_at": "2026-01-01T00:00:00Z",
+            "assessment_status": "current",
+            "assessment_method": "automatic",
+            "reviewed_by": "",
+            "metadata_snapshot_hash": "old-snapshot",
+        }
+    ]
+
+    reconciled = reconcile_research_assessments(
+        existing,
+        [{"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Updated title"}],
+    )
+
+    assert reconciled == existing
+
+
+def test_reconcile_research_assessments_assesses_only_unassessed_items():
+    existing = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "rps_score": "0.9000",
+            "rps_band": "high",
+            "rps_reasons": "Previously reviewed.",
+            "rps_model_version": "0.1.0",
+            "rps_config_hash": "old",
+            "assessed_at": "2026-01-01T00:00:00Z",
+            "assessment_status": "current",
+            "assessment_method": "automatic",
+            "reviewed_by": "",
+            "metadata_snapshot_hash": "old-snapshot",
+        }
+    ]
+
+    reconciled = reconcile_research_assessments(
+        existing,
+        [
+            {"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Known"},
+            {"catalog_item_id": "BK000002", "isbn13": "9780061571275", "title": "New"},
+        ],
+    )
+
+    assert len(reconciled) == 2
+    assert reconciled[0] == existing[0]
+    assert reconciled[1]["catalog_item_id"] == "BK000002"
+    assert reconciled[1]["assessment_method"] == "automatic"
 
 
 def test_format_catalog_item_id():
@@ -786,6 +920,14 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert acquisitions[0]["source"] == "amazon"
     assert acquisitions[0]["source_order_id"] == "1"
     assert acquisitions[0]["source_title"] == "Cognitive Neuroscience"
+    research_assessments = load_research_assessments(paths.research_priority_assessments_path)
+    assert len(research_assessments) == 1
+    assert research_assessments[0]["catalog_item_id"] == "BK000001"
+    assert research_assessments[0]["isbn13"] == "9780198786221"
+    assert research_assessments[0]["rps_score"] == "0.0000"
+    assert research_assessments[0]["rps_band"] == "low"
+    assert research_assessments[0]["assessment_status"] == "current"
+    assert research_assessments[0]["assessment_method"] == "automatic"
     manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["filename"] == "orders.csv"
@@ -833,8 +975,11 @@ def test_update_library_appends_manifest_rows_for_multiple_imports(tmp_path):
     )
 
     update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+    first_assessment = load_research_assessments(paths.research_priority_assessments_path)[0]
     update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
 
+    research_assessments = load_research_assessments(paths.research_priority_assessments_path)
+    assert research_assessments == [first_assessment]
     manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
     assert len(manifest_rows) == 2
     assert [row["status"] for row in manifest_rows] == ["success", "success"]
