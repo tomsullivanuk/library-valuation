@@ -127,9 +127,10 @@ Exit condition:
 Implementation status:
 
 - Done: directory conventions and centralized path handling.
-- Done: run-local `catalog_item_id` values in generated metadata and catalog
-  outputs.
-- Not yet done: durable ID reuse from `data/catalog_items.csv`.
+- Done: durable `catalog_item_id` reuse from `data/catalog_items.csv`.
+- Done: `catalog_item_id` values in generated metadata and catalog outputs.
+- Follow-up: because existing nonblank catalog fields are preserved, improved
+  external metadata will need an explicit refresh, override, or staleness policy.
 - Not yet done: durable acquisitions, research-priority assessments, import
   manifest, latest-file detection, and re-evaluation modes.
 

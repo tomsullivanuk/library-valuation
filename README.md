@@ -86,9 +86,9 @@ The first implementation step toward v0.2.0 introduces the project directory
 conventions and centralized path handling while preserving the current generated
 outputs and legacy cache defaults.
 
-The current implementation also emits run-local `catalog_item_id` values in
-generated metadata and catalog outputs. Durable reuse of those IDs from
-`data/catalog_items.csv` is a future v0.2.0 step.
+The current implementation maintains durable `catalog_item_id` values in
+`data/catalog_items.csv` and includes those IDs in generated metadata and
+catalog outputs.
 
 Version 0.2.0 should support an incremental workflow built around full-history
 Amazon exports. The user periodically downloads a full Amazon Order History CSV,
@@ -138,10 +138,9 @@ output/                               generated CSV, XLSX, and reports only
 `catalog_item_id` is the permanent internal identity for catalog records.
 ISBN-13 remains the preferred matching attribute, followed by ISBN-10, source
 fingerprint, and normalized title/author fallback. Other durable files should
-reference `catalog_item_id`. In the target durable workflow, existing
-`catalog_item_id` values must be loaded from `data/catalog_items.csv` and reused
-across runs; they must not be regenerated from Amazon row order, catalog sort
-order, or output row order.
+reference `catalog_item_id`. Existing `catalog_item_id` values are loaded from
+`data/catalog_items.csv` and reused across runs; they must not be regenerated
+from Amazon row order, catalog sort order, or output row order.
 
 Generated Excel and CSV files under `output/` are not source data. They should
 be reproducible from `input/`, `data/`, `cache/`, `config/`, and code.

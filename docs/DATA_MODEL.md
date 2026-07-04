@@ -229,13 +229,11 @@ Fields:
 Data classification:
 
 - Immutable: `catalog_item_id` should not change once assigned.
-- Target stability: durable `catalog_item_id` values must be loaded from state
-  and reused across runs. New durable IDs are assigned only for genuinely new
-  catalog items after matching has failed.
-- Target generation: durable `catalog_item_id` values must not be derived from
-  input row order, output row order, sort order, or other run-local positions.
-- Current v0.2.0 transition: generated outputs may contain run-local
-  `catalog_item_id` values until `data/catalog_items.csv` is implemented.
+- Durable stability: `catalog_item_id` values are loaded from
+  `data/catalog_items.csv` and reused across runs. New durable IDs are assigned
+  only for genuinely new catalog items after matching has failed.
+- Durable generation: `catalog_item_id` values must not be derived from input
+  row order, output row order, sort order, or other run-local positions.
 - Matching: ISBN-13, ISBN-10, source fingerprints, and title/author fingerprints
   are matching evidence, not permanent identity.
 - Derived: normalized identifiers, selected canonical title, selected canonical
@@ -495,11 +493,9 @@ Core relationships:
 Identity rules:
 
 - `catalog_item_id` is the durable internal key for valuation and decision work.
-- Target durable behavior: `catalog_item_id` values are persisted state. They
-  must remain stable across runs and must never be regenerated from Amazon row
-  order, catalog sort order, or output row order.
-- Current transitional behavior: generated metadata and catalog outputs include
-  run-local `catalog_item_id` values assigned during the current full run.
+- Current durable behavior: `catalog_item_id` values are persisted state in
+  `data/catalog_items.csv`. They must remain stable across runs and must never
+  be regenerated from Amazon row order, catalog sort order, or output row order.
 - ISBNs, OCLC numbers, LCCNs, ASINs, and source row numbers are identifiers, not
   durable internal keys.
 - ISBN-13 is the preferred matching attribute, not the canonical identity.
@@ -679,10 +675,10 @@ Once matched, the acquisition references the existing or newly created
 prior assessment as stale, but it should not replace the internal ID or
 silently rerun research priority for every known book.
 
-Target implementations must preserve existing `catalog_item_id` values by
-reading `data/catalog_items.csv` before assigning IDs. New IDs should be
-monotonic, UUID-based, or otherwise independent of the latest import's row
-order. The current implementation has not reached this durable state yet.
+Implementations must preserve existing `catalog_item_id` values by reading
+`data/catalog_items.csv` before assigning IDs. New IDs should be monotonic,
+UUID-based, or otherwise independent of the latest import's row order. The
+current implementation uses monotonic `BK000001`-style IDs.
 
 Research priority and market valuation remain separate. A future durable file
 such as `data/market_valuations.csv` may answer what a book is likely worth;

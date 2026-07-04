@@ -92,10 +92,10 @@ and centralized path handling. It intentionally preserves the current generated
 outputs and legacy Open Library cache defaults while preparing for
 provider-specific caches under `cache/openlibrary/`.
 
-The second implementation step adds run-local `catalog_item_id` values to the
-generated metadata and catalog outputs. Those IDs are assigned after the current
-full-run sort and are not durable yet. Durable ID reuse from
-`data/catalog_items.csv` belongs to a later v0.2.0 step.
+The second implementation step added `catalog_item_id` values to generated
+metadata and catalog outputs. The third implementation step makes those IDs
+durable by loading and rewriting `data/catalog_items.csv` during
+`update-library`.
 
 Intended command:
 
@@ -164,13 +164,11 @@ must not be read as source data.
 are matching attributes and useful human-readable columns, but they are not the
 canonical identity.
 
-Target durable behavior: `catalog_item_id` values must be stable across runs.
-The pipeline must load existing IDs from `data/catalog_items.csv` and assign new
-IDs only after matching fails. IDs must not be regenerated from Amazon row
-order, catalog sort order, output row order, or any other run-local position.
-
-Current transitional behavior: generated outputs include run-local
-`catalog_item_id` values assigned after the current full-run sort.
+Current durable behavior: `catalog_item_id` values are stable across runs when
+an item can be matched to `data/catalog_items.csv`. The pipeline loads existing
+IDs and assigns new IDs only after matching fails. IDs must not be regenerated
+from Amazon row order, catalog sort order, output row order, or any other
+run-local position.
 
 Import matching should use the strongest available evidence in this order where
 practical:
@@ -179,6 +177,10 @@ practical:
 2. ISBN-10.
 3. Source fingerprint.
 4. Normalized title plus author fallback.
+
+The current implementation supports ISBN-13, ISBN-10, and normalized title plus
+author matching. `source_fingerprint` is reserved for the future
+source-item/acquisition layer and is currently written blank.
 
 Once a source record is matched, its acquisition row references the existing or
 newly created `catalog_item_id`. Other durable files also reference

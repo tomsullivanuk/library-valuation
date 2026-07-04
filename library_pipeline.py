@@ -81,6 +81,18 @@ BOOK_METADATA_FIELDNAMES = [
     "resolved_query",
 ]
 
+CATALOG_ITEMS_FIELDNAMES = [
+    "catalog_item_id",
+    "isbn13",
+    "isbn10",
+    "title",
+    "author",
+    "publisher",
+    "publication_year",
+    "source_fingerprint",
+    "match_confidence",
+]
+
 LIBRARY_CATALOG_FIELDNAMES = [
     "catalog_item_id",
     "lcc",
@@ -122,6 +134,10 @@ class LibraryPaths:
     @property
     def openlibrary_search_cache_path(self) -> Path:
         return self.openlibrary_cache_dir / "search.json"
+
+    @property
+    def catalog_items_path(self) -> Path:
+        return self.data_dir / "catalog_items.csv"
 
     def ensure_directories(self) -> None:
         for path in (
@@ -725,6 +741,9 @@ def update_library(
         isbn_cache_path=isbn_cache_path,
         search_cache_path=search_cache_path,
     )
+    catalog_items = load_catalog_items(paths.catalog_items_path)
+    metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
+    write_catalog_items(paths.catalog_items_path, catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
@@ -747,17 +766,141 @@ def format_catalog_item_id(sequence_number: int) -> str:
     return f"BK{sequence_number:06d}"
 
 
-def assign_catalog_item_ids(records: list[dict[str, str]], start: int = 1) -> list[dict[str, str]]:
-    # PR 2 transitional behavior: catalog_item_id values are run-local and
-    # assigned after the current full-run sort. Future PRs will load/reuse
-    # durable IDs from data/catalog_items.csv before assigning IDs to new
-    # unmatched items.
-    assigned = []
-    for offset, record in enumerate(records):
-        assigned_record = dict(record)
-        assigned_record["catalog_item_id"] = format_catalog_item_id(start + offset)
-        assigned.append(assigned_record)
-    return assigned
+def load_catalog_items(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    with path.open(newline="", encoding="utf-8") as handle:
+        return [{field: row.get(field, "") for field in CATALOG_ITEMS_FIELDNAMES} for row in csv.DictReader(handle)]
+
+
+def write_catalog_items(path: Path, rows: list[dict[str, str]]) -> None:
+    write_csv(path, CATALOG_ITEMS_FIELDNAMES, rows)
+
+
+def reconcile_catalog_items(
+    metadata_rows: list[dict[str, str]], existing_items: list[dict[str, str]]
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    matcher = CatalogMatcher(existing_items)
+    reconciled_metadata = []
+    current_items_by_id = {row.get("catalog_item_id", ""): dict(row) for row in existing_items if row.get("catalog_item_id")}
+
+    for metadata in metadata_rows:
+        match, confidence = matcher.match(metadata)
+        if match:
+            catalog_item_id = match["catalog_item_id"]
+        else:
+            catalog_item_id = matcher.next_catalog_item_id()
+            confidence = initial_match_confidence(metadata)
+
+        metadata_with_id = dict(metadata)
+        metadata_with_id["catalog_item_id"] = catalog_item_id
+        reconciled_metadata.append(metadata_with_id)
+
+        catalog_item = merge_catalog_item(match, metadata_with_id, confidence)
+        current_items_by_id[catalog_item_id] = catalog_item
+        matcher.add(catalog_item)
+
+    catalog_items = sorted(current_items_by_id.values(), key=lambda row: row.get("catalog_item_id", ""))
+    return reconciled_metadata, catalog_items
+
+
+class CatalogMatcher:
+    def __init__(self, catalog_items: list[dict[str, str]]):
+        self.catalog_items_by_id = {row.get("catalog_item_id", ""): row for row in catalog_items if row.get("catalog_item_id")}
+        self.by_isbn13: dict[str, dict[str, str]] = {}
+        self.by_isbn10: dict[str, dict[str, str]] = {}
+        self.by_source_fingerprint: dict[str, dict[str, str]] = {}
+        self.by_title_author: dict[str, dict[str, str]] = {}
+        for item in catalog_items:
+            self.add(item)
+
+    def add(self, item: dict[str, str]) -> None:
+        catalog_item_id = item.get("catalog_item_id", "")
+        if catalog_item_id:
+            self.catalog_items_by_id[catalog_item_id] = item
+        if item.get("isbn13"):
+            self.by_isbn13.setdefault(item["isbn13"], item)
+        if item.get("isbn10"):
+            self.by_isbn10.setdefault(item["isbn10"], item)
+        if item.get("source_fingerprint"):
+            self.by_source_fingerprint.setdefault(item["source_fingerprint"], item)
+        title_author_key = normalized_title_author_key(item)
+        if title_author_key:
+            self.by_title_author.setdefault(title_author_key, item)
+
+    def match(self, row: dict[str, str]) -> tuple[dict[str, str] | None, str]:
+        if row.get("isbn13") and row["isbn13"] in self.by_isbn13:
+            return self.by_isbn13[row["isbn13"]], "high"
+        if row.get("isbn10") and row["isbn10"] in self.by_isbn10:
+            return self.by_isbn10[row["isbn10"]], "high"
+        # TODO: Populate source_fingerprint from source evidence once the
+        # durable acquisitions/source-item layer exists.
+        if row.get("source_fingerprint") and row["source_fingerprint"] in self.by_source_fingerprint:
+            return self.by_source_fingerprint[row["source_fingerprint"]], "high"
+        title_author_key = normalized_title_author_key(row)
+        if title_author_key and title_author_key in self.by_title_author:
+            return self.by_title_author[title_author_key], "medium"
+        return None, "needs_review"
+
+    def next_catalog_item_id(self) -> str:
+        max_sequence = 0
+        for catalog_item_id in self.catalog_items_by_id:
+            match = re.fullmatch(r"BK(\d{6})", catalog_item_id)
+            if match:
+                max_sequence = max(max_sequence, int(match.group(1)))
+        return format_catalog_item_id(max_sequence + 1)
+
+
+def normalized_title_author_key(row: dict[str, str]) -> str:
+    title = normalize_match_text(row.get("title") or row.get("representative_product_name", ""))
+    author = normalize_match_text(row.get("author") or row.get("authors", ""))
+    if not title or not author:
+        return ""
+    return f"{title}|{author}"
+
+
+def normalize_match_text(value: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", (value or "").lower()))
+
+
+def initial_match_confidence(metadata: dict[str, str]) -> str:
+    if metadata.get("isbn13") or metadata.get("isbn10"):
+        return "high"
+    if normalized_title_author_key(metadata):
+        return "medium"
+    return "needs_review"
+
+
+def catalog_item_from_metadata(metadata: dict[str, str], match_confidence: str) -> dict[str, str]:
+    return {
+        "catalog_item_id": metadata.get("catalog_item_id", ""),
+        "isbn13": metadata.get("isbn13", ""),
+        "isbn10": metadata.get("isbn10", ""),
+        "title": metadata.get("title") or metadata.get("representative_product_name", ""),
+        "author": metadata.get("authors", ""),
+        "publisher": metadata.get("publishers", ""),
+        "publication_year": publication_year(metadata.get("publish_date", "")),
+        "source_fingerprint": metadata.get("source_fingerprint", ""),
+        "match_confidence": match_confidence,
+    }
+
+
+def merge_catalog_item(existing: dict[str, str] | None, metadata: dict[str, str], match_confidence: str) -> dict[str, str]:
+    incoming = catalog_item_from_metadata(metadata, match_confidence)
+    if not existing:
+        return incoming
+    merged = {field: existing.get(field, "") for field in CATALOG_ITEMS_FIELDNAMES}
+    for field, value in incoming.items():
+        if field == "catalog_item_id":
+            merged[field] = value
+        elif not merged.get(field) and value:
+            merged[field] = value
+    return merged
+
+
+def publication_year(value: str) -> str:
+    match = re.search(r"\b(\d{4})\b", value or "")
+    return match.group(1) if match else ""
 
 
 def build_book_metadata_rows(
@@ -796,8 +939,7 @@ def build_book_metadata_rows(
         if search_cache_path and len(search_cache) != search_cache_count:
             save_cache(search_cache_path, search_cache)
         rows.append(metadata_row(summary, resolved))
-    sorted_rows = sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
-    return assign_catalog_item_ids(sorted_rows)
+    return sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
 
 
 def fetch_missing_isbn_cache(
