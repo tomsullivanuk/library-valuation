@@ -4,11 +4,13 @@ from pathlib import Path
 from library_pipeline import (
     LibraryPaths,
     analyze_enrichment,
+    assign_catalog_item_ids,
     book_candidate_from_row,
     build_book_metadata_rows,
     build_library_catalog_rows,
     build_parser,
     classify_asin,
+    format_catalog_item_id,
     is_valid_isbn10,
     is_valid_isbn13,
     isbn10_to_isbn13,
@@ -101,6 +103,29 @@ def test_library_paths_default_layout():
     assert paths.output_dir == Path("output")
     assert paths.openlibrary_isbn_cache_path == Path("cache/openlibrary/isbn.json")
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
+
+
+def test_format_catalog_item_id():
+    assert format_catalog_item_id(1) == "BK000001"
+    assert format_catalog_item_id(42) == "BK000042"
+
+
+def test_format_catalog_item_id_rejects_non_positive_sequence():
+    try:
+        format_catalog_item_id(0)
+    except ValueError as error:
+        assert "positive" in str(error)
+    else:
+        raise AssertionError("Expected non-positive catalog item sequence to fail")
+
+
+def test_assign_catalog_item_ids_adds_unique_ids_without_mutating_records():
+    records = [{"isbn13": "9780198786221"}, {"isbn13": "9780061571275"}]
+
+    assigned = assign_catalog_item_ids(records)
+
+    assert [row["catalog_item_id"] for row in assigned] == ["BK000001", "BK000002"]
+    assert records == [{"isbn13": "9780198786221"}, {"isbn13": "9780061571275"}]
 
 
 def test_library_paths_ensure_directories(tmp_path, monkeypatch):
@@ -205,6 +230,7 @@ def test_build_book_metadata_rows_deduplicates_by_isbn():
     assert len(rows) == 1
     assert rows[0]["purchase_count"] == "2"
     assert rows[0]["total_quantity"] == "3"
+    assert rows[0]["catalog_item_id"] == "BK000001"
     assert rows[0]["title"] == "Cognitive neuroscience"
     assert rows[0]["lcc"] == "QP360.5"
 
@@ -214,6 +240,7 @@ def test_build_library_catalog_rows_joins_metadata():
     metadata = [
         {
             "isbn13": "9780198786221",
+            "catalog_item_id": "BK000001",
             "title": "Cognitive neuroscience",
             "authors": "Richard Passingham",
             "lcc": "QP360.5",
@@ -226,6 +253,7 @@ def test_build_library_catalog_rows_joins_metadata():
 
     assert catalog[0]["title"] == "Cognitive neuroscience"
     assert catalog[0]["lcc"] == "QP360.5"
+    assert catalog[0]["catalog_item_id"] == "BK000001"
 
 
 def test_valuation_extension_context_names_post_catalog_handoff():

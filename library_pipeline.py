@@ -54,6 +54,7 @@ RESOLVED_FIELDNAMES = ENRICHED_FIELDNAMES + [
 ]
 
 BOOK_METADATA_FIELDNAMES = [
+    "catalog_item_id",
     "isbn13",
     "isbn10",
     "asin",
@@ -81,6 +82,7 @@ BOOK_METADATA_FIELDNAMES = [
 ]
 
 LIBRARY_CATALOG_FIELDNAMES = [
+    "catalog_item_id",
     "lcc",
     "title",
     "authors",
@@ -739,6 +741,25 @@ def update_library(
     }
 
 
+def format_catalog_item_id(sequence_number: int) -> str:
+    if sequence_number < 1:
+        raise ValueError("Catalog item sequence number must be positive.")
+    return f"BK{sequence_number:06d}"
+
+
+def assign_catalog_item_ids(records: list[dict[str, str]], start: int = 1) -> list[dict[str, str]]:
+    # PR 2 transitional behavior: catalog_item_id values are run-local and
+    # assigned after the current full-run sort. Future PRs will load/reuse
+    # durable IDs from data/catalog_items.csv before assigning IDs to new
+    # unmatched items.
+    assigned = []
+    for offset, record in enumerate(records):
+        assigned_record = dict(record)
+        assigned_record["catalog_item_id"] = format_catalog_item_id(start + offset)
+        assigned.append(assigned_record)
+    return assigned
+
+
 def build_book_metadata_rows(
     purchases: list[dict[str, str]],
     isbn_cache: dict[str, dict],
@@ -775,7 +796,8 @@ def build_book_metadata_rows(
         if search_cache_path and len(search_cache) != search_cache_count:
             save_cache(search_cache_path, search_cache)
         rows.append(metadata_row(summary, resolved))
-    return sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
+    sorted_rows = sorted(rows, key=lambda row: (row.get("lcc") or "ZZZ", row.get("title") or row.get("representative_product_name", "")))
+    return assign_catalog_item_ids(sorted_rows)
 
 
 def fetch_missing_isbn_cache(
@@ -864,6 +886,7 @@ def build_library_catalog_rows(
         metadata = metadata_by_isbn.get(purchase.get("isbn13", ""), {})
         catalog.append(
             {
+                "catalog_item_id": metadata.get("catalog_item_id", ""),
                 "lcc": metadata.get("lcc", ""),
                 "title": metadata.get("title") or purchase.get("product_name", ""),
                 "authors": metadata.get("authors", ""),
