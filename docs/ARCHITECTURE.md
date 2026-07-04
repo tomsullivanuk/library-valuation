@@ -82,9 +82,128 @@ The workflow also reuses:
 These caches reduce repeated external requests and help preserve reproducible
 results for a given run.
 
+## v0.2.0 Incremental Workflow Target
+
+Version 0.2.0 should change the monthly workflow from a generated-output-only
+pipeline into an incremental, file-backed catalog workflow.
+
+The first implementation step only establishes the expected directory structure
+and centralized path handling. It intentionally preserves the current generated
+outputs and legacy Open Library cache defaults while preparing for
+provider-specific caches under `cache/openlibrary/`.
+
+The second implementation step adds run-local `catalog_item_id` values to the
+generated metadata and catalog outputs. Those IDs are assigned after the current
+full-run sort and are not durable yet. Durable ID reuse from
+`data/catalog_items.csv` belongs to a later v0.2.0 step.
+
+Intended command:
+
+```bash
+python3 library_pipeline.py update-library \
+  --input-dir input \
+  --data-dir data \
+  --cache-dir cache \
+  --output-dir output
+```
+
+Default behavior:
+
+- Load previous durable catalog state.
+- Find the latest full Amazon CSV in `input/amazon`.
+- Rebuild current acquisitions from the latest full-history file.
+- Reconcile acquisitions to `catalog_items` using ISBN-first matching.
+- Update catalog metadata from source data and Open Library cache lookups.
+- Load existing research priority assessments.
+- Assess only newly discovered catalog items by default.
+- Preserve prior assessments for known items.
+- Regenerate output files from durable state.
+
+Research-priority re-evaluation should be explicit:
+
+```text
+--reevaluate new       # default
+--reevaluate stale
+--reevaluate all
+```
+
+Version fields:
+
+- `pipeline_version = 0.2.0`
+- `schema_version = 1`
+
+The pipeline version may change frequently. The schema version changes only
+when durable CSV layouts become incompatible.
+
+### Durable State Layout
+
+`input/` contains user-provided source files. For v0.2.0, this means full Amazon
+Order History CSV downloads under `input/amazon/`.
+
+`data/` contains durable project state:
+
+- `import_manifest.csv`: audit log of processed imports.
+- `catalog_items.csv`: one row per distinct catalog item/book identity.
+- `acquisitions.csv`: one row per purchase or acquisition event.
+- `research_priority_assessments.csv`: latest durable research-priority
+  assessment per catalog item.
+
+`cache/` contains provider-specific external lookup caches:
+
+- `openlibrary/isbn.json`
+- `openlibrary/search.json`
+
+`config/` contains scoring and classification configuration.
+
+`output/` contains generated artifacts only. Prior generated Excel or CSV files
+must not be read as source data.
+
+### Identity And Matching
+
+`catalog_item_id` is the permanent internal identity for catalog records. ISBNs
+are matching attributes and useful human-readable columns, but they are not the
+canonical identity.
+
+Target durable behavior: `catalog_item_id` values must be stable across runs.
+The pipeline must load existing IDs from `data/catalog_items.csv` and assign new
+IDs only after matching fails. IDs must not be regenerated from Amazon row
+order, catalog sort order, output row order, or any other run-local position.
+
+Current transitional behavior: generated outputs include run-local
+`catalog_item_id` values assigned after the current full-run sort.
+
+Import matching should use the strongest available evidence in this order where
+practical:
+
+1. ISBN-13.
+2. ISBN-10.
+3. Source fingerprint.
+4. Normalized title plus author fallback.
+
+Once a source record is matched, its acquisition row references the existing or
+newly created `catalog_item_id`. Other durable files also reference
+`catalog_item_id`.
+
+`data/catalog_items.csv` represents the current catalog-level identity and
+metadata for a book. `data/acquisitions.csv` represents source-linked purchase
+or acquisition facts. Acquisition rows should avoid duplicating book metadata
+except where needed for source provenance or reconciliation.
+
+### Metadata Changes
+
+Open Library or another provider may later return better metadata for a known
+item. The catalog may accept better derived metadata while preserving the same
+`catalog_item_id`.
+
+If scoring-relevant metadata changes, the existing research priority assessment
+should be marked stale rather than silently replaced during the default monthly
+run. The user can then choose `--reevaluate stale` or `--reevaluate all`.
+
 ## Source-of-Truth Principle
 
-The normalized catalog is the source of truth.
+The durable state under `data/`, together with user source files under
+`input/`, provider caches under `cache/`, and configuration under `config/`, is
+the source of truth.
 
 Generated spreadsheets, reports, dashboards, and review workbooks are outputs.
 They should not become the canonical data store, and the catalog should not be
@@ -100,6 +219,8 @@ The system should keep distinct categories of information separate:
 
 - Catalog data: bibliographic and acquisition facts such as ISBN, title,
   authors, publishers, classifications, purchase date, and source identifiers.
+- Research priority: a planning assessment that answers whether a book should
+  be researched.
 - Market research: observed listings, completed sales, dealer notes, source
   URLs, capture dates, condition observations, and comparable-copy evidence.
 - Valuation estimates: derived retail estimates, dealer-value estimates,
@@ -111,6 +232,12 @@ This separation matters because each layer changes at a different pace.
 Bibliographic facts should remain stable. Market observations can expire.
 Valuation estimates may change as pricing strategy improves. Decisions may
 depend on family goals, time constraints, and risk tolerance.
+
+Research priority must not be mixed with future market valuation. Research
+priority answers "Should this book be researched?" Market valuation answers
+"What is this book likely worth?" A future durable file such as
+`data/market_valuations.csv` should be separate from
+`data/research_priority_assessments.csv`.
 
 ## Planned Future Architecture
 
@@ -186,6 +313,10 @@ The project should distinguish between:
 - Caches that preserve external enrichment responses.
 - Normalized catalog data that acts as the durable project dataset.
 - Generated artifacts for browsing, analysis, review, and communication.
+
+For v0.2.0, generated Excel and CSV files under `output/` must not be read as
+source data. They must be reproducible from `input/`, `data/`, `cache/`,
+`config/`, and code.
 
 When generated files are committed, the reason should be clear: for example,
 sample outputs, reproducibility checkpoints, or user-facing deliverables.

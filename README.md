@@ -62,7 +62,7 @@ pytest
 
 ## Usage
 
-Monthly update from a fresh full Amazon export:
+Current monthly update from a fresh full Amazon export:
 
 ```bash
 python3 library_pipeline.py update-library \
@@ -79,6 +79,76 @@ This writes:
 The update workflow reuses `output/openlibrary_cache.json` and
 `output/openlibrary_search_cache.json`, so ISBNs and title searches that already
 have answers are not requested again.
+
+### v0.2.0 Monthly Workflow Target
+
+The first implementation step toward v0.2.0 introduces the project directory
+conventions and centralized path handling while preserving the current generated
+outputs and legacy cache defaults.
+
+The current implementation also emits run-local `catalog_item_id` values in
+generated metadata and catalog outputs. Durable reuse of those IDs from
+`data/catalog_items.csv` is a future v0.2.0 step.
+
+Version 0.2.0 should support an incremental workflow built around full-history
+Amazon exports. The user periodically downloads a full Amazon Order History CSV,
+saves it under `input/amazon/`, and runs:
+
+```bash
+python3 library_pipeline.py update-library \
+  --input-dir input \
+  --data-dir data \
+  --cache-dir cache \
+  --output-dir output
+```
+
+Default behavior:
+
+- Load previous durable catalog state.
+- Find the latest full Amazon CSV in `input/amazon`.
+- Rebuild current acquisitions from the latest full-history file.
+- Reconcile acquisitions to catalog items using ISBN-first matching.
+- Update catalog metadata.
+- Load existing research priority assessments.
+- Assess only newly discovered catalog items by default.
+- Preserve prior assessments for known catalog items.
+- Regenerate output files.
+
+Re-evaluation options:
+
+```text
+--reevaluate new       # default
+--reevaluate stale
+--reevaluate all
+```
+
+Durable state should live outside generated outputs:
+
+```text
+input/amazon/                         full Amazon Order History CSV downloads
+data/import_manifest.csv              import audit log
+data/catalog_items.csv                one row per catalog item identity
+data/acquisitions.csv                 one row per purchase/acquisition event
+data/research_priority_assessments.csv
+cache/openlibrary/isbn.json           Open Library ISBN lookup cache
+cache/openlibrary/search.json         Open Library title-search cache
+output/                               generated CSV, XLSX, and reports only
+```
+
+`catalog_item_id` is the permanent internal identity for catalog records.
+ISBN-13 remains the preferred matching attribute, followed by ISBN-10, source
+fingerprint, and normalized title/author fallback. Other durable files should
+reference `catalog_item_id`. In the target durable workflow, existing
+`catalog_item_id` values must be loaded from `data/catalog_items.csv` and reused
+across runs; they must not be regenerated from Amazon row order, catalog sort
+order, or output row order.
+
+Generated Excel and CSV files under `output/` are not source data. They should
+be reproducible from `input/`, `data/`, `cache/`, `config/`, and code.
+
+Research priority is separate from market valuation. Research priority answers
+whether a book should be researched; a future market valuation layer should
+answer what the book is likely worth.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

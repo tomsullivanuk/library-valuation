@@ -64,6 +64,75 @@ Exit condition:
   can be added without mixing facts, estimates, and recommendations in one flat
   table.
 
+## v0.2.0: Incremental Full-History Imports
+
+Version 0.2.0 should make the monthly Amazon workflow incremental without using
+generated workbooks as source data.
+
+Goals:
+
+- Treat each Amazon download as a full-history source file, not a delta.
+- Introduce durable CSV state under `data/`.
+- Use `catalog_item_id` as the permanent internal catalog identity.
+- Preserve durable `catalog_item_id` values across runs by loading existing
+  catalog state before assigning IDs.
+- Never derive `catalog_item_id` values from Amazon row order, catalog sort
+  order, output row order, or other run-local positions.
+- Treat ISBN-13 and ISBN-10 as preferred matching attributes, not canonical
+  identity.
+- Keep catalog items and acquisitions clearly separated.
+- Preserve existing research priority assessments for known catalog items.
+- Assess only newly discovered catalog items by default.
+- Keep research priority separate from future market valuation.
+
+Durable files:
+
+- `data/import_manifest.csv`: import audit log with file hash, counts, pipeline
+  version, schema version, and latest-file marker.
+- `data/catalog_items.csv`: one row per distinct catalog item/book identity.
+- `data/acquisitions.csv`: one row per purchase or acquisition event.
+- `data/research_priority_assessments.csv`: durable assessments linked by
+  `catalog_item_id`.
+
+Cache layout:
+
+- `cache/openlibrary/isbn.json`
+- `cache/openlibrary/search.json`
+
+Default command:
+
+```bash
+python3 library_pipeline.py update-library \
+  --input-dir input \
+  --data-dir data \
+  --cache-dir cache \
+  --output-dir output
+```
+
+Re-evaluation options:
+
+```text
+--reevaluate new
+--reevaluate stale
+--reevaluate all
+```
+
+Exit condition:
+
+- A monthly run from the latest full Amazon CSV rebuilds acquisitions, reconciles
+  them to durable catalog items, evaluates only new catalog items by default,
+  preserves prior assessments, records an import-manifest audit row, and
+  regenerates output artifacts from `input/`, `data/`, `cache/`, and `config/`.
+
+Implementation status:
+
+- Done: directory conventions and centralized path handling.
+- Done: run-local `catalog_item_id` values in generated metadata and catalog
+  outputs.
+- Not yet done: durable ID reuse from `data/catalog_items.csv`.
+- Not yet done: durable acquisitions, research-priority assessments, import
+  manifest, latest-file detection, and re-evaluation modes.
+
 ## Sprint 2: Research Priority Score
 
 Sprint 2 should add a heuristic score that identifies which books deserve human

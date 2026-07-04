@@ -191,10 +191,11 @@ A `Catalog Item` is the canonical record for a book or book-like object in the
 library. It represents the item to be analyzed, researched, valued, and included
 in generated outputs.
 
-In the current pipeline, the closest equivalent is one unique ISBN-13 metadata
-row. Over time, catalog identity may need to handle items without ISBNs,
-multi-volume sets, duplicate copies, special editions, and manually entered
-items.
+The catalog item has its own permanent internal identity. ISBN-13 is the
+preferred matching attribute when available, but it is not the canonical
+identity. This distinction matters because some books lack ISBNs, some source
+ISBNs are wrong or incomplete, some books have multiple ISBNs, and future
+sources may provide weak or no ISBN data.
 
 Fields:
 
@@ -203,6 +204,9 @@ Fields:
 - `primary_identifier`: canonical identifier value.
 - `isbn13`: normalized ISBN-13, when available.
 - `isbn10`: normalized ISBN-10, when available.
+- `source_fingerprint`: source-derived matching fingerprint for items without a
+  reliable ISBN.
+- `match_confidence`: high, medium, low, or needs_review.
 - `oclc`: OCLC identifier or identifiers.
 - `lccn`: Library of Congress Control Number or numbers.
 - `title`: canonical title.
@@ -225,6 +229,15 @@ Fields:
 Data classification:
 
 - Immutable: `catalog_item_id` should not change once assigned.
+- Target stability: durable `catalog_item_id` values must be loaded from state
+  and reused across runs. New durable IDs are assigned only for genuinely new
+  catalog items after matching has failed.
+- Target generation: durable `catalog_item_id` values must not be derived from
+  input row order, output row order, sort order, or other run-local positions.
+- Current v0.2.0 transition: generated outputs may contain run-local
+  `catalog_item_id` values until `data/catalog_items.csv` is implemented.
+- Matching: ISBN-13, ISBN-10, source fingerprints, and title/author fingerprints
+  are matching evidence, not permanent identity.
 - Derived: normalized identifiers, selected canonical title, selected canonical
   contributors, classifications, and subjects may be derived from enrichment and
   resolution rules.
@@ -298,19 +311,30 @@ Fields:
 
 - `research_priority_id`: stable internal identifier for the scoring event.
 - `catalog_item_id`: linked catalog item.
-- `score`: numeric priority score.
-- `band`: high, medium, low, manual_review, or excluded.
-- `reasons`: human-readable scoring reasons.
-- `scoring_version`: version of the scoring rules.
-- `scored_at`: timestamp.
+- `isbn13`: current ISBN-13 snapshot, when available, for readability only.
+- `rps_score`: numeric priority score.
+- `rps_band`: high, medium, low, manual_review, or excluded.
+- `rps_reasons`: human-readable scoring reasons.
+- `rps_model_version`: version of the research-priority scoring rules.
+- `rps_config_hash`: hash of the scoring configuration used.
+- `assessed_at`: timestamp.
+- `assessment_status`: current, stale_metadata, needs_review, or excluded.
+- `assessment_method`: automatic, manual, or overridden.
+- `reviewed_by`: optional user or process that reviewed or overrode the
+  assessment.
+- `metadata_snapshot_hash`: hash of scoring-relevant catalog metadata at the
+  time of assessment.
 
 Data classification:
 
-- Derived: score, band, reasons.
-- Regenerated: research priorities should be regenerated when catalog data or
-  scoring rules change.
-- User-maintained: optional manual priority override should be stored separately
-  from the generated score.
+- Derived: automatic score, band, reasons, config hash, and metadata snapshot
+  hash.
+- Regenerated: automatic research priorities may be regenerated for newly
+  discovered, stale, or explicitly requested catalog items.
+- User-maintained: manual and overridden assessments are durable decisions and
+  must not be silently replaced by automatic scoring.
+- Separated: research priority answers whether a book should be researched; it
+  does not estimate what the book is worth.
 
 ### Market Observation
 
@@ -471,8 +495,16 @@ Core relationships:
 Identity rules:
 
 - `catalog_item_id` is the durable internal key for valuation and decision work.
+- Target durable behavior: `catalog_item_id` values are persisted state. They
+  must remain stable across runs and must never be regenerated from Amazon row
+  order, catalog sort order, or output row order.
+- Current transitional behavior: generated metadata and catalog outputs include
+  run-local `catalog_item_id` values assigned during the current full run.
 - ISBNs, OCLC numbers, LCCNs, ASINs, and source row numbers are identifiers, not
   durable internal keys.
+- ISBN-13 is the preferred matching attribute, not the canonical identity.
+- Durable files should reference `catalog_item_id`; ISBN columns are retained as
+  searchable and human-readable attributes.
 - Multiple source items may refer to the same catalog item.
 - One source item may become more than one catalog item when a row represents a
   set, bundle, or ambiguous multi-volume purchase.
@@ -518,6 +550,144 @@ Examples:
 
 Derived data can be regenerated when source data, cached responses,
 configuration, or rules change.
+
+## v0.2.0 Durable CSV State
+
+Version 0.2.0 introduces a minimal file-backed state model for the monthly
+full-history Amazon workflow.
+
+Version fields:
+
+- `pipeline_version`: `0.2.0`.
+- `schema_version`: `1`.
+
+The pipeline version may change whenever behavior changes. The schema version
+changes only when durable CSV layouts become incompatible.
+
+Recommended directories:
+
+- `input/amazon/`: full Amazon Order History CSV downloads saved by the user.
+- `data/`: durable project state and user-reviewable state.
+- `cache/`: provider-specific external lookup caches.
+- `config/`: scoring and classification configuration.
+- `output/`: generated artifacts only.
+
+Durable files:
+
+- `data/import_manifest.csv`: audit log of processed full-history imports.
+- `data/catalog_items.csv`: one row per distinct catalog item/book identity.
+- `data/acquisitions.csv`: one row per purchase or acquisition event.
+- `data/research_priority_assessments.csv`: durable research-priority state
+  linked by `catalog_item_id`.
+
+Provider-specific caches:
+
+- `cache/openlibrary/isbn.json`.
+- `cache/openlibrary/search.json`.
+
+Generated outputs:
+
+- Generated CSV, XLSX, reports, and workbooks live under `output/`.
+- Nothing in `output/` is source data.
+- Everything in `output/` must be reproducible from `input/`, `data/`,
+  `cache/`, `config/`, and code.
+
+`data/import_manifest.csv` fields:
+
+- `filename`
+- `file_hash`
+- `imported_at`
+- `amazon_row_count`
+- `books_detected`
+- `catalog_items`
+- `new_books`
+- `updated_books`
+- `assessment_count`
+- `pipeline_version`
+- `schema_version`
+- `is_latest`
+
+`data/catalog_items.csv` should contain the internal identity and current
+catalog-level metadata. Suggested minimum fields:
+
+- `catalog_item_id`
+- `isbn13`
+- `isbn10`
+- `source_fingerprint`
+- `match_confidence`
+- `title`
+- `authors`
+- `publishers`
+- `publish_date`
+- `lcc`
+- `dewey`
+- `lccn`
+- `oclc`
+- `subjects`
+- `openlibrary_url`
+- `resolution_source`
+- `resolution_confidence`
+- `resolution_notes`
+- `created_at`
+- `updated_at`
+
+`data/acquisitions.csv` should contain source-linked purchase facts and avoid
+duplicating catalog metadata. Suggested minimum fields:
+
+- `acquisition_id`
+- `catalog_item_id`
+- `source_type`
+- `source_file_hash`
+- `source_row_number`
+- `source_record_id`
+- `source_product_id`
+- `source_title`
+- `source_isbn10`
+- `source_isbn13`
+- `acquired_at`
+- `quantity`
+- `unit_price`
+- `currency`
+- `condition_at_acquisition`
+
+`data/research_priority_assessments.csv` should contain the latest durable
+research-priority assessment per catalog item. Suggested minimum fields:
+
+- `catalog_item_id`
+- `isbn13`
+- `rps_score`
+- `rps_band`
+- `rps_reasons`
+- `rps_model_version`
+- `rps_config_hash`
+- `assessed_at`
+- `assessment_status`
+- `assessment_method`
+- `reviewed_by`
+- `metadata_snapshot_hash`
+
+Monthly import matching should attach each acquisition to a catalog item using
+the strongest available evidence:
+
+1. ISBN-13.
+2. ISBN-10.
+3. Source fingerprint.
+4. Normalized title plus author fallback.
+
+Once matched, the acquisition references the existing or newly created
+`catalog_item_id`. A later, better match may update catalog metadata and mark a
+prior assessment as stale, but it should not replace the internal ID or
+silently rerun research priority for every known book.
+
+Target implementations must preserve existing `catalog_item_id` values by
+reading `data/catalog_items.csv` before assigning IDs. New IDs should be
+monotonic, UUID-based, or otherwise independent of the latest import's row
+order. The current implementation has not reached this durable state yet.
+
+Research priority and market valuation remain separate. A future durable file
+such as `data/market_valuations.csv` may answer what a book is likely worth;
+`data/research_priority_assessments.csv` only answers whether the book deserves
+research attention.
 
 ### User-Maintained Data
 
