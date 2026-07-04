@@ -13,6 +13,7 @@ import time
 import urllib.parse
 import urllib.request
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -98,6 +99,39 @@ LIBRARY_CATALOG_FIELDNAMES = [
 ]
 
 VALUATION_EXTENSION_STAGE = "post_catalog_rows"
+
+
+@dataclass(frozen=True)
+class LibraryPaths:
+    """Central project paths for the library pipeline."""
+
+    input_dir: Path = Path("input")
+    amazon_input_dir: Path = Path("input/amazon")
+    data_dir: Path = Path("data")
+    cache_dir: Path = Path("cache")
+    openlibrary_cache_dir: Path = Path("cache/openlibrary")
+    config_dir: Path = Path("config")
+    output_dir: Path = Path("output")
+
+    @property
+    def openlibrary_isbn_cache_path(self) -> Path:
+        return self.openlibrary_cache_dir / "isbn.json"
+
+    @property
+    def openlibrary_search_cache_path(self) -> Path:
+        return self.openlibrary_cache_dir / "search.json"
+
+    def ensure_directories(self) -> None:
+        for path in (
+            self.input_dir,
+            self.amazon_input_dir,
+            self.data_dir,
+            self.cache_dir,
+            self.openlibrary_cache_dir,
+            self.config_dir,
+            self.output_dir,
+        ):
+            path.mkdir(parents=True, exist_ok=True)
 
 
 def valuation_extension_context(
@@ -670,7 +704,11 @@ def update_library(
     isbn_cache_path: Path,
     search_cache_path: Path,
     delay: float,
+    paths: LibraryPaths | None = None,
 ) -> dict[str, int]:
+    if paths is None:
+        paths = LibraryPaths(output_dir=output_dir)
+    paths.ensure_directories()
     output_dir.mkdir(parents=True, exist_ok=True)
     purchases = extract_candidate_rows(amazon_input)
     write_table_outputs(output_dir / "book_purchases.csv", BOOK_FIELDNAMES, purchases, "Book Purchases")
@@ -950,6 +988,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     update_parser = subparsers.add_parser("update-library")
     update_parser.add_argument("--amazon-input", required=True, type=Path)
+    update_parser.add_argument("--input-dir", type=Path, default=Path("input"))
+    update_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    update_parser.add_argument("--cache-dir", type=Path, default=Path("cache"))
+    update_parser.add_argument("--config-dir", type=Path, default=Path("config"))
     update_parser.add_argument("--output-dir", type=Path, default=Path("output"))
     update_parser.add_argument(
         "--isbn-cache",
@@ -991,7 +1033,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote resolved rows to {csv_path} and {xlsx_path}")
         return 0
     if args.command == "update-library":
-        summary = update_library(args.amazon_input, args.output_dir, args.isbn_cache, args.search_cache, args.delay)
+        paths = LibraryPaths(
+            input_dir=args.input_dir,
+            amazon_input_dir=args.input_dir / "amazon",
+            data_dir=args.data_dir,
+            cache_dir=args.cache_dir,
+            openlibrary_cache_dir=args.cache_dir / "openlibrary",
+            config_dir=args.config_dir,
+            output_dir=args.output_dir,
+        )
+        summary = update_library(
+            args.amazon_input,
+            args.output_dir,
+            args.isbn_cache,
+            args.search_cache,
+            args.delay,
+            paths=paths,
+        )
         print(json.dumps(summary, indent=2, sort_keys=True))
         print(f"Wrote monthly library outputs to {args.output_dir}")
         return 0

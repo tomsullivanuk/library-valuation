@@ -2,10 +2,12 @@ import zipfile
 from pathlib import Path
 
 from library_pipeline import (
+    LibraryPaths,
     analyze_enrichment,
     book_candidate_from_row,
     build_book_metadata_rows,
     build_library_catalog_rows,
+    build_parser,
     classify_asin,
     is_valid_isbn10,
     is_valid_isbn13,
@@ -85,6 +87,49 @@ def test_paired_output_paths():
 
     assert csv_path == output
     assert xlsx_path == Path("output/books.xlsx")
+
+
+def test_library_paths_default_layout():
+    paths = LibraryPaths()
+
+    assert paths.input_dir == Path("input")
+    assert paths.amazon_input_dir == Path("input/amazon")
+    assert paths.data_dir == Path("data")
+    assert paths.cache_dir == Path("cache")
+    assert paths.openlibrary_cache_dir == Path("cache/openlibrary")
+    assert paths.config_dir == Path("config")
+    assert paths.output_dir == Path("output")
+    assert paths.openlibrary_isbn_cache_path == Path("cache/openlibrary/isbn.json")
+    assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
+
+
+def test_library_paths_ensure_directories(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    paths = LibraryPaths(
+        input_dir=Path("custom-input"),
+        amazon_input_dir=Path("custom-input/amazon"),
+        data_dir=Path("custom-data"),
+        cache_dir=Path("custom-cache"),
+        openlibrary_cache_dir=Path("custom-cache/openlibrary"),
+        config_dir=Path("custom-config"),
+        output_dir=Path("custom-output"),
+    )
+
+    paths.ensure_directories()
+
+    assert paths.input_dir.is_dir()
+    assert paths.amazon_input_dir.is_dir()
+    assert paths.data_dir.is_dir()
+    assert paths.cache_dir.is_dir()
+    assert paths.openlibrary_cache_dir.is_dir()
+    assert paths.config_dir.is_dir()
+    assert paths.output_dir.is_dir()
+
+
+def test_update_library_input_dir_is_root_input_directory():
+    args = build_parser().parse_args(["update-library", "--amazon-input", "orders.csv"])
+
+    assert args.input_dir == Path("input")
 
 
 def test_write_table_outputs_creates_csv_and_xlsx(tmp_path):
