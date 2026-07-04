@@ -60,6 +60,12 @@ python -m compileall .
 pytest
 ```
 
+To include coverage reporting:
+
+```bash
+pytest --cov
+```
+
 ## Usage
 
 Current monthly update from a fresh full Amazon export:

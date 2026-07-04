@@ -26,6 +26,7 @@ from library_pipeline import (
     write_table_outputs,
     xml_safe_text,
 )
+from valuation.repositories import AcquisitionRepository, CatalogRepository
 
 
 def test_isbn10_validation_and_conversion():
@@ -108,6 +109,128 @@ def test_library_paths_default_layout():
     assert paths.output_dir == Path("output")
     assert paths.openlibrary_isbn_cache_path == Path("cache/openlibrary/isbn.json")
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
+
+
+def test_catalog_repository_missing_file_returns_empty_list(tmp_path):
+    repository = CatalogRepository(tmp_path / "catalog_items.csv")
+
+    assert repository.load() == []
+
+
+def test_catalog_repository_round_trip_persistence(tmp_path):
+    repository = CatalogRepository(tmp_path / "data" / "catalog_items.csv")
+    rows = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "title": "Cognitive neuroscience",
+            "author": "Richard Passingham",
+            "publisher": "Oxford",
+            "publication_year": "2016",
+            "source_fingerprint": "",
+            "match_confidence": "high",
+            "ignored_extra_field": "not persisted",
+        }
+    ]
+
+    repository.save(rows)
+
+    assert repository.path.read_text(encoding="utf-8").splitlines()[0] == (
+        "catalog_item_id,isbn13,isbn10,title,author,publisher,publication_year,source_fingerprint,match_confidence"
+    )
+    assert repository.load() == [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "title": "Cognitive neuroscience",
+            "author": "Richard Passingham",
+            "publisher": "Oxford",
+            "publication_year": "2016",
+            "source_fingerprint": "",
+            "match_confidence": "high",
+        }
+    ]
+
+
+def test_catalog_repository_load_fills_missing_fields(tmp_path):
+    path = tmp_path / "catalog_items.csv"
+    path.write_text("catalog_item_id,isbn13,title\nBK000001,9780198786221,Cognitive neuroscience\n", encoding="utf-8")
+
+    rows = CatalogRepository(path).load()
+
+    assert rows[0]["catalog_item_id"] == "BK000001"
+    assert rows[0]["isbn13"] == "9780198786221"
+    assert rows[0]["isbn10"] == ""
+    assert rows[0]["match_confidence"] == ""
+
+
+def test_acquisition_repository_missing_file_returns_empty_list(tmp_path):
+    repository = AcquisitionRepository(tmp_path / "acquisitions.csv")
+
+    assert repository.load() == []
+
+
+def test_acquisition_repository_round_trip_persistence(tmp_path):
+    repository = AcquisitionRepository(tmp_path / "data" / "acquisitions.csv")
+    rows = [
+        {
+            "acquisition_id": "AMZ-123",
+            "catalog_item_id": "BK000001",
+            "source": "amazon",
+            "source_order_id": "1",
+            "source_item_id": "SRC-123",
+            "order_date": "2021-10-10T22:33:42Z",
+            "quantity": "1",
+            "item_price": "11.95",
+            "item_subtotal": "11.95",
+            "currency": "USD",
+            "source_title": "Cognitive Neuroscience",
+            "source_asin": "0198786220",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "ignored_extra_field": "not persisted",
+        }
+    ]
+
+    repository.save(rows)
+
+    assert repository.path.read_text(encoding="utf-8").splitlines()[0] == (
+        "acquisition_id,catalog_item_id,source,source_order_id,source_item_id,order_date,"
+        "quantity,item_price,item_subtotal,currency,source_title,source_asin,isbn13,isbn10"
+    )
+    assert repository.load() == [
+        {
+            "acquisition_id": "AMZ-123",
+            "catalog_item_id": "BK000001",
+            "source": "amazon",
+            "source_order_id": "1",
+            "source_item_id": "SRC-123",
+            "order_date": "2021-10-10T22:33:42Z",
+            "quantity": "1",
+            "item_price": "11.95",
+            "item_subtotal": "11.95",
+            "currency": "USD",
+            "source_title": "Cognitive Neuroscience",
+            "source_asin": "0198786220",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+        }
+    ]
+
+
+def test_acquisition_repository_load_fills_missing_fields(tmp_path):
+    path = tmp_path / "acquisitions.csv"
+    path.write_text("acquisition_id,catalog_item_id,source\nAMZ-123,BK000001,amazon\n", encoding="utf-8")
+
+    rows = AcquisitionRepository(path).load()
+
+    assert rows[0]["acquisition_id"] == "AMZ-123"
+    assert rows[0]["catalog_item_id"] == "BK000001"
+    assert rows[0]["source"] == "amazon"
+    assert rows[0]["source_order_id"] == ""
+    assert rows[0]["isbn13"] == ""
 
 
 def test_format_catalog_item_id():

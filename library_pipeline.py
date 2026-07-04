@@ -18,6 +18,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from valuation.repositories import (
+    ACQUISITION_FIELDNAMES,
+    CATALOG_ITEMS_FIELDNAMES,
+    AcquisitionRepository,
+    CatalogRepository,
+)
+
 
 BOOK_FIELDNAMES = [
     "asin",
@@ -80,35 +87,6 @@ BOOK_METADATA_FIELDNAMES = [
     "resolution_confidence",
     "resolution_notes",
     "resolved_query",
-]
-
-CATALOG_ITEMS_FIELDNAMES = [
-    "catalog_item_id",
-    "isbn13",
-    "isbn10",
-    "title",
-    "author",
-    "publisher",
-    "publication_year",
-    "source_fingerprint",
-    "match_confidence",
-]
-
-ACQUISITION_FIELDNAMES = [
-    "acquisition_id",
-    "catalog_item_id",
-    "source",
-    "source_order_id",
-    "source_item_id",
-    "order_date",
-    "quantity",
-    "item_price",
-    "item_subtotal",
-    "currency",
-    "source_title",
-    "source_asin",
-    "isbn13",
-    "isbn10",
 ]
 
 LIBRARY_CATALOG_FIELDNAMES = [
@@ -763,12 +741,14 @@ def update_library(
         isbn_cache_path=isbn_cache_path,
         search_cache_path=search_cache_path,
     )
-    catalog_items = load_catalog_items(paths.catalog_items_path)
+    catalog_repository = CatalogRepository(paths.catalog_items_path)
+    acquisition_repository = AcquisitionRepository(paths.acquisitions_path)
+    catalog_items = catalog_repository.load()
     metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
-    write_catalog_items(paths.catalog_items_path, catalog_items)
+    catalog_repository.save(catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
     acquisitions = build_acquisitions(purchases, metadata_rows)
-    write_acquisitions(paths.acquisitions_path, acquisitions)
+    acquisition_repository.save(acquisitions)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
@@ -791,25 +771,19 @@ def format_catalog_item_id(sequence_number: int) -> str:
 
 
 def load_catalog_items(path: Path) -> list[dict[str, str]]:
-    if not path.exists():
-        return []
-    with path.open(newline="", encoding="utf-8") as handle:
-        return [{field: row.get(field, "") for field in CATALOG_ITEMS_FIELDNAMES} for row in csv.DictReader(handle)]
+    return CatalogRepository(path).load()
 
 
 def write_catalog_items(path: Path, rows: list[dict[str, str]]) -> None:
-    write_csv(path, CATALOG_ITEMS_FIELDNAMES, rows)
+    CatalogRepository(path).save(rows)
 
 
 def load_acquisitions(path: Path) -> list[dict[str, str]]:
-    if not path.exists():
-        return []
-    with path.open(newline="", encoding="utf-8") as handle:
-        return [{field: row.get(field, "") for field in ACQUISITION_FIELDNAMES} for row in csv.DictReader(handle)]
+    return AcquisitionRepository(path).load()
 
 
 def write_acquisitions(path: Path, rows: list[dict[str, str]]) -> None:
-    write_csv(path, ACQUISITION_FIELDNAMES, rows)
+    AcquisitionRepository(path).save(rows)
 
 
 def build_acquisitions(purchases: list[dict[str, str]], metadata_rows: list[dict[str, str]]) -> list[dict[str, str]]:
