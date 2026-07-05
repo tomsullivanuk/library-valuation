@@ -1121,6 +1121,8 @@ def find_metadata_for_purchase(
     isbn10 = purchase.get("isbn10", "")
     if isbn10 and isbn10 in metadata_index["isbn10"]:
         return metadata_index["isbn10"][isbn10]
+    if has_isbn_evidence(purchase):
+        return {}
     title_key = normalized_acquisition_title_key(purchase)
     if title_key and title_key in metadata_index["title"]:
         return metadata_index["title"][title_key]
@@ -1221,10 +1223,14 @@ class CatalogMatcher:
             self.by_title_author.setdefault(title_author_key, item)
 
     def match(self, row: dict[str, str]) -> tuple[dict[str, str] | None, str]:
-        if row.get("isbn13") and row["isbn13"] in self.by_isbn13:
-            return self.by_isbn13[row["isbn13"]], "high"
-        if row.get("isbn10") and row["isbn10"] in self.by_isbn10:
-            return self.by_isbn10[row["isbn10"]], "high"
+        if row.get("isbn13"):
+            if row["isbn13"] in self.by_isbn13:
+                return self.by_isbn13[row["isbn13"]], "high"
+            return None, "needs_review"
+        if row.get("isbn10"):
+            if row["isbn10"] in self.by_isbn10:
+                return self.by_isbn10[row["isbn10"]], "high"
+            return None, "needs_review"
         # TODO: Populate source_fingerprint from source evidence once the
         # durable acquisitions/source-item layer exists.
         if row.get("source_fingerprint") and row["source_fingerprint"] in self.by_source_fingerprint:
@@ -1249,6 +1255,10 @@ def normalized_title_author_key(row: dict[str, str]) -> str:
     if not title or not author:
         return ""
     return f"{title}|{author}"
+
+
+def has_isbn_evidence(row: dict[str, str]) -> bool:
+    return bool(row.get("isbn13") or row.get("isbn10"))
 
 
 def normalize_match_text(value: str) -> str:

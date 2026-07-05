@@ -761,6 +761,62 @@ def test_reconcile_catalog_items_title_author_fallback_requires_title_and_author
     assert [row["catalog_item_id"] for row in catalog_items] == ["BK000011", "BK000012"]
 
 
+def test_reconcile_catalog_items_does_not_title_match_different_isbn_bearing_books():
+    existing = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "title": "Collected Works",
+            "author": "Same Author",
+            "publisher": "",
+            "publication_year": "",
+            "source_fingerprint": "",
+            "match_confidence": "high",
+        }
+    ]
+    metadata = [{"isbn13": "9780061571275", "isbn10": "006157127X", "title": "Collected Works", "authors": "Same Author"}]
+
+    reconciled, catalog_items = reconcile_catalog_items(metadata, existing)
+
+    assert reconciled[0]["catalog_item_id"] == "BK000002"
+    assert [row["catalog_item_id"] for row in catalog_items] == ["BK000001", "BK000002"]
+
+
+def test_reconcile_catalog_items_does_not_merge_multi_volume_isbn_bearing_books_by_title():
+    metadata = [
+        {"isbn13": "9780198786221", "isbn10": "0198786220", "title": "History of Philosophy", "authors": "Same Author"},
+        {"isbn13": "9780061571275", "isbn10": "006157127X", "title": "History of Philosophy", "authors": "Same Author"},
+    ]
+
+    reconciled, catalog_items = reconcile_catalog_items(metadata, [])
+
+    assert [row["catalog_item_id"] for row in reconciled] == ["BK000001", "BK000002"]
+    assert [row["catalog_item_id"] for row in catalog_items] == ["BK000001", "BK000002"]
+
+
+def test_reconcile_catalog_items_title_author_fallback_still_matches_isbnless_rows():
+    existing = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "",
+            "isbn10": "",
+            "title": "Unidentified pamphlet",
+            "author": "Anonymous",
+            "publisher": "",
+            "publication_year": "",
+            "source_fingerprint": "",
+            "match_confidence": "medium",
+        }
+    ]
+    metadata = [{"isbn13": "", "isbn10": "", "title": "Unidentified Pamphlet", "authors": "Anonymous"}]
+
+    reconciled, catalog_items = reconcile_catalog_items(metadata, existing)
+
+    assert reconciled[0]["catalog_item_id"] == "BK000001"
+    assert [row["catalog_item_id"] for row in catalog_items] == ["BK000001"]
+
+
 def test_build_acquisitions_links_purchase_rows_to_catalog_items():
     purchases = [
         {
@@ -863,6 +919,34 @@ def test_build_acquisitions_links_by_title_when_isbns_are_blank():
     acquisitions = build_acquisitions(purchases, metadata)
 
     assert acquisitions[0]["catalog_item_id"] == "BK000001"
+
+
+def test_build_acquisitions_does_not_title_match_when_purchase_has_unmatched_isbn():
+    purchases = [
+        {
+            "asin": "006157127X",
+            "isbn10": "006157127X",
+            "isbn13": "9780061571275",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+        }
+    ]
+    metadata = [
+        {
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "title": "Cognitive neuroscience",
+            "catalog_item_id": "BK000001",
+        }
+    ]
+
+    acquisitions = build_acquisitions(purchases, metadata)
+
+    assert acquisitions[0]["catalog_item_id"] == ""
 
 
 def test_library_paths_ensure_directories(tmp_path, monkeypatch):
