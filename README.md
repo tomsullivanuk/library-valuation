@@ -68,13 +68,23 @@ pytest --cov
 
 ## Usage
 
-Current monthly update from a fresh full Amazon export:
+Monthly update from a fresh full Amazon export saved under `input/amazon/`:
+
+```bash
+python3 library_pipeline.py update-library
+```
+
+You can still provide an explicit Amazon export when needed:
 
 ```bash
 python3 library_pipeline.py update-library \
-  --amazon-input "/path/to/latest Order History.csv" \
-  --output-dir output
+  --amazon-input "/path/to/Your Orders.zip"
 ```
+
+Supported Amazon inputs are `Order History.csv`, `Your Orders.zip`, and
+extracted export directories. On macOS, successful and expected failed monthly
+updates show a desktop notification when run from an interactive terminal and
+`osascript` is available.
 
 This writes:
 
@@ -86,11 +96,10 @@ The update workflow reuses `cache/openlibrary/isbn.json` and
 `cache/openlibrary/search.json`, so ISBNs and title searches that already
 have answers are not requested again.
 
-### v0.2.0 Monthly Workflow Target
+### v0.2.0 Monthly Workflow
 
-The first implementation step toward v0.2.0 introduces the project directory
-conventions and centralized path handling while preserving the current generated
-outputs and legacy cache defaults.
+Version 0.2.0 introduces durable monthly state while preserving generated CSV
+and XLSX reports as disposable outputs.
 
 The current implementation maintains durable `catalog_item_id` values in
 `data/catalog_items.csv` and includes those IDs in generated metadata and
@@ -100,22 +109,17 @@ It also rebuilds `data/acquisitions.csv` from the provided full Amazon export on
 each `update-library` run. Acquisition IDs are deterministic `AMZ-...` hashes
 derived from available Amazon purchase evidence.
 
-Version 0.2.0 should support an incremental workflow built around full-history
-Amazon exports. The user periodically downloads a full Amazon Order History CSV,
+The user periodically downloads a full Amazon Order History CSV or ZIP package,
 saves it under `input/amazon/`, and runs:
 
 ```bash
-python3 library_pipeline.py update-library \
-  --input-dir input \
-  --data-dir data \
-  --cache-dir cache \
-  --output-dir output
+python3 library_pipeline.py update-library
 ```
 
 Default behavior:
 
 - Load previous durable catalog state.
-- Find the latest full Amazon CSV in `input/amazon`.
+- Find the latest full Amazon `.csv` or `.zip` export in `input/amazon`.
 - Rebuild current acquisitions from the latest full-history file.
 - Reconcile acquisitions to catalog items using ISBN-first matching.
 - Update catalog metadata.
@@ -124,12 +128,13 @@ Default behavior:
 - Preserve prior assessments for known catalog items.
 - Regenerate output files.
 
-Re-evaluation options:
+The standard directory flags remain available for non-default workspaces:
 
 ```text
---reevaluate new       # default
---reevaluate stale
---reevaluate all
+--input-dir input
+--data-dir data
+--cache-dir cache
+--output-dir output
 ```
 
 Durable state should live outside generated outputs:

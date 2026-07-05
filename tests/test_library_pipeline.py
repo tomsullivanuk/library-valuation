@@ -236,6 +236,15 @@ def test_resolve_amazon_order_history_input_raises_when_zip_has_no_order_history
             pass
 
 
+def test_resolve_amazon_order_history_input_raises_on_bad_zip(tmp_path):
+    zip_path = tmp_path / "Your Orders.zip"
+    zip_path.write_text("not really a zip", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not a readable ZIP file"):
+        with resolve_amazon_order_history_input(zip_path):
+            pass
+
+
 def test_resolve_amazon_order_history_input_raises_on_ambiguous_directory_matches(tmp_path):
     first = tmp_path / "first" / "Order History.csv"
     second = tmp_path / "second" / "Order History.csv"
@@ -1072,6 +1081,200 @@ def test_discover_amazon_export_raises_when_input_amazon_is_empty(tmp_path):
 
     with pytest.raises(ValueError, match="No Amazon exports found"):
         discover_amazon_export(amazon_dir)
+
+
+def test_main_update_library_prints_friendly_error_without_traceback(tmp_path, capsys, monkeypatch):
+    notifications = []
+    monkeypatch.setattr(library_pipeline, "send_macos_notification", notifications.append)
+
+    result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(tmp_path / "input"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert captured.out == ""
+    assert captured.err.startswith("Error: No Amazon exports found")
+    assert "Traceback" not in captured.err
+    assert notifications == ["Library update failed"]
+
+
+def test_main_update_library_prints_friendly_error_for_unsupported_input(tmp_path, capsys, monkeypatch):
+    amazon_input = tmp_path / "orders.txt"
+    amazon_input.write_text("not an export", encoding="utf-8")
+    monkeypatch.setattr(library_pipeline, "send_macos_notification", lambda message: None)
+
+    result = main(["update-library", "--amazon-input", str(amazon_input)])
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "Error: Unsupported Amazon input" in captured.err
+    assert "Traceback" not in captured.err
+
+
+def test_main_does_not_swallow_unexpected_exceptions(tmp_path, monkeypatch):
+    amazon_input = write_amazon_history(
+        tmp_path / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+
+    def broken_update_library(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(library_pipeline, "update_library", broken_update_library)
+
+    with pytest.raises(RuntimeError, match="boom"):
+        main(["update-library", "--amazon-input", str(amazon_input)])
+
+
+def test_main_update_library_sends_success_notification(tmp_path, monkeypatch):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    write_amazon_history(
+        paths.amazon_input_dir / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    notifications = []
+
+    def fake_update_library(amazon_input_arg, output_dir, isbn_cache_path, search_cache_path, delay, paths):
+        return {
+            "amazon_export": str(amazon_input_arg),
+            "amazon_row_count": 0,
+            "purchase_rows": 0,
+            "catalog_durable_total": 0,
+            "catalog_current_export": 0,
+            "catalog_existing": 0,
+            "catalog_new": 0,
+            "acquisition_rows": 0,
+            "research_durable_total": 0,
+            "research_reused": 0,
+            "research_created": 0,
+            "manifest_entries": 0,
+        }
+
+    monkeypatch.setattr(library_pipeline, "update_library", fake_update_library)
+    monkeypatch.setattr(library_pipeline, "send_macos_notification", notifications.append)
+
+    result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+        ]
+    )
+
+    assert result == 0
+    assert notifications == ["Library update complete"]
+
+
+def test_send_macos_notification_invokes_osascript_when_available(monkeypatch):
+    calls = []
+
+    class TtyStdout:
+        def isatty(self):
+            return True
+
+    def fake_run(args, check, stdout, stderr):
+        calls.append(
+            {
+                "args": args,
+                "check": check,
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+        )
+
+    monkeypatch.delenv("LIBRARY_PIPELINE_DISABLE_NOTIFICATIONS", raising=False)
+    monkeypatch.setattr(library_pipeline.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(library_pipeline.sys, "stdout", TtyStdout())
+    monkeypatch.setattr(library_pipeline.shutil, "which", lambda command: "/usr/bin/osascript")
+    monkeypatch.setattr(library_pipeline.subprocess, "run", fake_run)
+
+    library_pipeline.send_macos_notification('Done "cleanly"')
+
+    assert calls == [
+        {
+            "args": [
+                "/usr/bin/osascript",
+                "-e",
+                'display notification "Done \\"cleanly\\"" with title "Library Valuation"',
+            ],
+            "check": False,
+            "stdout": library_pipeline.subprocess.DEVNULL,
+            "stderr": library_pipeline.subprocess.DEVNULL,
+        }
+    ]
+
+
+def test_send_macos_notification_skips_non_macos(monkeypatch):
+    calls = []
+
+    class TtyStdout:
+        def isatty(self):
+            return True
+
+    monkeypatch.delenv("LIBRARY_PIPELINE_DISABLE_NOTIFICATIONS", raising=False)
+    monkeypatch.setattr(library_pipeline.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(library_pipeline.sys, "stdout", TtyStdout())
+    monkeypatch.setattr(library_pipeline.shutil, "which", lambda command: calls.append(command))
+
+    library_pipeline.send_macos_notification("Done")
+
+    assert calls == []
+
+
+def test_send_macos_notification_ignores_launch_failure(monkeypatch):
+    class TtyStdout:
+        def isatty(self):
+            return True
+
+    def failing_run(*args, **kwargs):
+        raise OSError("osascript unavailable")
+
+    monkeypatch.delenv("LIBRARY_PIPELINE_DISABLE_NOTIFICATIONS", raising=False)
+    monkeypatch.setattr(library_pipeline.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(library_pipeline.sys, "stdout", TtyStdout())
+    monkeypatch.setattr(library_pipeline.shutil, "which", lambda command: "/usr/bin/osascript")
+    monkeypatch.setattr(library_pipeline.subprocess, "run", failing_run)
+
+    library_pipeline.send_macos_notification("Done")
 
 
 def test_format_update_summary_includes_selected_export_and_key_counts():

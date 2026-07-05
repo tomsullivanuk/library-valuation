@@ -7,8 +7,12 @@ import argparse
 import csv
 import hashlib
 import json
+import os
+import platform
 import re
+import shutil
 import ssl
+import subprocess
 import sys
 import tempfile
 import time
@@ -30,6 +34,10 @@ from valuation.repositories import (
     ImportManifestRepository,
     ResearchAssessmentRepository,
 )
+
+
+class UserFacingError(ValueError):
+    """Expected CLI error that should be shown without a traceback."""
 
 
 BOOK_FIELDNAMES = [
@@ -431,11 +439,14 @@ def resolve_amazon_order_history_input(input_path: Path):
         return
     if input_path.is_file() and input_path.suffix.lower() == ".zip":
         with tempfile.TemporaryDirectory() as temp_dir:
-            with zipfile.ZipFile(input_path) as archive:
-                safe_extract_zip(archive, Path(temp_dir))
+            try:
+                with zipfile.ZipFile(input_path) as archive:
+                    safe_extract_zip(archive, Path(temp_dir))
+            except zipfile.BadZipFile as error:
+                raise UserFacingError(f"Unsupported Amazon input: {input_path} is not a readable ZIP file.") from error
             yield find_order_history_csv(iter_order_history_candidates(Path(temp_dir)))
         return
-    raise ValueError(f"Unsupported Amazon input: {input_path}. Expected a CSV file, ZIP file, or directory.")
+    raise UserFacingError(f"Unsupported Amazon input: {input_path}. Expected a CSV file, ZIP file, or directory.")
 
 
 def iter_order_history_candidates(root: Path):
@@ -446,7 +457,7 @@ def iter_order_history_candidates(root: Path):
 def find_order_history_csv(candidates_iterable) -> Path:
     candidates = sorted(Path(candidate) for candidate in candidates_iterable)
     if not candidates:
-        raise ValueError(
+        raise UserFacingError(
             "No Amazon order history CSV found. Expected 'Your Amazon Orders/Order History.csv' "
             "or 'Retail.OrderHistory.1/Retail.OrderHistory.1.csv'."
         )
@@ -461,7 +472,7 @@ def find_order_history_csv(candidates_iterable) -> Path:
     if len(order_history) == 1:
         return order_history[0]
     candidate_list = "\n".join(str(candidate) for candidate in candidates)
-    raise ValueError(f"Multiple ambiguous Amazon order history CSV files found:\n{candidate_list}")
+    raise UserFacingError(f"Multiple ambiguous Amazon order history CSV files found:\n{candidate_list}")
 
 
 def is_preferred_order_history_path(path: Path) -> bool:
@@ -480,7 +491,7 @@ def validate_order_history_schema(path: Path) -> None:
         fieldnames = set(reader.fieldnames or [])
     missing = [field for field in AMAZON_ORDER_HISTORY_REQUIRED_COLUMNS if field not in fieldnames]
     if missing:
-        raise ValueError(f"Unsupported Amazon order history CSV schema in {path}. Missing columns: {', '.join(missing)}")
+        raise UserFacingError(f"Unsupported Amazon order history CSV schema in {path}. Missing columns: {', '.join(missing)}")
 
 
 def safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> None:
@@ -489,7 +500,7 @@ def safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> None:
         member_path = destination / member.filename
         resolved_member_path = member_path.resolve()
         if destination != resolved_member_path and destination not in resolved_member_path.parents:
-            raise ValueError(f"Unsafe path in Amazon ZIP export: {member.filename}")
+            raise UserFacingError(f"Unsafe path in Amazon ZIP export: {member.filename}")
     archive.extractall(destination)
 
 
@@ -1557,17 +1568,44 @@ def analyze_enrichment(input_path: Path) -> dict[str, str | int]:
 
 def discover_amazon_export(amazon_input_dir: Path) -> Path:
     if not amazon_input_dir.exists():
-        raise ValueError(f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input.")
+        raise UserFacingError(
+            f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input."
+        )
     candidates = sorted(
         path
         for path in amazon_input_dir.iterdir()
         if path.is_file() and path.suffix.lower() in {".csv", ".zip"}
     )
     if not candidates:
-        raise ValueError(f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input.")
+        raise UserFacingError(
+            f"No Amazon exports found in {amazon_input_dir}. Add a .zip or .csv export, or pass --amazon-input."
+        )
     if len(candidates) == 1:
         return candidates[0]
     return max(candidates, key=lambda path: (path.stat().st_mtime, str(path)))
+
+
+def send_macos_notification(message: str, title: str = "Library Valuation") -> None:
+    try:
+        if os.environ.get("LIBRARY_PIPELINE_DISABLE_NOTIFICATIONS"):
+            return
+        if platform.system() != "Darwin" or not sys.stdout.isatty():
+            return
+        osascript = shutil.which("osascript")
+        if not osascript:
+            return
+        subprocess.run(
+            [osascript, "-e", f"display notification {applescript_string(message)} with title {applescript_string(title)}"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        pass
+
+
+def applescript_string(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> str:
@@ -1659,53 +1697,60 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.command == "summarize":
-        print(json.dumps(summarize(args.input), indent=2, sort_keys=True))
-        return 0
-    if args.command == "extract":
-        count = extract_candidates(args.input, args.output)
-        csv_path, xlsx_path = paired_output_paths(args.output)
-        print(f"Wrote {count} book candidates to {csv_path} and {xlsx_path}")
-        return 0
-    if args.command == "enrich-openlibrary":
-        count = enrich_openlibrary(args.input, args.output, args.cache, args.delay, args.limit)
-        csv_path, xlsx_path = paired_output_paths(args.output)
-        print(f"Wrote {count} enriched rows to {csv_path} and {xlsx_path}")
-        return 0
-    if args.command == "analyze-enrichment":
-        print(json.dumps(analyze_enrichment(args.input), indent=2, sort_keys=True))
-        return 0
-    if args.command == "resolve-missing":
-        counts = resolve_missing(args.input, args.output, args.isbn_cache, args.search_cache, args.delay)
-        csv_path, xlsx_path = paired_output_paths(args.output)
-        print(json.dumps(counts, indent=2, sort_keys=True))
-        print(f"Wrote resolved rows to {csv_path} and {xlsx_path}")
-        return 0
-    if args.command == "update-library":
-        paths = LibraryPaths(
-            input_dir=args.input_dir,
-            amazon_input_dir=args.input_dir / "amazon",
-            data_dir=args.data_dir,
-            cache_dir=args.cache_dir,
-            openlibrary_cache_dir=args.cache_dir / "openlibrary",
-            config_dir=args.config_dir,
-            output_dir=args.output_dir,
-        )
-        amazon_input = args.amazon_input or discover_amazon_export(paths.amazon_input_dir)
-        isbn_cache = args.isbn_cache or paths.openlibrary_isbn_cache_path
-        search_cache = args.search_cache or paths.openlibrary_search_cache_path
-        print("Using Amazon export:")
-        print(f"  {amazon_input}")
-        summary = update_library(
-            amazon_input,
-            args.output_dir,
-            isbn_cache,
-            search_cache,
-            args.delay,
-            paths=paths,
-        )
-        print(format_update_summary(summary, args.output_dir))
-        return 0
+    try:
+        if args.command == "summarize":
+            print(json.dumps(summarize(args.input), indent=2, sort_keys=True))
+            return 0
+        if args.command == "extract":
+            count = extract_candidates(args.input, args.output)
+            csv_path, xlsx_path = paired_output_paths(args.output)
+            print(f"Wrote {count} book candidates to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "enrich-openlibrary":
+            count = enrich_openlibrary(args.input, args.output, args.cache, args.delay, args.limit)
+            csv_path, xlsx_path = paired_output_paths(args.output)
+            print(f"Wrote {count} enriched rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "analyze-enrichment":
+            print(json.dumps(analyze_enrichment(args.input), indent=2, sort_keys=True))
+            return 0
+        if args.command == "resolve-missing":
+            counts = resolve_missing(args.input, args.output, args.isbn_cache, args.search_cache, args.delay)
+            csv_path, xlsx_path = paired_output_paths(args.output)
+            print(json.dumps(counts, indent=2, sort_keys=True))
+            print(f"Wrote resolved rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "update-library":
+            paths = LibraryPaths(
+                input_dir=args.input_dir,
+                amazon_input_dir=args.input_dir / "amazon",
+                data_dir=args.data_dir,
+                cache_dir=args.cache_dir,
+                openlibrary_cache_dir=args.cache_dir / "openlibrary",
+                config_dir=args.config_dir,
+                output_dir=args.output_dir,
+            )
+            amazon_input = args.amazon_input or discover_amazon_export(paths.amazon_input_dir)
+            isbn_cache = args.isbn_cache or paths.openlibrary_isbn_cache_path
+            search_cache = args.search_cache or paths.openlibrary_search_cache_path
+            print("Using Amazon export:")
+            print(f"  {amazon_input}")
+            summary = update_library(
+                amazon_input,
+                args.output_dir,
+                isbn_cache,
+                search_cache,
+                args.delay,
+                paths=paths,
+            )
+            print(format_update_summary(summary, args.output_dir))
+            send_macos_notification("Library update complete")
+            return 0
+    except UserFacingError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        if args.command == "update-library":
+            send_macos_notification("Library update failed")
+        return 1
     return 2
 
 

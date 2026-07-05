@@ -82,48 +82,31 @@ The workflow also reuses:
 These caches reduce repeated external requests and help preserve reproducible
 results for a given run.
 
-## v0.2.0 Incremental Workflow Target
+## v0.2.0 Incremental Workflow
 
-Version 0.2.0 should change the monthly workflow from a generated-output-only
+Version 0.2.0 changes the monthly workflow from a generated-output-only
 pipeline into an incremental, file-backed catalog workflow.
 
-The first implementation step only establishes the expected directory structure
-and centralized path handling. It intentionally preserves the current generated
-outputs and legacy Open Library cache defaults while preparing for
-provider-specific caches under `cache/openlibrary/`.
-
-The second implementation step added `catalog_item_id` values to generated
-metadata and catalog outputs. The third implementation step makes those IDs
-durable by loading and rewriting `data/catalog_items.csv` during
-`update-library`.
-
-The fourth implementation step writes `data/acquisitions.csv` from the current
-full-history Amazon export. Acquisition rows are rebuilt each run and linked to
-durable `catalog_item_id` values.
-
-Intended command:
+Default command:
 
 ```bash
-python3 library_pipeline.py update-library \
-  --input-dir input \
-  --data-dir data \
-  --cache-dir cache \
-  --output-dir output
+python3 library_pipeline.py update-library
 ```
 
 Default behavior:
 
 - Load previous durable catalog state.
-- Find the latest full Amazon CSV in `input/amazon`.
+- Find the latest full Amazon `.csv` or `.zip` export in `input/amazon`.
 - Rebuild current acquisitions from the latest full-history file.
 - Reconcile acquisitions to `catalog_items` using ISBN-first matching.
 - Update catalog metadata from source data and Open Library cache lookups.
 - Load existing research priority assessments.
 - Assess only newly discovered catalog items by default.
 - Preserve prior assessments for known items.
+- Record an import-manifest row.
 - Regenerate output files from durable state.
 
-Research-priority re-evaluation should be explicit:
+Research-priority re-evaluation remains future work and should be explicit:
 
 ```text
 --reevaluate new       # default
@@ -142,7 +125,7 @@ when durable CSV layouts become incompatible.
 ### Durable State Layout
 
 `input/` contains user-provided source files. For v0.2.0, this means full Amazon
-Order History CSV downloads under `input/amazon/`.
+Order History CSV or ZIP downloads under `input/amazon/`.
 
 `data/` contains durable project state:
 

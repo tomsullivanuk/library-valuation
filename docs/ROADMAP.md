@@ -102,14 +102,10 @@ Cache layout:
 Default command:
 
 ```bash
-python3 library_pipeline.py update-library \
-  --input-dir input \
-  --data-dir data \
-  --cache-dir cache \
-  --output-dir output
+python3 library_pipeline.py update-library
 ```
 
-Re-evaluation options:
+Future re-evaluation options:
 
 ```text
 --reevaluate new
@@ -119,7 +115,7 @@ Re-evaluation options:
 
 Exit condition:
 
-- A monthly run from the latest full Amazon CSV rebuilds acquisitions, reconciles
+- A monthly run from the latest full Amazon CSV or ZIP export rebuilds acquisitions, reconciles
   them to durable catalog items, evaluates only new catalog items by default,
   preserves prior assessments, records an import-manifest audit row, and
   regenerates output artifacts from `input/`, `data/`, `cache/`, and `config/`.
@@ -131,12 +127,19 @@ Implementation status:
 - Done: `catalog_item_id` values in generated metadata and catalog outputs.
 - Done: `data/acquisitions.csv` rebuilt from the current full-history Amazon
   export and linked to durable catalog items.
+- Done: `data/import_manifest.csv` append-only audit log.
+- Done: persistent research-priority assessments in
+  `data/research_priority_assessments.csv`.
+- Done: latest `.csv`/`.zip` discovery in `input/amazon`.
+- Done: Amazon ZIP and compatible `Retail.OrderHistory.1` package support.
+- Done: Open Library caches default to `cache/openlibrary/`.
+- Done: release polish for friendly expected CLI errors and optional macOS
+  completion/failure notification.
 - Follow-up: because existing nonblank catalog fields are preserved, improved
   external metadata will need an explicit refresh, override, or staleness policy.
 - Follow-up: acquisition IDs are deterministic hashes of available Amazon
   evidence until a richer source-item layer exposes true source line IDs.
-- Not yet done: persistent research-priority assessments, import manifest,
-  latest-file detection, and re-evaluation modes.
+- Not yet done: explicit `--reevaluate` modes.
 
 ## Sprint 2: Research Priority Score
 

@@ -5,6 +5,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.coverage
+htmlcov/
 
 # Virtual Environments
 .venv/
@@ -18,3 +20,6 @@ venv/
 
 # Generated Reports
 output/reports/
+
+# Local Acceptance Runs
+acceptance_test/
