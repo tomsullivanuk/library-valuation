@@ -160,6 +160,60 @@ def test_resolve_amazon_order_history_input_finds_preferred_zip_csv(tmp_path):
     assert not resolved.exists()
 
 
+def test_resolve_amazon_order_history_input_finds_retail_order_history_zip_csv(tmp_path):
+    zip_path = tmp_path / "Your Orders.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.writestr(
+            "Retail.OrderHistory.1/Retail.OrderHistory.1.csv",
+            amazon_history_csv_text("0198786220", "1", "Cognitive Neuroscience"),
+        )
+
+    with resolve_amazon_order_history_input(zip_path) as resolved:
+        assert resolved.name == "Retail.OrderHistory.1.csv"
+        assert "Cognitive Neuroscience" in resolved.read_text(encoding="utf-8")
+
+
+def test_resolve_amazon_order_history_input_finds_retail_order_history_directory_csv(tmp_path):
+    retail = tmp_path / "Your Orders" / "Retail.OrderHistory.1" / "Retail.OrderHistory.1.csv"
+    retail.parent.mkdir(parents=True)
+    retail.write_text(amazon_history_csv_text("0198786220", "1", "Cognitive Neuroscience"), encoding="utf-8")
+
+    with resolve_amazon_order_history_input(tmp_path / "Your Orders") as resolved:
+        assert resolved == retail
+
+
+def test_resolve_amazon_order_history_input_prefers_order_history_over_retail(tmp_path):
+    preferred = tmp_path / "Your Orders" / "Your Amazon Orders" / "Order History.csv"
+    retail = tmp_path / "Your Orders" / "Retail.OrderHistory.1" / "Retail.OrderHistory.1.csv"
+    preferred.parent.mkdir(parents=True)
+    retail.parent.mkdir(parents=True)
+    preferred.write_text("ASIN\n0198786220\n", encoding="utf-8")
+    retail.write_text(amazon_history_csv_text("006157127X", "2", "The Printing Revolution"), encoding="utf-8")
+
+    with resolve_amazon_order_history_input(tmp_path / "Your Orders") as resolved:
+        assert resolved == preferred
+
+
+def test_resolve_amazon_order_history_input_rejects_retail_order_history_2_only(tmp_path):
+    retail2 = tmp_path / "Your Orders" / "Retail.OrderHistory.2" / "Retail.OrderHistory.2.csv"
+    retail2.parent.mkdir(parents=True)
+    retail2.write_text(amazon_history_csv_text("0198786220", "1", "Cognitive Neuroscience"), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="No Amazon order history CSV found"):
+        with resolve_amazon_order_history_input(tmp_path / "Your Orders"):
+            pass
+
+
+def test_resolve_amazon_order_history_input_rejects_retail_order_history_1_with_unsupported_schema(tmp_path):
+    retail = tmp_path / "Your Orders" / "Retail.OrderHistory.1" / "Retail.OrderHistory.1.csv"
+    retail.parent.mkdir(parents=True)
+    retail.write_text("ASIN,Product Name\n0198786220,Cognitive Neuroscience\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Unsupported Amazon order history CSV schema"):
+        with resolve_amazon_order_history_input(tmp_path / "Your Orders"):
+            pass
+
+
 def test_resolve_amazon_order_history_input_raises_when_no_order_history(tmp_path):
     package = tmp_path / "Your Orders"
     package.mkdir()
@@ -1127,6 +1181,35 @@ def test_build_book_metadata_rows_deduplicates_by_isbn():
     assert rows[0]["lcc"] == "QP360.5"
 
 
+def test_build_book_metadata_rows_prints_cached_isbn_message_once(capsys):
+    purchases = [
+        {
+            "asin": "0198786220",
+            "isbn10": "0198786220",
+            "isbn13": "9780198786221",
+            "order_date": "2021-10-10T22:33:42Z",
+            "order_id": "1",
+            "product_name": "Cognitive Neuroscience",
+            "product_condition": "New",
+            "quantity": "1",
+            "unit_price": "11.95",
+            "currency": "USD",
+            "website": "Amazon.com",
+        }
+    ]
+    cache = {
+        "9780198786221": {
+            "title": "Cognitive neuroscience",
+            "authors": [{"name": "Richard Passingham"}],
+        }
+    }
+
+    build_book_metadata_rows(purchases, cache, {}, delay=0)
+
+    captured = capsys.readouterr()
+    assert captured.err.count("ISBN cache already has all required Open Library lookups.") == 1
+
+
 def test_build_library_catalog_rows_joins_metadata():
     purchases = [{"isbn13": "9780198786221", "isbn10": "0198786220", "product_name": "Raw title"}]
     metadata = [
@@ -1631,6 +1714,15 @@ def write_monthly_workflow_caches(tmp_path):
     )
     search_cache.write_text("{}", encoding="utf-8")
     return isbn_cache, search_cache
+
+
+def amazon_history_csv_text(asin, order_id, product_name):
+    return "\n".join(
+        [
+            "ASIN,Order Date,Order ID,Product Name,Product Condition,Original Quantity,Unit Price,Currency,Website",
+            f"{asin},2021-10-10T22:33:42Z,{order_id},{product_name},New,1,11.95,USD,Amazon.com",
+        ]
+    )
 
 
 def write_amazon_history(path, rows):

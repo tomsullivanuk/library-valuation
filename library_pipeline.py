@@ -46,6 +46,18 @@ BOOK_FIELDNAMES = [
     "website",
 ]
 
+AMAZON_ORDER_HISTORY_REQUIRED_COLUMNS = [
+    "ASIN",
+    "Order Date",
+    "Order ID",
+    "Product Name",
+    "Product Condition",
+    "Original Quantity",
+    "Unit Price",
+    "Currency",
+    "Website",
+]
+
 ENRICHED_FIELDNAMES = BOOK_FIELDNAMES + [
     "openlibrary_status",
     "openlibrary_url",
@@ -415,26 +427,39 @@ def resolve_amazon_order_history_input(input_path: Path):
         yield input_path
         return
     if input_path.is_dir():
-        yield find_order_history_csv(input_path.rglob("Order History.csv"))
+        yield find_order_history_csv(iter_order_history_candidates(input_path))
         return
     if input_path.is_file() and input_path.suffix.lower() == ".zip":
         with tempfile.TemporaryDirectory() as temp_dir:
             with zipfile.ZipFile(input_path) as archive:
                 safe_extract_zip(archive, Path(temp_dir))
-            yield find_order_history_csv(Path(temp_dir).rglob("Order History.csv"))
+            yield find_order_history_csv(iter_order_history_candidates(Path(temp_dir)))
         return
     raise ValueError(f"Unsupported Amazon input: {input_path}. Expected a CSV file, ZIP file, or directory.")
+
+
+def iter_order_history_candidates(root: Path):
+    yield from root.rglob("Order History.csv")
+    yield from root.rglob("Retail.OrderHistory.1.csv")
 
 
 def find_order_history_csv(candidates_iterable) -> Path:
     candidates = sorted(Path(candidate) for candidate in candidates_iterable)
     if not candidates:
-        raise ValueError("No Amazon order history CSV found. Expected a file named 'Order History.csv'.")
+        raise ValueError(
+            "No Amazon order history CSV found. Expected 'Your Amazon Orders/Order History.csv' "
+            "or 'Retail.OrderHistory.1/Retail.OrderHistory.1.csv'."
+        )
     preferred = [candidate for candidate in candidates if is_preferred_order_history_path(candidate)]
     if len(preferred) == 1:
         return preferred[0]
-    if len(candidates) == 1:
-        return candidates[0]
+    retail = [candidate for candidate in candidates if is_retail_order_history_1_path(candidate)]
+    if len(retail) == 1:
+        validate_order_history_schema(retail[0])
+        return retail[0]
+    order_history = [candidate for candidate in candidates if candidate.name == "Order History.csv"]
+    if len(order_history) == 1:
+        return order_history[0]
     candidate_list = "\n".join(str(candidate) for candidate in candidates)
     raise ValueError(f"Multiple ambiguous Amazon order history CSV files found:\n{candidate_list}")
 
@@ -442,6 +467,20 @@ def find_order_history_csv(candidates_iterable) -> Path:
 def is_preferred_order_history_path(path: Path) -> bool:
     parts = path.parts
     return len(parts) >= 2 and parts[-2:] == ("Your Amazon Orders", "Order History.csv")
+
+
+def is_retail_order_history_1_path(path: Path) -> bool:
+    parts = path.parts
+    return len(parts) >= 2 and parts[-2:] == ("Retail.OrderHistory.1", "Retail.OrderHistory.1.csv")
+
+
+def validate_order_history_schema(path: Path) -> None:
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+    missing = [field for field in AMAZON_ORDER_HISTORY_REQUIRED_COLUMNS if field not in fieldnames]
+    if missing:
+        raise ValueError(f"Unsupported Amazon order history CSV schema in {path}. Missing columns: {', '.join(missing)}")
 
 
 def safe_extract_zip(archive: zipfile.ZipFile, destination: Path) -> None:
@@ -1330,6 +1369,7 @@ def build_book_metadata_rows(
         isbn_cache,
         isbn_cache_path=isbn_cache_path,
         delay=delay,
+        report_cached=False,
     )
 
     for summary, enriched in prepared_rows:
@@ -1350,10 +1390,12 @@ def fetch_missing_isbn_cache(
     isbn_cache_path: Path | None = None,
     delay: float = 0.25,
     batch_size: int = 50,
+    report_cached: bool = True,
 ) -> None:
     missing = [isbn for isbn in isbns if isbn and isbn not in isbn_cache]
     if not missing:
-        print("ISBN cache already has all required Open Library lookups.", file=sys.stderr)
+        if report_cached:
+            print("ISBN cache already has all required Open Library lookups.", file=sys.stderr)
         return
     print(f"Fetching {len(missing)} missing Open Library ISBN lookups in batches of {batch_size}.", file=sys.stderr)
     for start in range(0, len(missing), batch_size):
