@@ -66,6 +66,21 @@ To include coverage reporting:
 pytest --cov
 ```
 
+## Creating a Release
+
+Use the release helper with a semantic version:
+
+```bash
+./release.sh 0.2.0
+```
+
+The script requires a clean working tree, runs compile checks, runs the pytest
+suite, creates an annotated Git tag, pushes the current branch, and pushes the
+tag.
+
+Creating the GitHub Release remains a manual step. Use `CHANGELOG.md` for the
+release notes.
+
 ## Usage
 
 Monthly update from a fresh full Amazon export saved under `input/amazon/`:
