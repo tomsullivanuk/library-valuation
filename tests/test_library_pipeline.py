@@ -9,6 +9,7 @@ from library_pipeline import (
     LibraryPaths,
     analyze_enrichment,
     acquisition_id,
+    assessment_metadata_for_catalog_items,
     book_candidate_from_row,
     build_acquisitions,
     build_book_metadata_rows,
@@ -522,6 +523,43 @@ def test_reconcile_research_assessments_assesses_only_unassessed_items():
     assert reconciled[1]["assessment_method"] == "automatic"
 
 
+def test_assessment_metadata_for_catalog_items_includes_preserved_catalog_items():
+    catalog_items = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "isbn10": "0198786220",
+            "title": "Preserved title",
+            "author": "Preserved author",
+            "publisher": "Preserved publisher",
+            "publication_year": "2016",
+        },
+        {
+            "catalog_item_id": "BK000002",
+            "isbn13": "9780061571275",
+            "isbn10": "006157127X",
+            "title": "Catalog-only title",
+            "author": "Catalog author",
+            "publisher": "Catalog publisher",
+            "publication_year": "2012",
+        },
+    ]
+    metadata_rows = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "title": "Current export title",
+            "authors": "Current author",
+        }
+    ]
+
+    metadata = assessment_metadata_for_catalog_items(catalog_items, metadata_rows)
+
+    assert metadata[0]["title"] == "Current export title"
+    assert metadata[1]["catalog_item_id"] == "BK000002"
+    assert metadata[1]["authors"] == "Catalog author"
+
+
 def test_format_catalog_item_id():
     assert format_catalog_item_id(1) == "BK000001"
     assert format_catalog_item_id(42) == "BK000042"
@@ -901,9 +939,12 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
         "amazon_export": "input/amazon/Your Orders.zip",
         "amazon_row_count": 10,
         "purchase_rows": 4,
+        "catalog_durable_total": 5,
+        "catalog_current_export": 4,
         "catalog_existing": 3,
         "catalog_new": 1,
         "acquisition_rows": 4,
+        "research_durable_total": 5,
         "research_reused": 3,
         "research_created": 1,
         "manifest_entries": 2,
@@ -914,11 +955,13 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
     assert "Amazon export:\n  input/amazon/Your Orders.zip" in output
     assert "Amazon rows processed:      10" in output
     assert "Book candidates:            4" in output
-    assert "  Existing:                 3" in output
-    assert "  New:                      1" in output
+    assert "  Durable total:            5" in output
+    assert "  Current export:           4" in output
+    assert "  Existing in export:       3" in output
+    assert "  New this run:             1" in output
     assert "  Rebuilt:                  4" in output
-    assert "  Reused:                   3" in output
-    assert "  Created:                  1" in output
+    assert "  Reused for export:        3" in output
+    assert "  Created this run:         1" in output
     assert "Manifest entries:           2" in output
     assert "output/library_catalog.xlsx" in output
 
@@ -1096,6 +1139,105 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert (paths.output_dir / "book_purchases.csv").exists()
     assert (paths.output_dir / "book_metadata.csv").exists()
     assert (paths.output_dir / "library_catalog.csv").read_text(encoding="utf-8").splitlines()[0].startswith("catalog_item_id,")
+
+
+def test_update_library_summary_counts_distinct_catalog_items_for_duplicate_purchases(tmp_path):
+    amazon_input = write_amazon_history(
+        tmp_path / "orders.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            },
+            {
+                "asin": "0198786220",
+                "order_date": "2021-11-10T22:33:42Z",
+                "order_id": "2",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "10.95",
+            },
+        ],
+    )
+    isbn_cache, search_cache = write_monthly_workflow_caches(tmp_path)
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+
+    summary = update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    current_catalog_item_ids = {row["catalog_item_id"] for row in load_catalog_items(paths.catalog_items_path)}
+    assert summary["purchase_rows"] == 2
+    assert summary["acquisition_rows"] == 2
+    assert summary["catalog_existing"] + summary["catalog_new"] == len(current_catalog_item_ids)
+    assert summary["research_reused"] + summary["research_created"] == len(current_catalog_item_ids)
+    assert summary["catalog_new"] == 1
+    assert summary["research_created"] == 1
+
+
+def test_update_library_assesses_preserved_catalog_items_absent_from_current_export(tmp_path):
+    amazon_input = write_amazon_history(
+        tmp_path / "orders.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    isbn_cache, search_cache = write_monthly_workflow_caches(tmp_path)
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    CatalogRepository(paths.catalog_items_path).save(
+        [
+            {
+                "catalog_item_id": "BK000050",
+                "isbn13": "9780061571275",
+                "isbn10": "006157127X",
+                "title": "The Printing Revolution in Early Modern Europe",
+                "author": "Elizabeth Eisenstein",
+                "publisher": "Cambridge",
+                "publication_year": "2012",
+                "source_fingerprint": "",
+                "match_confidence": "high",
+            }
+        ]
+    )
+
+    summary = update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
+
+    catalog_item_ids = {row["catalog_item_id"] for row in load_catalog_items(paths.catalog_items_path)}
+    assessment_ids = {row["catalog_item_id"] for row in load_research_assessments(paths.research_priority_assessments_path)}
+    assert catalog_item_ids == assessment_ids
+    assert "BK000050" in assessment_ids
+    assert summary["catalog_durable_total"] == 2
+    assert summary["catalog_current_export"] == 1
+    assert summary["catalog_existing"] == 0
+    assert summary["catalog_new"] == 1
+    assert summary["research_durable_total"] == 2
+    assert summary["research_reused"] == 0
+    assert summary["research_created"] == 1
 
 
 def test_update_library_accepts_zip_order_export_package(tmp_path):

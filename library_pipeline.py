@@ -824,7 +824,8 @@ def update_library(
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
     acquisitions = build_acquisitions(purchases, metadata_rows)
     acquisition_repository.save(acquisitions)
-    research_assessments = reconcile_research_assessments(existing_assessments, metadata_rows)
+    assessment_metadata_rows = assessment_metadata_for_catalog_items(catalog_items, metadata_rows)
+    research_assessments = reconcile_research_assessments(existing_assessments, assessment_metadata_rows)
     research_assessment_repository.save(research_assessments)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
@@ -855,7 +856,12 @@ def update_library(
         for row in metadata_rows
         if row.get("catalog_item_id")
     }
-    created_assessment_count = len(current_metadata_catalog_item_ids - assessed_catalog_item_ids)
+    final_assessed_catalog_item_ids = {
+        row.get("catalog_item_id", "")
+        for row in research_assessments
+        if row.get("catalog_item_id")
+    }
+    created_assessment_catalog_item_ids = final_assessed_catalog_item_ids - assessed_catalog_item_ids
 
     return {
         "amazon_export": str(amazon_input),
@@ -865,11 +871,14 @@ def update_library(
         "metadata_matched": sum(1 for row in metadata_rows if row.get("openlibrary_status") == "matched"),
         "metadata_with_lcc": sum(1 for row in metadata_rows if row.get("lcc")),
         "metadata_manual_review": sum(1 for row in metadata_rows if row.get("resolution_source") == "manual_review"),
-        "catalog_existing": sum(1 for row in metadata_rows if row.get("catalog_item_id") in existing_catalog_item_ids),
-        "catalog_new": len(final_catalog_item_ids - existing_catalog_item_ids),
+        "catalog_durable_total": len(final_catalog_item_ids),
+        "catalog_current_export": len(current_metadata_catalog_item_ids),
+        "catalog_existing": len(current_metadata_catalog_item_ids & existing_catalog_item_ids),
+        "catalog_new": len(current_metadata_catalog_item_ids - existing_catalog_item_ids),
         "acquisition_rows": len(acquisitions),
-        "research_reused": sum(1 for catalog_item_id in current_metadata_catalog_item_ids if catalog_item_id in assessed_catalog_item_ids),
-        "research_created": created_assessment_count,
+        "research_durable_total": len(final_assessed_catalog_item_ids),
+        "research_reused": len(current_metadata_catalog_item_ids & assessed_catalog_item_ids),
+        "research_created": len(current_metadata_catalog_item_ids & created_assessment_catalog_item_ids),
         "manifest_entries": len(manifest_repository.load()),
     }
 
@@ -946,6 +955,33 @@ def reconcile_research_assessments(
         if catalog_item_id and catalog_item_id not in assessments_by_id:
             assessments_by_id[catalog_item_id] = build_research_assessment(metadata)
     return sorted(assessments_by_id.values(), key=lambda row: row.get("catalog_item_id", ""))
+
+
+def assessment_metadata_for_catalog_items(
+    catalog_items: list[dict[str, str]], metadata_rows: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    metadata_by_id = {}
+    for item in catalog_items:
+        catalog_item_id = item.get("catalog_item_id", "")
+        if catalog_item_id:
+            metadata_by_id[catalog_item_id] = catalog_item_assessment_metadata(item)
+    for metadata in metadata_rows:
+        catalog_item_id = metadata.get("catalog_item_id", "")
+        if catalog_item_id:
+            metadata_by_id[catalog_item_id] = metadata
+    return sorted(metadata_by_id.values(), key=lambda row: row.get("catalog_item_id", ""))
+
+
+def catalog_item_assessment_metadata(item: dict[str, str]) -> dict[str, str]:
+    return {
+        "catalog_item_id": item.get("catalog_item_id", ""),
+        "isbn13": item.get("isbn13", ""),
+        "isbn10": item.get("isbn10", ""),
+        "title": item.get("title", ""),
+        "authors": item.get("author", ""),
+        "publishers": item.get("publisher", ""),
+        "publish_date": item.get("publication_year", ""),
+    }
 
 
 def build_research_assessment(metadata: dict[str, str]) -> dict[str, str]:
@@ -1490,13 +1526,16 @@ def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> st
             f"Amazon rows processed:      {summary.get('amazon_row_count', 0)}",
             f"Book candidates:            {summary.get('purchase_rows', 0)}",
             "Catalog",
-            f"  Existing:                 {summary.get('catalog_existing', 0)}",
-            f"  New:                      {summary.get('catalog_new', 0)}",
+            f"  Durable total:            {summary.get('catalog_durable_total', 0)}",
+            f"  Current export:           {summary.get('catalog_current_export', 0)}",
+            f"  Existing in export:       {summary.get('catalog_existing', 0)}",
+            f"  New this run:             {summary.get('catalog_new', 0)}",
             "Acquisitions",
             f"  Rebuilt:                  {summary.get('acquisition_rows', 0)}",
             "Research Priority",
-            f"  Reused:                   {summary.get('research_reused', 0)}",
-            f"  Created:                  {summary.get('research_created', 0)}",
+            f"  Durable total:            {summary.get('research_durable_total', 0)}",
+            f"  Reused for export:        {summary.get('research_reused', 0)}",
+            f"  Created this run:         {summary.get('research_created', 0)}",
             f"Manifest entries:           {summary.get('manifest_entries', 0)}",
             "Outputs",
             f"  {output_dir / 'book_purchases.xlsx'}",
