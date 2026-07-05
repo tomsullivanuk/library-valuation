@@ -1,10 +1,12 @@
 import hashlib
 import os
+import shutil
 import zipfile
 from pathlib import Path
 
 import pytest
 
+import library_pipeline
 from library_pipeline import (
     LibraryPaths,
     analyze_enrichment,
@@ -1501,6 +1503,247 @@ def test_main_update_library_auto_discovers_export_and_prints_summary(tmp_path, 
     assert str(paths.output_dir / "library_catalog.xlsx") in captured
 
 
+def test_main_update_library_default_caches_use_cache_openlibrary(tmp_path, monkeypatch):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    amazon_input = write_amazon_history(
+        paths.amazon_input_dir / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    captured = {}
+
+    def fake_update_library(amazon_input_arg, output_dir, isbn_cache_path, search_cache_path, delay, paths):
+        captured["amazon_input"] = amazon_input_arg
+        captured["isbn_cache_path"] = isbn_cache_path
+        captured["search_cache_path"] = search_cache_path
+        return {
+            "amazon_export": str(amazon_input_arg),
+            "amazon_row_count": 0,
+            "purchase_rows": 0,
+            "catalog_durable_total": 0,
+            "catalog_current_export": 0,
+            "catalog_existing": 0,
+            "catalog_new": 0,
+            "acquisition_rows": 0,
+            "research_durable_total": 0,
+            "research_reused": 0,
+            "research_created": 0,
+            "manifest_entries": 0,
+        }
+
+    monkeypatch.setattr(library_pipeline, "update_library", fake_update_library)
+
+    result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+        ]
+    )
+
+    assert result == 0
+    assert captured["amazon_input"] == amazon_input
+    assert captured["isbn_cache_path"] == paths.openlibrary_isbn_cache_path
+    assert captured["search_cache_path"] == paths.openlibrary_search_cache_path
+    assert "output" not in captured["isbn_cache_path"].parts
+    assert "output" not in captured["search_cache_path"].parts
+
+
+def test_main_update_library_explicit_cache_paths_override_defaults(tmp_path, monkeypatch):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    amazon_input = write_amazon_history(
+        paths.amazon_input_dir / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    explicit_isbn_cache = tmp_path / "legacy" / "openlibrary_cache.json"
+    explicit_search_cache = tmp_path / "legacy" / "openlibrary_search_cache.json"
+    captured = {}
+
+    def fake_update_library(amazon_input_arg, output_dir, isbn_cache_path, search_cache_path, delay, paths):
+        captured["isbn_cache_path"] = isbn_cache_path
+        captured["search_cache_path"] = search_cache_path
+        return {
+            "amazon_export": str(amazon_input_arg),
+            "amazon_row_count": 0,
+            "purchase_rows": 0,
+            "catalog_durable_total": 0,
+            "catalog_current_export": 0,
+            "catalog_existing": 0,
+            "catalog_new": 0,
+            "acquisition_rows": 0,
+            "research_durable_total": 0,
+            "research_reused": 0,
+            "research_created": 0,
+            "manifest_entries": 0,
+        }
+
+    monkeypatch.setattr(library_pipeline, "update_library", fake_update_library)
+
+    result = main(
+        [
+            "update-library",
+            "--amazon-input",
+            str(amazon_input),
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+            "--isbn-cache",
+            str(explicit_isbn_cache),
+            "--search-cache",
+            str(explicit_search_cache),
+        ]
+    )
+
+    assert result == 0
+    assert captured["isbn_cache_path"] == explicit_isbn_cache
+    assert captured["search_cache_path"] == explicit_search_cache
+
+
+def test_update_library_durable_state_survives_output_regeneration(tmp_path):
+    paths = LibraryPaths(
+        input_dir=tmp_path / "input",
+        amazon_input_dir=tmp_path / "input" / "amazon",
+        data_dir=tmp_path / "data",
+        cache_dir=tmp_path / "cache",
+        openlibrary_cache_dir=tmp_path / "cache" / "openlibrary",
+        config_dir=tmp_path / "config",
+        output_dir=tmp_path / "output",
+    )
+    amazon_input = write_amazon_history(
+        paths.amazon_input_dir / "history.csv",
+        [
+            {
+                "asin": "0198786220",
+                "order_date": "2021-10-10T22:33:42Z",
+                "order_id": "1",
+                "product_name": "Cognitive Neuroscience",
+                "quantity": "1",
+                "unit_price": "11.95",
+            }
+        ],
+    )
+    write_default_openlibrary_caches(paths)
+
+    first_result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+            "--delay",
+            "0",
+        ]
+    )
+
+    first_catalog_ids = catalog_ids_by_isbn(paths)
+    first_acquisition_ids = acquisition_ids(paths)
+    first_assessment_ids = {
+        row["catalog_item_id"]
+        for row in load_research_assessments(paths.research_priority_assessments_path)
+    }
+    first_manifest_count = len(ImportManifestRepository(paths.import_manifest_path).load())
+    first_isbn_cache_text = paths.openlibrary_isbn_cache_path.read_text(encoding="utf-8")
+    first_search_cache_text = paths.openlibrary_search_cache_path.read_text(encoding="utf-8")
+    assert first_result == 0
+    assert paths.catalog_items_path.exists()
+    assert paths.acquisitions_path.exists()
+    assert paths.research_priority_assessments_path.exists()
+    assert paths.import_manifest_path.exists()
+    assert paths.openlibrary_isbn_cache_path.exists()
+    assert paths.openlibrary_search_cache_path.exists()
+    assert_monthly_outputs_exist(paths)
+
+    shutil.rmtree(paths.output_dir)
+
+    second_result = main(
+        [
+            "update-library",
+            "--input-dir",
+            str(paths.input_dir),
+            "--data-dir",
+            str(paths.data_dir),
+            "--cache-dir",
+            str(paths.cache_dir),
+            "--config-dir",
+            str(paths.config_dir),
+            "--output-dir",
+            str(paths.output_dir),
+            "--delay",
+            "0",
+        ]
+    )
+
+    second_assessment_ids = {
+        row["catalog_item_id"]
+        for row in load_research_assessments(paths.research_priority_assessments_path)
+    }
+    assert second_result == 0
+    assert catalog_ids_by_isbn(paths) == first_catalog_ids
+    assert acquisition_ids(paths) == first_acquisition_ids
+    assert second_assessment_ids == first_assessment_ids
+    assert len(ImportManifestRepository(paths.import_manifest_path).load()) == first_manifest_count + 1
+    assert paths.openlibrary_isbn_cache_path.read_text(encoding="utf-8") == first_isbn_cache_text
+    assert paths.openlibrary_search_cache_path.read_text(encoding="utf-8") == first_search_cache_text
+    assert not (paths.output_dir / "openlibrary_cache.json").exists()
+    assert not (paths.output_dir / "openlibrary_search_cache.json").exists()
+    assert_monthly_outputs_exist(paths)
+
+
 def test_main_update_library_explicit_amazon_input_overrides_discovery(tmp_path, capsys):
     paths = LibraryPaths(
         input_dir=tmp_path / "input",
@@ -1714,6 +1957,21 @@ def write_monthly_workflow_caches(tmp_path):
     )
     search_cache.write_text("{}", encoding="utf-8")
     return isbn_cache, search_cache
+
+
+def write_default_openlibrary_caches(paths):
+    paths.openlibrary_cache_dir.mkdir(parents=True, exist_ok=True)
+    paths.openlibrary_isbn_cache_path.write_text(
+        "\n".join(
+            [
+                "{",
+                '  "9780198786221": {"title": "Cognitive neuroscience", "authors": [{"name": "Richard Passingham"}], "publishers": [{"name": "Oxford"}], "publish_date": "2016"}',
+                "}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    paths.openlibrary_search_cache_path.write_text("{}", encoding="utf-8")
 
 
 def amazon_history_csv_text(asin, order_id, product_name):

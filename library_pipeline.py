@@ -1647,12 +1647,10 @@ def build_parser() -> argparse.ArgumentParser:
     update_parser.add_argument(
         "--isbn-cache",
         type=Path,
-        default=Path("output/openlibrary_cache.json"),
     )
     update_parser.add_argument(
         "--search-cache",
         type=Path,
-        default=Path("output/openlibrary_search_cache.json"),
     )
     update_parser.add_argument("--delay", type=float, default=0.25)
 
@@ -1694,13 +1692,15 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
         )
         amazon_input = args.amazon_input or discover_amazon_export(paths.amazon_input_dir)
+        isbn_cache = args.isbn_cache or paths.openlibrary_isbn_cache_path
+        search_cache = args.search_cache or paths.openlibrary_search_cache_path
         print("Using Amazon export:")
         print(f"  {amazon_input}")
         summary = update_library(
             amazon_input,
             args.output_dir,
-            args.isbn_cache,
-            args.search_cache,
+            isbn_cache,
+            search_cache,
             args.delay,
             paths=paths,
         )

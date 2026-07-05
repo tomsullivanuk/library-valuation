@@ -82,8 +82,8 @@ This writes:
 - `book_metadata.csv` / `book_metadata.xlsx`: one row per unique ISBN-13
 - `library_catalog.csv` / `library_catalog.xlsx`: purchase rows joined to metadata for Excel browsing
 
-The update workflow reuses `output/openlibrary_cache.json` and
-`output/openlibrary_search_cache.json`, so ISBNs and title searches that already
+The update workflow reuses `cache/openlibrary/isbn.json` and
+`cache/openlibrary/search.json`, so ISBNs and title searches that already
 have answers are not requested again.
 
 ### v0.2.0 Monthly Workflow Target
