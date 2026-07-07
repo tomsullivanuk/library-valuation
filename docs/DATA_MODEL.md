@@ -300,10 +300,21 @@ Data classification:
 - Regenerated: records may be recreated by rerunning enrichment, but prior
   evidence should remain auditable when used for valuation or decisions.
 
-### Research Priority
+### Research Signals And Priority
 
-A `Research Priority` ranks catalog items for human attention. It is a derived
-planning layer, not a valuation estimate.
+A `Research Signal` is a deterministic reason that a catalog item may deserve
+collector attention. A `Research Priority` or future Research Assessment
+aggregates those signals into a planning assessment. This layer is not a
+valuation estimate.
+
+Research Signal examples:
+
+- old publication year;
+- university or specialist publisher;
+- missing bibliographic metadata;
+- scholarly LC subject;
+- ambiguous metadata resolution;
+- multiple acquisitions.
 
 Fields:
 

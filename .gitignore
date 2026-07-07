@@ -15,6 +15,9 @@ venv/
 # Local Caches
 .cache/
 
+# Local Imports
+imports/
+
 # Excel
 ~$*.xlsx
 

@@ -1,0 +1,11 @@
+old_publication_year_threshold: 1950
+
+weights:
+  old_publication_year: 12
+  university_press: 15
+  specialist_publisher: 10
+  missing_lcc: 8
+  missing_oclc: 5
+  scholarly_lc_subject: 10
+  multiple_acquisitions: 6
+  low_metadata_confidence: 6

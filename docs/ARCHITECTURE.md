@@ -216,6 +216,8 @@ The system should keep distinct categories of information separate:
   authors, publishers, classifications, purchase date, and source identifiers.
 - Research priority: a planning assessment that answers whether a book should
   be researched.
+- Research signals: deterministic, explainable evidence points that feed
+  research-priority assessments and future Research Candidates.
 - Market research: observed listings, completed sales, dealer notes, source
   URLs, capture dates, condition observations, and comparable-copy evidence.
 - Valuation estimates: derived retail estimates, dealer-value estimates,
