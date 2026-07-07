@@ -43,6 +43,14 @@ bibliographic APIs.
 The extraction step intentionally excludes billing address, shipping address,
 tracking number, payment method, gift fields, and other personal columns.
 
+## Project Docs
+
+- `docs/ARCHITECTURE.md`: source-of-truth rules and system boundaries.
+- `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
+- `docs/ROADMAP.md`: release direction and implementation sequence.
+- `docs/BACKLOG.md`: lightweight product backlog for future releases.
+- `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
+
 ## Developer Setup
 
 Create and activate the project virtual environment, then install dependencies:
