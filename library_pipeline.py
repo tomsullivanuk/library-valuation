@@ -25,7 +25,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from valuation.rps import DEFAULT_RPS_WEIGHTS, calculate_rps
+from valuation.research_assessments import (
+    RESEARCH_MODEL_VERSION,
+    acquisition_snapshot_hash,
+    build_research_assessment,
+    metadata_snapshot_hash,
+    research_config_hash,
+)
+from valuation.research_signals import (
+    ResearchSignalConfig,
+    default_research_signal_config,
+    load_research_signal_config,
+)
 from valuation.repositories import (
     ACQUISITION_FIELDNAMES,
     CATALOG_ITEMS_FIELDNAMES,
@@ -137,7 +148,6 @@ LIBRARY_CATALOG_FIELDNAMES = [
 VALUATION_EXTENSION_STAGE = "post_catalog_rows"
 PIPELINE_VERSION = "0.2.0"
 SCHEMA_VERSION = "1"
-RPS_MODEL_VERSION = "0.2.0"
 
 
 @dataclass(frozen=True)
@@ -875,7 +885,13 @@ def update_library(
     acquisitions = build_acquisitions(purchases, metadata_rows)
     acquisition_repository.save(acquisitions)
     assessment_metadata_rows = assessment_metadata_for_catalog_items(catalog_items, metadata_rows)
-    research_assessments = reconcile_research_assessments(existing_assessments, assessment_metadata_rows)
+    research_signal_config = load_research_signal_config(paths.config_dir)
+    research_assessments = reconcile_research_assessments(
+        existing_assessments,
+        assessment_metadata_rows,
+        acquisitions=acquisitions,
+        config=research_signal_config,
+    )
     research_assessment_repository.save(research_assessments)
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
@@ -993,18 +1009,56 @@ def write_research_assessments(path: Path, rows: list[dict[str, str]]) -> None:
 
 
 def reconcile_research_assessments(
-    existing_assessments: list[dict[str, str]], metadata_rows: list[dict[str, str]]
+    existing_assessments: list[dict[str, str]],
+    metadata_rows: list[dict[str, str]],
+    acquisitions: list[dict[str, str]] | None = None,
+    config: ResearchSignalConfig | None = None,
 ) -> list[dict[str, str]]:
+    config = config or default_research_signal_config()
     assessments_by_id = {
         row.get("catalog_item_id", ""): dict(row)
         for row in existing_assessments
         if row.get("catalog_item_id")
     }
+    acquisitions_by_catalog_item_id = group_acquisitions_by_catalog_item_id(acquisitions or [])
+    config_hash = research_config_hash(config)
     for metadata in metadata_rows:
         catalog_item_id = metadata.get("catalog_item_id", "")
-        if catalog_item_id and catalog_item_id not in assessments_by_id:
-            assessments_by_id[catalog_item_id] = build_research_assessment(metadata)
+        if not catalog_item_id:
+            continue
+        existing = assessments_by_id.get(catalog_item_id)
+        acquisition_rows = acquisitions_by_catalog_item_id.get(catalog_item_id, [])
+        if existing and is_current_research_assessment(existing, metadata, acquisition_rows, config_hash):
+            continue
+        assessments_by_id[catalog_item_id] = build_research_assessment(
+            metadata,
+            acquisitions=acquisition_rows,
+            config=config,
+        )
     return sorted(assessments_by_id.values(), key=lambda row: row.get("catalog_item_id", ""))
+
+
+def is_current_research_assessment(
+    assessment: dict[str, str],
+    metadata: dict[str, str],
+    acquisitions: list[dict[str, str]],
+    config_hash: str,
+) -> bool:
+    return (
+        assessment.get("research_model_version") == RESEARCH_MODEL_VERSION
+        and assessment.get("research_config_hash") == config_hash
+        and assessment.get("acquisition_snapshot_hash") == acquisition_snapshot_hash(acquisitions)
+        and assessment.get("metadata_snapshot_hash") == metadata_snapshot_hash(metadata)
+    )
+
+
+def group_acquisitions_by_catalog_item_id(acquisitions: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for acquisition in acquisitions:
+        catalog_item_id = acquisition.get("catalog_item_id", "")
+        if catalog_item_id:
+            grouped.setdefault(catalog_item_id, []).append(acquisition)
+    return grouped
 
 
 def assessment_metadata_for_catalog_items(
@@ -1032,52 +1086,6 @@ def catalog_item_assessment_metadata(item: dict[str, str]) -> dict[str, str]:
         "publishers": item.get("publisher", ""),
         "publish_date": item.get("publication_year", ""),
     }
-
-
-def build_research_assessment(metadata: dict[str, str]) -> dict[str, str]:
-    score = calculate_rps({})
-    return {
-        "catalog_item_id": metadata.get("catalog_item_id", ""),
-        "isbn13": metadata.get("isbn13", ""),
-        "rps_score": f"{score:.4f}",
-        "rps_band": rps_band(score),
-        "rps_reasons": "No scoring signals available yet.",
-        "rps_model_version": RPS_MODEL_VERSION,
-        "rps_config_hash": stable_json_hash(DEFAULT_RPS_WEIGHTS),
-        "assessed_at": utc_timestamp(),
-        "assessment_status": "current",
-        "assessment_method": "automatic",
-        "reviewed_by": "",
-        "metadata_snapshot_hash": metadata_snapshot_hash(metadata),
-    }
-
-
-def rps_band(score: float) -> str:
-    if score >= 0.75:
-        return "high"
-    if score >= 0.4:
-        return "medium"
-    return "low"
-
-
-def stable_json_hash(value: object) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-def metadata_snapshot_hash(metadata: dict[str, str]) -> str:
-    scoring_metadata = {
-        "catalog_item_id": metadata.get("catalog_item_id", ""),
-        "isbn13": metadata.get("isbn13", ""),
-        "isbn10": metadata.get("isbn10", ""),
-        "title": metadata.get("title", ""),
-        "authors": metadata.get("authors", ""),
-        "publishers": metadata.get("publishers", ""),
-        "publish_date": metadata.get("publish_date", ""),
-        "lcc": metadata.get("lcc", ""),
-        "subjects": metadata.get("subjects", ""),
-    }
-    return stable_json_hash(scoring_metadata)
 
 
 def load_catalog_items(path: Path) -> list[dict[str, str]]:

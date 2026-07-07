@@ -22,6 +22,11 @@ DEFAULT_RESEARCH_SIGNAL_WEIGHTS = {
 }
 
 DEFAULT_OLD_PUBLICATION_YEAR_THRESHOLD = 1950
+DEFAULT_RESEARCH_BAND_THRESHOLDS = {
+    "high": 30,
+    "medium": 15,
+    "low": 1,
+}
 
 
 @dataclass(frozen=True)
@@ -48,15 +53,27 @@ class ResearchSignal:
 class ResearchSignalConfig:
     weights: Mapping[str, int]
     old_publication_year_threshold: int = DEFAULT_OLD_PUBLICATION_YEAR_THRESHOLD
+    band_thresholds: Mapping[str, int] | None = None
     publisher_tiers: Mapping[str, list[str]] | None = None
     scholarly_lc_classes: Mapping[str, str] | None = None
 
     def points(self, signal_code: str) -> int:
         return int(self.weights.get(signal_code, 0))
 
+    def band_threshold(self, band: str) -> int:
+        return int(self.effective_band_thresholds().get(band, 0))
+
+    def effective_band_thresholds(self) -> dict[str, int]:
+        thresholds = dict(DEFAULT_RESEARCH_BAND_THRESHOLDS)
+        thresholds.update({key: int(value) for key, value in (self.band_thresholds or {}).items()})
+        return thresholds
+
 
 def default_research_signal_config() -> ResearchSignalConfig:
-    return ResearchSignalConfig(weights=dict(DEFAULT_RESEARCH_SIGNAL_WEIGHTS))
+    return ResearchSignalConfig(
+        weights=dict(DEFAULT_RESEARCH_SIGNAL_WEIGHTS),
+        band_thresholds=dict(DEFAULT_RESEARCH_BAND_THRESHOLDS),
+    )
 
 
 def load_research_signal_config(config_dir: Path) -> ResearchSignalConfig:
@@ -67,10 +84,13 @@ def load_research_signal_config(config_dir: Path) -> ResearchSignalConfig:
     weights = dict(DEFAULT_RESEARCH_SIGNAL_WEIGHTS)
     weights.update({key: int(value) for key, value in signal_config.get("weights", {}).items()})
     threshold = int(signal_config.get("old_publication_year_threshold", DEFAULT_OLD_PUBLICATION_YEAR_THRESHOLD))
+    band_thresholds = dict(DEFAULT_RESEARCH_BAND_THRESHOLDS)
+    band_thresholds.update({key: int(value) for key, value in signal_config.get("bands", {}).items()})
 
     return ResearchSignalConfig(
         weights=weights,
         old_publication_year_threshold=threshold,
+        band_thresholds=band_thresholds,
         publisher_tiers=_publisher_tier_patterns(publisher_config),
         scholarly_lc_classes=_lc_subject_labels(subject_config),
     )

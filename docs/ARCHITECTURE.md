@@ -254,7 +254,7 @@ Analysis Engine
 Decision Engine
       |
       +-- Valuation Workbook
-      +-- Research Queue
+      +-- Research Candidates
       +-- Dealer Prospectus
       +-- Collection Analytics
       +-- Estate Reports

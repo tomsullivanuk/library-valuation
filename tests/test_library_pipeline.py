@@ -47,6 +47,12 @@ from valuation.repositories import (
     ImportManifestRepository,
     ResearchAssessmentRepository,
 )
+from valuation.research_assessments import (
+    acquisition_snapshot_hash,
+    metadata_snapshot_hash,
+    research_config_hash,
+)
+from valuation.research_signals import ResearchSignalConfig
 
 
 def test_isbn10_validation_and_conversion():
@@ -475,15 +481,17 @@ def test_research_assessment_repository_round_trip_persistence(tmp_path):
         {
             "catalog_item_id": "BK000001",
             "isbn13": "9780198786221",
-            "rps_score": "0.0000",
-            "rps_band": "low",
-            "rps_reasons": "No scoring signals available yet.",
-            "rps_model_version": "0.2.0",
-            "rps_config_hash": "abc123",
+            "research_priority_score": "12",
+            "research_priority_band": "medium",
+            "research_signal_count": "1",
+            "research_signal_codes": "old_publication_year",
+            "research_signal_summary": "old_publication_year:+12",
+            "research_signal_explanations": "Published before 1950.",
+            "research_model_version": "0.3.0",
+            "research_config_hash": "abc123",
             "assessed_at": "2026-07-04T00:00:00Z",
             "assessment_status": "current",
-            "assessment_method": "automatic",
-            "reviewed_by": "",
+            "acquisition_snapshot_hash": "acq789",
             "metadata_snapshot_hash": "def456",
             "ignored_extra_field": "not persisted",
         }
@@ -495,76 +503,198 @@ def test_research_assessment_repository_round_trip_persistence(tmp_path):
         {
             "catalog_item_id": "BK000001",
             "isbn13": "9780198786221",
-            "rps_score": "0.0000",
-            "rps_band": "low",
-            "rps_reasons": "No scoring signals available yet.",
-            "rps_model_version": "0.2.0",
-            "rps_config_hash": "abc123",
+            "research_priority_score": "12",
+            "research_priority_band": "medium",
+            "research_signal_count": "1",
+            "research_signal_codes": "old_publication_year",
+            "research_signal_summary": "old_publication_year:+12",
+            "research_signal_explanations": "Published before 1950.",
+            "research_model_version": "0.3.0",
+            "research_config_hash": "abc123",
             "assessed_at": "2026-07-04T00:00:00Z",
             "assessment_status": "current",
-            "assessment_method": "automatic",
-            "reviewed_by": "",
+            "acquisition_snapshot_hash": "acq789",
             "metadata_snapshot_hash": "def456",
         }
     ]
 
 
-def test_build_research_assessment_populates_provenance():
+def test_build_research_assessment_sums_signals_and_populates_provenance():
+    config = ResearchSignalConfig(
+        weights={"old_publication_year": 12, "missing_oclc": 5},
+        old_publication_year_threshold=1950,
+        band_thresholds={"high": 30, "medium": 15, "low": 1},
+    )
     assessment = build_research_assessment(
         {
             "catalog_item_id": "BK000001",
             "isbn13": "9780198786221",
             "title": "Cognitive neuroscience",
             "authors": "Richard Passingham",
-        }
+            "publish_date": "1931",
+            "lcc": "B123 .A1",
+        },
+        config=config,
+        assessed_at="2026-07-04T00:00:00Z",
     )
 
     assert assessment["catalog_item_id"] == "BK000001"
     assert assessment["isbn13"] == "9780198786221"
-    assert assessment["rps_score"] == "0.0000"
-    assert assessment["rps_band"] == "low"
-    assert assessment["rps_model_version"] == "0.2.0"
-    assert assessment["rps_config_hash"]
+    assert assessment["research_priority_score"] == "17"
+    assert assessment["research_priority_band"] == "medium"
+    assert assessment["research_signal_count"] == "2"
+    assert assessment["research_signal_codes"] == "missing_oclc; old_publication_year"
+    assert assessment["research_signal_summary"] == "missing_oclc:+5; old_publication_year:+12"
+    assert "Published before 1950." in assessment["research_signal_explanations"]
+    assert "OCLC identifier is missing" in assessment["research_signal_explanations"]
+    assert assessment["research_model_version"] == "0.3.0"
+    assert assessment["research_config_hash"]
+    assert assessment["assessed_at"] == "2026-07-04T00:00:00Z"
     assert assessment["assessment_status"] == "current"
-    assert assessment["assessment_method"] == "automatic"
+    assert assessment["acquisition_snapshot_hash"]
     assert assessment["metadata_snapshot_hash"]
 
 
-def test_reconcile_research_assessments_reuses_existing_assessment():
+def test_build_research_assessment_uses_configurable_band_thresholds():
+    metadata = {"catalog_item_id": "BK000001", "isbn13": "9780198786221", "publish_date": "1931", "oclc": "1"}
+
+    high = build_research_assessment(
+        metadata,
+        config=ResearchSignalConfig(
+            weights={"old_publication_year": 12},
+            old_publication_year_threshold=1950,
+            band_thresholds={"high": 10, "medium": 5, "low": 1},
+        ),
+    )
+    low = build_research_assessment(
+        metadata,
+        config=ResearchSignalConfig(
+            weights={"old_publication_year": 12},
+            old_publication_year_threshold=1950,
+            band_thresholds={"high": 30, "medium": 20, "low": 1},
+        ),
+    )
+
+    assert high["research_priority_band"] == "high"
+    assert low["research_priority_band"] == "low"
+    assert high["research_config_hash"] != low["research_config_hash"]
+
+
+def test_build_research_assessment_records_no_signal_behavior():
+    assessment = build_research_assessment(
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "publish_date": "2020",
+            "publisher": "Modern Books",
+            "lcc": "Z123 .A1",
+            "oclc": "1",
+            "resolution_confidence": "high",
+            "openlibrary_status": "matched",
+        },
+        config=ResearchSignalConfig(weights={}, band_thresholds={"high": 30, "medium": 15, "low": 1}),
+    )
+
+    assert assessment["research_priority_score"] == "0"
+    assert assessment["research_priority_band"] == "none"
+    assert assessment["research_signal_count"] == "0"
+    assert assessment["research_signal_codes"] == ""
+    assert assessment["research_signal_summary"] == ""
+    assert assessment["research_signal_explanations"] == "No research signals generated."
+
+
+def test_reconcile_research_assessments_reuses_current_assessment():
+    metadata = {"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Known"}
+    config = ResearchSignalConfig(weights={}, band_thresholds={"high": 30, "medium": 15, "low": 1})
     existing = [
         {
             "catalog_item_id": "BK000001",
             "isbn13": "9780198786221",
-            "rps_score": "0.9000",
-            "rps_band": "high",
-            "rps_reasons": "Previously reviewed.",
-            "rps_model_version": "0.1.0",
-            "rps_config_hash": "old",
+            "research_priority_score": "0",
+            "research_priority_band": "none",
+            "research_signal_count": "0",
+            "research_signal_codes": "",
+            "research_signal_summary": "",
+            "research_signal_explanations": "No research signals generated.",
+            "research_model_version": "0.3.0",
+            "research_config_hash": research_config_hash(config),
             "assessed_at": "2026-01-01T00:00:00Z",
             "assessment_status": "current",
-            "assessment_method": "automatic",
-            "reviewed_by": "",
-            "metadata_snapshot_hash": "old-snapshot",
+            "acquisition_snapshot_hash": acquisition_snapshot_hash([]),
+            "metadata_snapshot_hash": metadata_snapshot_hash(metadata),
         }
     ]
 
-    reconciled = reconcile_research_assessments(
-        existing,
-        [{"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Updated title"}],
-    )
+    reconciled = reconcile_research_assessments(existing, [metadata], config=config)
 
     assert reconciled == existing
 
 
-def test_reconcile_research_assessments_assesses_only_unassessed_items():
+def test_reconcile_research_assessments_regenerates_when_acquisitions_change():
+    metadata = {
+        "catalog_item_id": "BK000001",
+        "isbn13": "9780198786221",
+        "title": "Known",
+        "lcc": "Z123 .A1",
+        "oclc": "1",
+    }
+    config = ResearchSignalConfig(
+        weights={"multiple_acquisitions": 6},
+        band_thresholds={"high": 30, "medium": 15, "low": 1},
+    )
     existing = [
         {
             "catalog_item_id": "BK000001",
             "isbn13": "9780198786221",
-            "rps_score": "0.9000",
-            "rps_band": "high",
-            "rps_reasons": "Previously reviewed.",
-            "rps_model_version": "0.1.0",
+            "research_priority_score": "0",
+            "research_priority_band": "none",
+            "research_signal_count": "0",
+            "research_signal_codes": "",
+            "research_signal_summary": "",
+            "research_signal_explanations": "No research signals generated.",
+            "research_model_version": "0.3.0",
+            "research_config_hash": research_config_hash(config),
+            "assessed_at": "2026-01-01T00:00:00Z",
+            "assessment_status": "current",
+            "acquisition_snapshot_hash": acquisition_snapshot_hash(
+                [{"catalog_item_id": "BK000001", "acquisition_id": "A1"}]
+            ),
+            "metadata_snapshot_hash": metadata_snapshot_hash(metadata),
+        }
+    ]
+
+    reconciled = reconcile_research_assessments(
+        existing,
+        [metadata],
+        acquisitions=[
+            {"catalog_item_id": "BK000001", "acquisition_id": "A1"},
+            {"catalog_item_id": "BK000001", "acquisition_id": "A2"},
+        ],
+        config=config,
+    )
+
+    assert len(reconciled) == 1
+    assert reconciled[0] != existing[0]
+    assert reconciled[0]["research_priority_score"] == "6"
+    assert reconciled[0]["research_priority_band"] == "low"
+    assert reconciled[0]["research_signal_codes"] == "multiple_acquisitions"
+    assert reconciled[0]["acquisition_snapshot_hash"] == acquisition_snapshot_hash(
+        [
+            {"catalog_item_id": "BK000001", "acquisition_id": "A1"},
+            {"catalog_item_id": "BK000001", "acquisition_id": "A2"},
+        ]
+    )
+
+
+def test_reconcile_research_assessments_supersedes_v02_placeholder_assessment():
+    existing = [
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780198786221",
+            "rps_score": "0.0000",
+            "rps_band": "low",
+            "rps_reasons": "No scoring signals available yet.",
+            "rps_model_version": "0.2.0",
             "rps_config_hash": "old",
             "assessed_at": "2026-01-01T00:00:00Z",
             "assessment_status": "current",
@@ -576,16 +706,33 @@ def test_reconcile_research_assessments_assesses_only_unassessed_items():
 
     reconciled = reconcile_research_assessments(
         existing,
+        [{"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Known"}],
+        config=ResearchSignalConfig(weights={}, band_thresholds={"high": 30, "medium": 15, "low": 1}),
+    )
+
+    assert len(reconciled) == 1
+    assert "rps_score" not in reconciled[0]
+    assert reconciled[0]["catalog_item_id"] == "BK000001"
+    assert reconciled[0]["research_priority_score"] == "0"
+    assert reconciled[0]["research_priority_band"] == "none"
+    assert reconciled[0]["research_model_version"] == "0.3.0"
+
+
+def test_reconcile_research_assessments_assesses_new_items():
+    config = ResearchSignalConfig(weights={}, band_thresholds={"high": 30, "medium": 15, "low": 1})
+
+    reconciled = reconcile_research_assessments(
+        [],
         [
             {"catalog_item_id": "BK000001", "isbn13": "9780198786221", "title": "Known"},
             {"catalog_item_id": "BK000002", "isbn13": "9780061571275", "title": "New"},
         ],
+        config=config,
     )
 
     assert len(reconciled) == 2
-    assert reconciled[0] == existing[0]
-    assert reconciled[1]["catalog_item_id"] == "BK000002"
-    assert reconciled[1]["assessment_method"] == "automatic"
+    assert [row["catalog_item_id"] for row in reconciled] == ["BK000001", "BK000002"]
+    assert {row["research_model_version"] for row in reconciled} == {"0.3.0"}
 
 
 def test_assessment_metadata_for_catalog_items_includes_preserved_catalog_items():
@@ -1492,10 +1639,12 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert len(research_assessments) == 1
     assert research_assessments[0]["catalog_item_id"] == "BK000001"
     assert research_assessments[0]["isbn13"] == "9780198786221"
-    assert research_assessments[0]["rps_score"] == "0.0000"
-    assert research_assessments[0]["rps_band"] == "low"
+    assert research_assessments[0]["research_priority_score"] == "13"
+    assert research_assessments[0]["research_priority_band"] == "low"
+    assert research_assessments[0]["research_signal_codes"] == "missing_lcc; missing_oclc"
+    assert research_assessments[0]["research_model_version"] == "0.3.0"
     assert research_assessments[0]["assessment_status"] == "current"
-    assert research_assessments[0]["assessment_method"] == "automatic"
+    assert research_assessments[0]["acquisition_snapshot_hash"]
     manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["filename"] == "orders.csv"

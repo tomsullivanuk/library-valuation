@@ -9,3 +9,8 @@ weights:
   scholarly_lc_subject: 10
   multiple_acquisitions: 6
   low_metadata_confidence: 6
+
+bands:
+  high: 30
+  medium: 15
+  low: 1

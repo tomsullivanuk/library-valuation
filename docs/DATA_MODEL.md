@@ -318,19 +318,21 @@ Research Signal examples:
 
 Fields:
 
-- `research_priority_id`: stable internal identifier for the scoring event.
 - `catalog_item_id`: linked catalog item.
 - `isbn13`: current ISBN-13 snapshot, when available, for readability only.
-- `rps_score`: numeric priority score.
-- `rps_band`: high, medium, low, manual_review, or excluded.
-- `rps_reasons`: human-readable scoring reasons.
-- `rps_model_version`: version of the research-priority scoring rules.
-- `rps_config_hash`: hash of the scoring configuration used.
+- `research_priority_score`: numeric priority score.
+- `research_priority_band`: high, medium, low, or none.
+- `research_signal_count`: number of generated Research Signals.
+- `research_signal_codes`: compact signal codes used by the assessment.
+- `research_signal_summary`: compact signal-code and point summary.
+- `research_signal_explanations`: human-readable signal explanations.
+- `research_model_version`: version of the research assessment rules.
+- `research_config_hash`: hash of the research signal and band configuration
+  used.
 - `assessed_at`: timestamp.
 - `assessment_status`: current, stale_metadata, needs_review, or excluded.
-- `assessment_method`: automatic, manual, or overridden.
-- `reviewed_by`: optional user or process that reviewed or overrode the
-  assessment.
+- `acquisition_snapshot_hash`: hash of acquisition evidence used by
+  acquisition-sensitive Research Signals.
 - `metadata_snapshot_hash`: hash of scoring-relevant catalog metadata at the
   time of assessment.
 
@@ -667,15 +669,17 @@ research-priority assessment per catalog item. Suggested minimum fields:
 
 - `catalog_item_id`
 - `isbn13`
-- `rps_score`
-- `rps_band`
-- `rps_reasons`
-- `rps_model_version`
-- `rps_config_hash`
+- `research_priority_score`
+- `research_priority_band`
+- `research_signal_count`
+- `research_signal_codes`
+- `research_signal_summary`
+- `research_signal_explanations`
+- `research_model_version`
+- `research_config_hash`
 - `assessed_at`
 - `assessment_status`
-- `assessment_method`
-- `reviewed_by`
+- `acquisition_snapshot_hash`
 - `metadata_snapshot_hash`
 
 Monthly import matching should attach each acquisition to a catalog item using
@@ -730,7 +734,7 @@ Examples:
 
 - CSV and XLSX catalog outputs;
 - valuation workbooks;
-- research queues;
+- Research Candidate views;
 - inventory views;
 - dealer prospectuses;
 - collection reports;
@@ -751,7 +755,7 @@ Expected workbook tabs can map directly to the model:
 - `Acquisitions`: source-linked acquisition history.
 - `Holdings`: current believed inventory, condition, location, verification
   state, and disposition status.
-- `Research Queue`: latest `Research Priority` per catalog item.
+- `Research Candidates`: latest `Research Assessment` per catalog item.
 - `Market Research`: editable or importable view of `Market Observations`.
 - `Valuation`: latest `Valuation Estimate` per catalog item or holding.
 - `Decisions`: proposed and accepted `Decisions`, usually tied to holdings when

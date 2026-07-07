@@ -141,10 +141,12 @@ Implementation status:
   evidence until a richer source-item layer exposes true source line IDs.
 - Not yet done: explicit `--reevaluate` modes.
 
-## Sprint 2: Research Priority Score
+## Sprint 2: Research Assessments
 
-Sprint 2 should add a heuristic score that identifies which books deserve human
-research first. This score is a prioritization tool, not a valuation estimate.
+Sprint 2 should add Research Assessments that identify which books deserve
+human research first. A Research Assessment aggregates deterministic Research
+Signals into a priority score, band, and explanation. It is a prioritization
+tool, not a valuation estimate.
 
 Goals:
 
@@ -163,16 +165,17 @@ Possible score inputs:
 - Product-name clues that indicate sets, rare editions, imports, or specialized
   academic works.
 
-Likely outputs:
+Likely durable assessment fields:
 
 - A `research_priority_score`.
 - A `research_priority_band`, such as high, medium, low, or manual review.
-- Human-readable `research_priority_reasons`.
+- Compact Research Signal codes and summaries.
+- Human-readable Research Signal explanations.
 
 Exit condition:
 
-- The catalog can produce a reproducible research queue that directs human time
-  toward books with the highest expected payoff or uncertainty.
+- The catalog can produce reproducible Research Candidates that direct human
+  time toward books with the highest expected payoff or uncertainty.
 
 ## Sprint 3: Generated Valuation Workbook
 
@@ -216,7 +219,7 @@ books first.
 
 Goals:
 
-- Select the top 25 books from the research queue.
+- Select the top 25 Research Candidates.
 - Capture comparable market evidence in a structured way.
 - Produce initial valuation estimates backed by observed data.
 - Preserve source URLs, capture dates, condition notes, and confidence.

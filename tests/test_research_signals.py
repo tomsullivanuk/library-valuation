@@ -167,7 +167,7 @@ def test_load_research_signal_config_reads_weights_threshold_publishers_and_subj
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "research_signals.yml").write_text(
-        "old_publication_year_threshold: 1940\nweights:\n  old_publication_year: 9\n",
+        "old_publication_year_threshold: 1940\nweights:\n  old_publication_year: 9\nbands:\n  high: 25\n",
         encoding="utf-8",
     )
     (config_dir / "publisher_tiers.yml").write_text(
@@ -183,5 +183,6 @@ def test_load_research_signal_config_reads_weights_threshold_publishers_and_subj
 
     assert config.old_publication_year_threshold == 1940
     assert config.points("old_publication_year") == 9
+    assert config.band_threshold("high") == 25
     assert config.publisher_tiers == {"university_press": ["Oxford University Press"]}
     assert config.scholarly_lc_classes == {"B": "Philosophy"}
