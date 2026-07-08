@@ -717,10 +717,35 @@ Rows with band `none` are excluded by default. Current fields:
 - `subjects`
 - `openlibrary_work_key`
 - `openlibrary_edition_key`
+- `workflow_state`
+- `disposition`
+- `priority_override`
+- `reviewed_at`
+- `reviewed_by`
+- `review_notes`
 
 Research Candidates are sorted by band, score, signal count, older publication
 year, title, and `catalog_item_id`. They are regenerated outputs, not durable
-review state.
+review state. Collector Review fields in this output are read-only context
+copied from `data/collector_reviews.csv`.
+
+`data/collector_reviews.csv` contains collector-owned workflow state and
+lightweight notes. It is durable human-owned data, not generated assessment
+state. Current fields:
+
+- `catalog_item_id`
+- `workflow_state`
+- `disposition`
+- `priority_override`
+- `reviewed_at`
+- `reviewed_by`
+- `review_notes`
+- `created_at`
+- `updated_at`
+
+Monthly automation may create the file when missing and may read rows when
+building generated outputs. It must not overwrite nonblank collector-owned
+fields during imports, assessment generation, or Research Candidate generation.
 
 Monthly import matching should attach each acquisition to a catalog item using
 the strongest available evidence:
@@ -761,6 +786,7 @@ Examples:
 - family or historical significance notes;
 - comparable-quality assessment for market observations;
 - accepted decisions and decision rationale;
+- collector review workflow state and notes;
 - manual valuation overrides.
 
 User-maintained data should be stored separately from regenerated outputs so it

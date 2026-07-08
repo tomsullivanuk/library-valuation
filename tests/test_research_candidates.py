@@ -65,6 +65,17 @@ def test_build_research_candidate_rows_aggregates_acquisitions_and_metadata():
         metadata_rows,
         acquisitions,
         [assessment("BK000001", "low", "13", "2")],
+        [
+            {
+                "catalog_item_id": "BK000001",
+                "workflow_state": "reviewed",
+                "disposition": "keep",
+                "priority_override": "high",
+                "reviewed_at": "2026-07-08T00:00:00Z",
+                "reviewed_by": "Tom",
+                "review_notes": "Signed copy.",
+            }
+        ],
     )
 
     assert rows == [
@@ -93,6 +104,12 @@ def test_build_research_candidate_rows_aggregates_acquisitions_and_metadata():
             "subjects": "Neuroscience; Cognition",
             "openlibrary_work_key": "",
             "openlibrary_edition_key": "",
+            "workflow_state": "reviewed",
+            "disposition": "keep",
+            "priority_override": "high",
+            "reviewed_at": "2026-07-08T00:00:00Z",
+            "reviewed_by": "Tom",
+            "review_notes": "Signed copy.",
         }
     ]
 

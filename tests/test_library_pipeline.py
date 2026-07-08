@@ -28,6 +28,7 @@ from library_pipeline import (
     isbn10_to_isbn13,
     load_acquisitions,
     load_catalog_items,
+    load_collector_reviews,
     load_research_assessments,
     main,
     paired_output_paths,
@@ -39,11 +40,13 @@ from library_pipeline import (
     update_library,
     valuation_extension_context,
     write_table_outputs,
+    write_collector_reviews,
     xml_safe_text,
 )
 from valuation.repositories import (
     AcquisitionRepository,
     CatalogRepository,
+    CollectorReviewRepository,
     ImportManifestRepository,
     ResearchAssessmentRepository,
 )
@@ -137,6 +140,7 @@ def test_library_paths_default_layout():
     assert paths.openlibrary_search_cache_path == Path("cache/openlibrary/search.json")
     assert paths.import_manifest_path == Path("data/import_manifest.csv")
     assert paths.research_priority_assessments_path == Path("data/research_priority_assessments.csv")
+    assert paths.collector_reviews_path == Path("data/collector_reviews.csv")
 
 
 def test_resolve_amazon_order_history_input_accepts_direct_csv(tmp_path):
@@ -517,6 +521,66 @@ def test_research_assessment_repository_round_trip_persistence(tmp_path):
             "metadata_snapshot_hash": "def456",
         }
     ]
+
+
+def test_collector_review_repository_missing_file_returns_empty_list(tmp_path):
+    repository = CollectorReviewRepository(tmp_path / "collector_reviews.csv")
+
+    assert repository.load() == []
+
+
+def test_collector_review_repository_round_trip_persistence(tmp_path):
+    repository = CollectorReviewRepository(tmp_path / "data" / "collector_reviews.csv")
+    rows = [
+        {
+            "catalog_item_id": "BK000001",
+            "workflow_state": "reviewed",
+            "disposition": "keep",
+            "priority_override": "high",
+            "reviewed_at": "2026-07-08T00:00:00Z",
+            "reviewed_by": "Tom",
+            "review_notes": "Signed copy; inspect jacket.",
+            "created_at": "2026-07-08T00:00:00Z",
+            "updated_at": "2026-07-08T00:00:00Z",
+            "ignored_extra_field": "not persisted",
+        }
+    ]
+
+    repository.save(rows)
+
+    assert repository.load() == [
+        {
+            "catalog_item_id": "BK000001",
+            "workflow_state": "reviewed",
+            "disposition": "keep",
+            "priority_override": "high",
+            "reviewed_at": "2026-07-08T00:00:00Z",
+            "reviewed_by": "Tom",
+            "review_notes": "Signed copy; inspect jacket.",
+            "created_at": "2026-07-08T00:00:00Z",
+            "updated_at": "2026-07-08T00:00:00Z",
+        }
+    ]
+
+
+def test_collector_review_repository_ensure_exists_does_not_overwrite_rows(tmp_path):
+    repository = CollectorReviewRepository(tmp_path / "data" / "collector_reviews.csv")
+    row = {
+        "catalog_item_id": "BK000001",
+        "workflow_state": "reviewed",
+        "disposition": "keep",
+        "priority_override": "",
+        "reviewed_at": "2026-07-08T00:00:00Z",
+        "reviewed_by": "Tom",
+        "review_notes": "Human-owned note.",
+        "created_at": "2026-07-08T00:00:00Z",
+        "updated_at": "2026-07-08T00:00:00Z",
+    }
+    repository.save([row])
+
+    repository.ensure_exists()
+
+    assert repository.load() == [row]
 
 
 def test_build_research_assessment_sums_signals_and_populates_provenance():
@@ -1614,6 +1678,18 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
         config_dir=tmp_path / "config",
         output_dir=tmp_path / "output",
     )
+    collector_review = {
+        "catalog_item_id": "BK000001",
+        "workflow_state": "reviewed",
+        "disposition": "keep",
+        "priority_override": "high",
+        "reviewed_at": "2026-07-08T00:00:00Z",
+        "reviewed_by": "Tom",
+        "review_notes": "Human-owned note.",
+        "created_at": "2026-07-08T00:00:00Z",
+        "updated_at": "2026-07-08T00:00:00Z",
+    }
+    write_collector_reviews(paths.collector_reviews_path, [collector_review])
 
     update_library(amazon_input, paths.output_dir, isbn_cache, search_cache, delay=0, paths=paths)
 
@@ -1647,6 +1723,7 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert research_assessments[0]["research_model_version"] == "0.3.0"
     assert research_assessments[0]["assessment_status"] == "current"
     assert research_assessments[0]["acquisition_snapshot_hash"]
+    assert load_collector_reviews(paths.collector_reviews_path) == [collector_review]
     manifest_rows = ImportManifestRepository(paths.import_manifest_path).load()
     assert len(manifest_rows) == 1
     assert manifest_rows[0]["filename"] == "orders.csv"
@@ -1665,6 +1742,7 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     research_candidate_lines = (paths.output_dir / "research_candidates.csv").read_text(encoding="utf-8").splitlines()
     assert research_candidate_lines[0].startswith("catalog_item_id,isbn13,title,authors,publisher,publication_year,")
     assert research_candidate_lines[1].startswith("BK000001,9780198786221,Cognitive neuroscience,Richard Passingham,Oxford,2016,")
+    assert research_candidate_lines[1].endswith(",reviewed,keep,high,2026-07-08T00:00:00Z,Tom,Human-owned note.")
     assert (paths.output_dir / "research_candidates.xlsx").exists()
 
 
@@ -2061,6 +2139,7 @@ def test_update_library_durable_state_survives_output_regeneration(tmp_path):
     assert paths.catalog_items_path.exists()
     assert paths.acquisitions_path.exists()
     assert paths.research_priority_assessments_path.exists()
+    assert paths.collector_reviews_path.exists()
     assert paths.import_manifest_path.exists()
     assert paths.openlibrary_isbn_cache_path.exists()
     assert paths.openlibrary_search_cache_path.exists()
@@ -2270,6 +2349,7 @@ def test_update_library_monthly_incremental_workflow_regression(tmp_path):
     assert paths.acquisitions_path.exists()
     assert paths.import_manifest_path.exists()
     assert paths.research_priority_assessments_path.exists()
+    assert paths.collector_reviews_path.exists()
     assert len(ImportManifestRepository(paths.import_manifest_path).load()) == 1
     assert run1_catalog_ids == {"9780198786221": "BK000001"}
     assert len(run1_acquisition_ids) == 1

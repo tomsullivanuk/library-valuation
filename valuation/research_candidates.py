@@ -30,6 +30,12 @@ RESEARCH_CANDIDATE_FIELDNAMES = [
     "subjects",
     "openlibrary_work_key",
     "openlibrary_edition_key",
+    "workflow_state",
+    "disposition",
+    "priority_override",
+    "reviewed_at",
+    "reviewed_by",
+    "review_notes",
 ]
 
 DEFAULT_INCLUDED_BANDS = ("high", "medium", "low")
@@ -41,12 +47,14 @@ def build_research_candidate_rows(
     metadata_rows: Iterable[Mapping[str, str]],
     acquisitions: Iterable[Mapping[str, str]],
     research_assessments: Iterable[Mapping[str, str]],
+    collector_reviews: Iterable[Mapping[str, str]] | None = None,
     included_bands: Iterable[str] = DEFAULT_INCLUDED_BANDS,
 ) -> list[dict[str, str]]:
     """Build output-only Research Candidate rows from current durable state."""
     catalog_by_id = index_by_catalog_item_id(catalog_items)
     metadata_by_id = index_by_catalog_item_id(metadata_rows)
     acquisitions_by_id = group_by_catalog_item_id(acquisitions)
+    collector_reviews_by_id = index_by_catalog_item_id(collector_reviews or [])
     included_band_set = set(included_bands)
     candidates = []
     for assessment in research_assessments:
@@ -57,12 +65,14 @@ def build_research_candidate_rows(
         catalog_item = catalog_by_id.get(catalog_item_id, {})
         metadata = metadata_by_id.get(catalog_item_id, {})
         acquisition_rows = acquisitions_by_id.get(catalog_item_id, [])
+        collector_review = collector_reviews_by_id.get(catalog_item_id, {})
         candidates.append(
             build_research_candidate_row(
                 catalog_item,
                 metadata,
                 acquisition_rows,
                 assessment,
+                collector_review,
             )
         )
     return sorted(candidates, key=research_candidate_sort_key)
@@ -73,8 +83,10 @@ def build_research_candidate_row(
     metadata: Mapping[str, str],
     acquisitions: Iterable[Mapping[str, str]],
     assessment: Mapping[str, str],
+    collector_review: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     acquisition_summary = summarize_acquisitions(acquisitions)
+    collector_review = collector_review or {}
     return {
         "catalog_item_id": first_present(assessment, metadata, catalog_item, "catalog_item_id"),
         "isbn13": first_present(assessment, metadata, catalog_item, "isbn13"),
@@ -100,6 +112,12 @@ def build_research_candidate_row(
         "subjects": metadata.get("subjects", ""),
         "openlibrary_work_key": metadata.get("openlibrary_work_key", ""),
         "openlibrary_edition_key": metadata.get("openlibrary_edition_key", ""),
+        "workflow_state": collector_review.get("workflow_state", ""),
+        "disposition": collector_review.get("disposition", ""),
+        "priority_override": collector_review.get("priority_override", ""),
+        "reviewed_at": collector_review.get("reviewed_at", ""),
+        "reviewed_by": collector_review.get("reviewed_by", ""),
+        "review_notes": collector_review.get("review_notes", ""),
     }
 
 

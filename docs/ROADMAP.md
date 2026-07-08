@@ -184,7 +184,9 @@ Implementation status:
   `data/research_priority_assessments.csv` path.
 - Done: generated `output/research_candidates.csv` and `.xlsx` views that rank
   high, medium, and low Research Assessments for collector attention.
-- Not yet done: durable Collector Review state or reviewed-item filtering.
+- Done: durable `data/collector_reviews.csv` state for collector-owned review
+  workflow fields and notes.
+- Not yet done: reviewed-item filtering or priority override behavior.
 
 ## Sprint 3: Collector Review State And Generated Workbook
 

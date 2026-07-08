@@ -141,7 +141,7 @@ attention.
 
 ## PR4 — Durable Collector Review State
 
-**Status:** Planned
+**Status:** In progress
 
 ### Goal
 
@@ -151,7 +151,8 @@ Introduce durable collector-owned review information that persists across monthl
 
 - Collector review data model
 - Persistent review state
-- Migration/update logic
+- Durable `data/collector_reviews.csv`
+- Read-only review context in generated Research Candidates
 - Tests
 
 ### Acceptance Criteria
@@ -159,6 +160,8 @@ Introduce durable collector-owned review information that persists across monthl
 - Review information survives repeated monthly imports.
 - Existing pipeline behavior remains unchanged.
 - No user-entered review data is overwritten.
+- Reviewed-item filtering and priority override behavior remain deferred until
+  they can be designed as explicit workflow rules.
 
 ---
 

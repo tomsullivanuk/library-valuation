@@ -46,6 +46,7 @@ from valuation.repositories import (
     CATALOG_ITEMS_FIELDNAMES,
     AcquisitionRepository,
     CatalogRepository,
+    CollectorReviewRepository,
     ImportManifestRepository,
     ResearchAssessmentRepository,
 )
@@ -189,6 +190,10 @@ class LibraryPaths:
     @property
     def research_priority_assessments_path(self) -> Path:
         return self.data_dir / "research_priority_assessments.csv"
+
+    @property
+    def collector_reviews_path(self) -> Path:
+        return self.data_dir / "collector_reviews.csv"
 
     def ensure_directories(self) -> None:
         for path in (
@@ -880,9 +885,12 @@ def update_library(
     catalog_repository = CatalogRepository(paths.catalog_items_path)
     acquisition_repository = AcquisitionRepository(paths.acquisitions_path)
     research_assessment_repository = ResearchAssessmentRepository(paths.research_priority_assessments_path)
+    collector_review_repository = CollectorReviewRepository(paths.collector_reviews_path)
     catalog_items = catalog_repository.load()
     existing_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
     existing_assessments = research_assessment_repository.load()
+    collector_review_repository.ensure_exists()
+    collector_reviews = collector_review_repository.load()
     metadata_rows, catalog_items = reconcile_catalog_items(metadata_rows, catalog_items)
     catalog_repository.save(catalog_items)
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
@@ -902,6 +910,7 @@ def update_library(
         metadata_rows,
         acquisitions,
         research_assessments,
+        collector_reviews,
     )
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
@@ -1023,6 +1032,14 @@ def load_research_assessments(path: Path) -> list[dict[str, str]]:
 
 def write_research_assessments(path: Path, rows: list[dict[str, str]]) -> None:
     ResearchAssessmentRepository(path).save(rows)
+
+
+def load_collector_reviews(path: Path) -> list[dict[str, str]]:
+    return CollectorReviewRepository(path).load()
+
+
+def write_collector_reviews(path: Path, rows: list[dict[str, str]]) -> None:
+    CollectorReviewRepository(path).save(rows)
 
 
 def reconcile_research_assessments(

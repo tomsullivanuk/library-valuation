@@ -134,6 +134,8 @@ Order History CSV or ZIP downloads under `input/amazon/`.
 - `acquisitions.csv`: one row per purchase or acquisition event.
 - `research_priority_assessments.csv`: latest durable research-priority
   assessment per catalog item.
+- `collector_reviews.csv`: collector-owned workflow state and lightweight
+  review notes, linked by `catalog_item_id`.
 
 `cache/` contains provider-specific external lookup caches:
 
@@ -231,6 +233,9 @@ The system should keep distinct categories of information separate:
 - Research Candidates: generated collector-facing output rows that rank catalog
   items by Research Assessment band, score, signal count, age, title, and
   stable catalog identity.
+- Collector Reviews: human-owned workflow state, disposition hints, priority
+  overrides, and notes. Automated processing may read this state for generated
+  views, but must not overwrite it.
 - Market research: observed listings, completed sales, dealer notes, source
   URLs, capture dates, condition observations, and comparable-copy evidence.
 - Valuation estimates: derived retail estimates, dealer-value estimates,

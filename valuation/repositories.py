@@ -68,6 +68,18 @@ RESEARCH_ASSESSMENT_FIELDNAMES = [
     "metadata_snapshot_hash",
 ]
 
+COLLECTOR_REVIEW_FIELDNAMES = [
+    "catalog_item_id",
+    "workflow_state",
+    "disposition",
+    "priority_override",
+    "reviewed_at",
+    "reviewed_by",
+    "review_notes",
+    "created_at",
+    "updated_at",
+]
+
 
 class CsvRepository:
     fieldnames: list[str] = []
@@ -87,6 +99,10 @@ class CsvRepository:
             writer = csv.DictWriter(handle, fieldnames=self.fieldnames)
             writer.writeheader()
             writer.writerows({field: row.get(field, "") for field in self.fieldnames} for row in rows)
+
+    def ensure_exists(self) -> None:
+        if not self.path.exists():
+            self.save([])
 
 
 class CatalogRepository(CsvRepository):
@@ -112,3 +128,7 @@ class ImportManifestRepository(CsvRepository):
 
 class ResearchAssessmentRepository(CsvRepository):
     fieldnames = RESEARCH_ASSESSMENT_FIELDNAMES
+
+
+class CollectorReviewRepository(CsvRepository):
+    fieldnames = COLLECTOR_REVIEW_FIELDNAMES

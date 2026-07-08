@@ -342,6 +342,10 @@ Examples include whether the item is new, currently being researched, or
 reviewed; whether the collector has set a priority override; and brief notes
 about next steps.
 
+Current lightweight fields include workflow state, disposition, priority
+override, reviewer, review timestamp, review notes, and created/updated
+timestamps.
+
 Owner: collector-owned.
 
 Generated or manual: manually maintained. The system may create an empty
