@@ -167,7 +167,7 @@ Introduce durable collector-owned review information that persists across monthl
 
 ## PR5 — Collector Workbook
 
-**Status:** Planned
+**Status:** In progress
 
 ### Goal
 
@@ -176,15 +176,18 @@ Produce an Excel workbook designed for collector workflow.
 ### Proposed Worksheets
 
 - Research Candidates
-- New Acquisitions
-- Reviewed
+- Current Acquisitions
+- Reviewed Items
 - Metadata Gaps
 - Summary
+- Collector Reviews
 
 ### Acceptance Criteria
 
 - Workbook is understandable without reading project documentation.
 - Information is organized around collector decisions rather than internal implementation.
+- Workbook is generated output only; edits are not imported.
+- Durable review state remains in `data/collector_reviews.csv`.
 
 ---
 

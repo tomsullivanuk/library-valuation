@@ -450,7 +450,7 @@ Examples include:
 - research signals;
 - research assessments;
 - Research Candidate lists;
-- generated reports and workbooks.
+- generated reports and workbooks, including `collector_workbook.xlsx`.
 
 This information should be reproducible wherever practical. If the same source
 data, cached provider responses, and configuration are used, the system should

@@ -799,7 +799,7 @@ Regenerated data are outputs or calculated views.
 Examples:
 
 - CSV and XLSX catalog outputs;
-- valuation workbooks;
+- collector and valuation workbooks;
 - Research Candidate views;
 - inventory views;
 - dealer prospectuses;
@@ -817,6 +817,13 @@ artifact over canonical entities.
 
 Expected workbook tabs can map directly to the model:
 
+- `Summary`: generated counts and a generated-output-only note.
+- `Research Candidates`: generated Research Candidate rows in candidate order.
+- `Current Acquisitions`: acquisition rows from the selected full-history
+  import.
+- `Reviewed Items`: Collector Review rows with review activity.
+- `Metadata Gaps`: catalog items missing important metadata fields.
+- `Collector Reviews`: read-only presentation of `data/collector_reviews.csv`.
 - `Catalog`: current `Catalog Item` view plus acquisition summary.
 - `Acquisitions`: source-linked acquisition history.
 - `Holdings`: current believed inventory, condition, location, verification

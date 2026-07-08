@@ -156,6 +156,8 @@ Current generated outputs include:
 - `research_candidates.csv` / `.xlsx`: collector-facing Research Candidates
   generated from current catalog items, acquisitions, metadata, and Research
   Assessments.
+- `collector_workbook.xlsx`: generated multi-sheet collector workbook over
+  current durable state and generated Research Candidate rows.
 
 ### Identity And Matching
 
@@ -214,7 +216,9 @@ the source of truth.
 
 Generated spreadsheets, reports, dashboards, and review workbooks are outputs.
 They should not become the canonical data store, and the catalog should not be
-reshaped just to make a report convenient.
+reshaped just to make a report convenient. Edits made in generated workbooks
+are not imported; durable collector-owned review state lives in
+`data/collector_reviews.csv`.
 
 If a downstream artifact needs a different layout, that layout should be created
 by a transformation step. The underlying catalog should remain stable,

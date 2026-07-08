@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from valuation.collector_workbook import write_collector_workbook
 from valuation.research_assessments import (
     RESEARCH_MODEL_VERSION,
     acquisition_snapshot_hash,
@@ -920,6 +921,15 @@ def update_library(
         RESEARCH_CANDIDATE_FIELDNAMES,
         research_candidates,
         "Research Candidates",
+    )
+    write_collector_workbook(
+        output_dir / "collector_workbook.xlsx",
+        catalog_items=catalog_items,
+        acquisitions=acquisitions,
+        research_candidates=research_candidates,
+        collector_reviews=collector_reviews,
+        metadata_rows=metadata_rows,
+        latest_import=str(amazon_input),
     )
     save_cache(isbn_cache_path, isbn_cache)
     save_cache(search_cache_path, search_cache)

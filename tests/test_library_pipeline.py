@@ -1744,6 +1744,7 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert research_candidate_lines[1].startswith("BK000001,9780198786221,Cognitive neuroscience,Richard Passingham,Oxford,2016,")
     assert research_candidate_lines[1].endswith(",reviewed,keep,high,2026-07-08T00:00:00Z,Tom,Human-owned note.")
     assert (paths.output_dir / "research_candidates.xlsx").exists()
+    assert (paths.output_dir / "collector_workbook.xlsx").exists()
 
 
 def test_update_library_summary_counts_distinct_catalog_items_for_duplicate_purchases(tmp_path):
@@ -2461,6 +2462,7 @@ def assert_monthly_outputs_exist(paths):
     assert (paths.output_dir / "library_catalog.xlsx").exists()
     assert (paths.output_dir / "research_candidates.csv").exists()
     assert (paths.output_dir / "research_candidates.xlsx").exists()
+    assert (paths.output_dir / "collector_workbook.xlsx").exists()
 
 
 def test_valuation_extension_context_names_post_catalog_handoff():

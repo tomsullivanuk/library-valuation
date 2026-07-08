@@ -1,0 +1,100 @@
+import zipfile
+from xml.etree import ElementTree
+
+from valuation.collector_workbook import (
+    COLLECTOR_WORKBOOK_SHEETS,
+    GENERATED_WORKBOOK_NOTE,
+    write_collector_workbook,
+)
+
+
+def test_write_collector_workbook_creates_expected_sheets_and_content(tmp_path):
+    output_path = tmp_path / "collector_workbook.xlsx"
+    research_candidates = [
+        {
+            "catalog_item_id": "BK000002",
+            "isbn13": "9780000000002",
+            "title": "High Candidate",
+            "research_priority_score": "30",
+            "research_priority_band": "high",
+        },
+        {
+            "catalog_item_id": "BK000001",
+            "isbn13": "9780000000001",
+            "title": "Low Candidate",
+            "research_priority_score": "13",
+            "research_priority_band": "low",
+        },
+    ]
+    collector_reviews = [
+        {
+            "catalog_item_id": "BK000001",
+            "workflow_state": "reviewed",
+            "disposition": "keep",
+            "priority_override": "",
+            "reviewed_at": "2026-07-08T00:00:00Z",
+            "reviewed_by": "Tom",
+            "review_notes": "Already checked.",
+            "created_at": "2026-07-08T00:00:00Z",
+            "updated_at": "2026-07-08T00:00:00Z",
+        }
+    ]
+
+    write_collector_workbook(
+        output_path,
+        catalog_items=[
+            {
+                "catalog_item_id": "BK000001",
+                "isbn13": "9780000000001",
+                "title": "Low Candidate",
+                "author": "",
+                "publisher": "",
+                "publication_year": "",
+                "match_confidence": "",
+            }
+        ],
+        acquisitions=[
+            {
+                "acquisition_id": "AMZ-1",
+                "catalog_item_id": "BK000001",
+                "source": "amazon",
+                "source_order_id": "1",
+                "source_item_id": "SRC-1",
+                "order_date": "2021-10-10T22:33:42Z",
+                "quantity": "1",
+                "item_price": "11.95",
+                "item_subtotal": "11.95",
+                "currency": "USD",
+                "source_title": "Low Candidate",
+                "source_asin": "0000000001",
+                "isbn13": "9780000000001",
+                "isbn10": "0000000001",
+            }
+        ],
+        research_candidates=research_candidates,
+        collector_reviews=collector_reviews,
+        metadata_rows=[],
+        latest_import="input/amazon/orders.csv",
+    )
+
+    with zipfile.ZipFile(output_path) as workbook:
+        assert workbook_sheet_names(workbook) == COLLECTOR_WORKBOOK_SHEETS
+        summary_xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        candidates_xml = workbook.read("xl/worksheets/sheet2.xml").decode("utf-8")
+        reviewed_xml = workbook.read("xl/worksheets/sheet4.xml").decode("utf-8")
+        metadata_gaps_xml = workbook.read("xl/worksheets/sheet5.xml").decode("utf-8")
+        reviews_xml = workbook.read("xl/worksheets/sheet6.xml").decode("utf-8")
+
+    assert GENERATED_WORKBOOK_NOTE in summary_xml
+    assert "Research Candidates total" in summary_xml
+    assert candidates_xml.index("BK000002") < candidates_xml.index("BK000001")
+    assert "Already checked." in reviewed_xml
+    assert "Already checked." in reviews_xml
+    assert "authors; publisher; publication_year; lcc; oclc; metadata_source; metadata_confidence" in metadata_gaps_xml
+    assert '<pane ySplit="1"' in summary_xml
+
+
+def workbook_sheet_names(workbook):
+    namespace = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    root = ElementTree.fromstring(workbook.read("xl/workbook.xml"))
+    return [sheet.attrib["name"] for sheet in root.findall("main:sheets/main:sheet", namespace)]
