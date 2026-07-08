@@ -35,7 +35,10 @@ Acquisition    Catalog Item ---- Bibliographic Work
 Owned Copy / Inventory Holding
                      |
                      v
-              Research Priority
+              Research Assessment
+                     |
+                     v
+             Research Candidate View
                      |
                      v
 Market Observation -> Valuation Estimate -> Decision
@@ -300,12 +303,11 @@ Data classification:
 - Regenerated: records may be recreated by rerunning enrichment, but prior
   evidence should remain auditable when used for valuation or decisions.
 
-### Research Signals And Priority
+### Research Signals And Assessments
 
 A `Research Signal` is a deterministic reason that a catalog item may deserve
-collector attention. A `Research Priority` or future Research Assessment
-aggregates those signals into a planning assessment. This layer is not a
-valuation estimate.
+collector attention. A `Research Assessment` aggregates those signals into a
+planning assessment. This layer is not a valuation estimate.
 
 Research Signal examples:
 
@@ -460,7 +462,7 @@ or review file produced from project data.
 Fields:
 
 - `generated_artifact_id`: stable internal identifier.
-- `artifact_type`: valuation_workbook, research_queue, dealer_prospectus,
+- `artifact_type`: valuation_workbook, research_candidates, dealer_prospectus,
   collection_report, estate_report, other.
 - `file_path`: output path.
 - `generated_at`: timestamp.
@@ -492,7 +494,8 @@ Core relationships:
 - One `Catalog Item` may link to one `Bibliographic Work`.
 - One `Bibliographic Work` may group many `Catalog Items`.
 - One `Catalog Item` may have many `Bibliographic Source Records`.
-- One `Catalog Item` may have many `Research Priority` scoring events.
+- One `Catalog Item` may have one current generated `Research Assessment` and
+  may later have many historical assessment events.
 - One `Catalog Item` may have many `Market Observations`.
 - One `Valuation Estimate` may use many `Market Observations`.
 - One `Catalog Item` may have many historical `Valuation Estimates`.
@@ -600,6 +603,9 @@ Generated outputs:
 - Nothing in `output/` is source data.
 - Everything in `output/` must be reproducible from `input/`, `data/`,
   `cache/`, `config/`, and code.
+- `output/research_candidates.csv` and `.xlsx` are generated collector-facing
+  views over current catalog items, acquisitions, metadata, and Research
+  Assessments.
 
 `data/import_manifest.csv` fields:
 
@@ -665,7 +671,8 @@ because the current normalized Amazon rows do not expose a true source line-item
 identifier.
 
 `data/research_priority_assessments.csv` should contain the latest durable
-research-priority assessment per catalog item. Suggested minimum fields:
+Research Assessment per catalog item. The filename is preserved for continuity,
+but the conceptual object is a Research Assessment. Suggested minimum fields:
 
 - `catalog_item_id`
 - `isbn13`
@@ -681,6 +688,39 @@ research-priority assessment per catalog item. Suggested minimum fields:
 - `assessment_status`
 - `acquisition_snapshot_hash`
 - `metadata_snapshot_hash`
+
+`output/research_candidates.csv` should contain generated Research Candidate
+rows for catalog items whose Research Assessment band is high, medium, or low.
+Rows with band `none` are excluded by default. Current fields:
+
+- `catalog_item_id`
+- `isbn13`
+- `title`
+- `authors`
+- `publisher`
+- `publication_year`
+- `research_priority_score`
+- `research_priority_band`
+- `research_signal_count`
+- `research_signal_codes`
+- `research_signal_summary`
+- `research_signal_explanations`
+- `acquisition_count`
+- `first_acquired_date`
+- `latest_acquired_date`
+- `source_asins`
+- `source_order_ids`
+- `metadata_source`
+- `metadata_confidence`
+- `lcc`
+- `oclc`
+- `subjects`
+- `openlibrary_work_key`
+- `openlibrary_edition_key`
+
+Research Candidates are sorted by band, score, signal count, older publication
+year, title, and `catalog_item_id`. They are regenerated outputs, not durable
+review state.
 
 Monthly import matching should attach each acquisition to a catalog item using
 the strongest available evidence:

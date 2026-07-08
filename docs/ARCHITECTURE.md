@@ -145,6 +145,16 @@ Order History CSV or ZIP downloads under `input/amazon/`.
 `output/` contains generated artifacts only. Prior generated Excel or CSV files
 must not be read as source data.
 
+Current generated outputs include:
+
+- `book_purchases.csv` / `.xlsx`: normalized book-like source rows from the
+  latest Amazon export.
+- `book_metadata.csv` / `.xlsx`: current import metadata and enrichment view.
+- `library_catalog.csv` / `.xlsx`: catalog-facing acquisition view.
+- `research_candidates.csv` / `.xlsx`: collector-facing Research Candidates
+  generated from current catalog items, acquisitions, metadata, and Research
+  Assessments.
+
 ### Identity And Matching
 
 `catalog_item_id` is the permanent internal identity for catalog records. ISBNs
@@ -214,10 +224,13 @@ The system should keep distinct categories of information separate:
 
 - Catalog data: bibliographic and acquisition facts such as ISBN, title,
   authors, publishers, classifications, purchase date, and source identifiers.
-- Research priority: a planning assessment that answers whether a book should
-  be researched.
+- Research Assessment: a generated planning assessment that answers whether a
+  book should be researched.
 - Research signals: deterministic, explainable evidence points that feed
-  research-priority assessments and future Research Candidates.
+  Research Assessments and Research Candidates.
+- Research Candidates: generated collector-facing output rows that rank catalog
+  items by Research Assessment band, score, signal count, age, title, and
+  stable catalog identity.
 - Market research: observed listings, completed sales, dealer notes, source
   URLs, capture dates, condition observations, and comparable-copy evidence.
 - Valuation estimates: derived retail estimates, dealer-value estimates,

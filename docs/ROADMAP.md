@@ -177,10 +177,20 @@ Exit condition:
 - The catalog can produce reproducible Research Candidates that direct human
   time toward books with the highest expected payoff or uncertainty.
 
-## Sprint 3: Generated Valuation Workbook
+Implementation status:
 
-Sprint 3 should generate a workbook designed for review and valuation planning,
-without making the workbook the source of truth.
+- Done: deterministic Research Signals.
+- Done: generated Research Assessments in the preserved durable
+  `data/research_priority_assessments.csv` path.
+- Done: generated `output/research_candidates.csv` and `.xlsx` views that rank
+  high, medium, and low Research Assessments for collector attention.
+- Not yet done: durable Collector Review state or reviewed-item filtering.
+
+## Sprint 3: Collector Review State And Generated Workbook
+
+Sprint 3 should introduce collector-owned review state and generate a workbook
+designed for review and valuation planning, without making the workbook the
+source of truth.
 
 Goals:
 
@@ -192,7 +202,7 @@ Goals:
 Likely workbook sections:
 
 - Catalog overview.
-- Research queue sorted by priority.
+- Research Candidates sorted by priority.
 - Manual-review candidates.
 - Market research input sheet or generated market-observation view.
 - Valuation estimate view.

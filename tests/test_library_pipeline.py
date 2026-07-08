@@ -1437,6 +1437,7 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
         "research_durable_total": 5,
         "research_reused": 3,
         "research_created": 1,
+        "research_candidates": 4,
         "manifest_entries": 2,
     }
 
@@ -1452,6 +1453,7 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
     assert "  Rebuilt:                  4" in output
     assert "  Reused for export:        3" in output
     assert "  Created this run:         1" in output
+    assert "  Research Candidates:      4" in output
     assert "Manifest entries:           2" in output
     assert "output/library_catalog.xlsx" in output
 
@@ -1660,6 +1662,10 @@ def test_update_library_writes_catalog_acquisitions_and_manifest_csv(tmp_path):
     assert (paths.output_dir / "book_purchases.csv").exists()
     assert (paths.output_dir / "book_metadata.csv").exists()
     assert (paths.output_dir / "library_catalog.csv").read_text(encoding="utf-8").splitlines()[0].startswith("catalog_item_id,")
+    research_candidate_lines = (paths.output_dir / "research_candidates.csv").read_text(encoding="utf-8").splitlines()
+    assert research_candidate_lines[0].startswith("catalog_item_id,isbn13,title,authors,publisher,publication_year,")
+    assert research_candidate_lines[1].startswith("BK000001,9780198786221,Cognitive neuroscience,Richard Passingham,Oxford,2016,")
+    assert (paths.output_dir / "research_candidates.xlsx").exists()
 
 
 def test_update_library_summary_counts_distinct_catalog_items_for_duplicate_purchases(tmp_path):
@@ -2373,6 +2379,8 @@ def assert_monthly_outputs_exist(paths):
     assert (paths.output_dir / "book_metadata.xlsx").exists()
     assert (paths.output_dir / "library_catalog.csv").exists()
     assert (paths.output_dir / "library_catalog.xlsx").exists()
+    assert (paths.output_dir / "research_candidates.csv").exists()
+    assert (paths.output_dir / "research_candidates.xlsx").exists()
 
 
 def test_valuation_extension_context_names_post_catalog_handoff():

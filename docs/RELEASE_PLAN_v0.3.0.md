@@ -68,7 +68,7 @@ Monthly imports should continue to process only new acquisitions while preservin
 
 ## PR1 — Research Signal Model
 
-**Status:** Planned
+**Status:** Done
 
 ### Goal
 
@@ -94,7 +94,7 @@ later Research Assessments and Research Candidates.
 
 ## PR2 — Explainable Research Assessment
 
-**Status:** Planned
+**Status:** Done
 
 ### Goal
 
@@ -114,7 +114,7 @@ Assessments.
 
 ## PR3 — Research Candidates
 
-**Status:** Planned
+**Status:** In progress
 
 ### Goal
 
@@ -124,14 +124,18 @@ attention.
 ### Deliverables
 
 - Ranked Research Candidates
-- Filtering of previously reviewed items
-- Summary metrics
+- CSV and XLSX generated outputs
+- Acquisition and metadata context for each candidate
+- Deterministic sorting by band, score, signal count, publication year, title,
+  and catalog identity
 
 ### Acceptance Criteria
 
 - Newly acquired books appear appropriately.
-- Reviewed items can be excluded or deprioritized.
-- Queue generation is deterministic.
+- Rows with no Research Signals are excluded by default.
+- Candidate generation is deterministic.
+- Collector review state, reviewed-item filtering, and priority overrides remain
+  deferred to PR4.
 
 ---
 

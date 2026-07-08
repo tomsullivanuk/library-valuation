@@ -32,6 +32,10 @@ from valuation.research_assessments import (
     metadata_snapshot_hash,
     research_config_hash,
 )
+from valuation.research_candidates import (
+    RESEARCH_CANDIDATE_FIELDNAMES,
+    build_research_candidate_rows,
+)
 from valuation.research_signals import (
     ResearchSignalConfig,
     default_research_signal_config,
@@ -893,9 +897,21 @@ def update_library(
         config=research_signal_config,
     )
     research_assessment_repository.save(research_assessments)
+    research_candidates = build_research_candidate_rows(
+        catalog_items,
+        metadata_rows,
+        acquisitions,
+        research_assessments,
+    )
 
     write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
     write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
+    write_table_outputs(
+        output_dir / "research_candidates.csv",
+        RESEARCH_CANDIDATE_FIELDNAMES,
+        research_candidates,
+        "Research Candidates",
+    )
     save_cache(isbn_cache_path, isbn_cache)
     save_cache(search_cache_path, search_cache)
     manifest_repository = ImportManifestRepository(paths.import_manifest_path)
@@ -945,6 +961,7 @@ def update_library(
         "research_durable_total": len(final_assessed_catalog_item_ids),
         "research_reused": len(current_metadata_catalog_item_ids & assessed_catalog_item_ids),
         "research_created": len(current_metadata_catalog_item_ids & created_assessment_catalog_item_ids),
+        "research_candidates": len(research_candidates),
         "manifest_entries": len(manifest_repository.load()),
     }
 
@@ -1630,10 +1647,11 @@ def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> st
             f"  New this run:             {summary.get('catalog_new', 0)}",
             "Acquisitions",
             f"  Rebuilt:                  {summary.get('acquisition_rows', 0)}",
-            "Research Priority",
+            "Research Assessments",
             f"  Durable total:            {summary.get('research_durable_total', 0)}",
             f"  Reused for export:        {summary.get('research_reused', 0)}",
             f"  Created this run:         {summary.get('research_created', 0)}",
+            f"  Research Candidates:      {summary.get('research_candidates', 0)}",
             f"Manifest entries:           {summary.get('manifest_entries', 0)}",
             "Outputs",
             f"  {output_dir / 'book_purchases.xlsx'}",
