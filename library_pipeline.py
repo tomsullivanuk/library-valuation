@@ -888,6 +888,7 @@ def update_library(
     research_assessment_repository = ResearchAssessmentRepository(paths.research_priority_assessments_path)
     collector_review_repository = CollectorReviewRepository(paths.collector_reviews_path)
     catalog_items = catalog_repository.load()
+    existing_acquisitions = acquisition_repository.load()
     existing_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
     existing_assessments = research_assessment_repository.load()
     collector_review_repository.ensure_exists()
@@ -897,6 +898,9 @@ def update_library(
     catalog_rows = build_library_catalog_rows(purchases, metadata_rows)
     acquisitions = build_acquisitions(purchases, metadata_rows)
     acquisition_repository.save(acquisitions)
+    existing_acquisition_ids = {row.get("acquisition_id", "") for row in existing_acquisitions if row.get("acquisition_id")}
+    current_acquisition_ids = {row.get("acquisition_id", "") for row in acquisitions if row.get("acquisition_id")}
+    new_acquisition_count = len(current_acquisition_ids - existing_acquisition_ids)
     assessment_metadata_rows = assessment_metadata_for_catalog_items(catalog_items, metadata_rows)
     research_signal_config = load_research_signal_config(paths.config_dir)
     research_assessments = reconcile_research_assessments(
@@ -912,39 +916,6 @@ def update_library(
         acquisitions,
         research_assessments,
         collector_reviews,
-    )
-
-    write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
-    write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
-    write_table_outputs(
-        output_dir / "research_candidates.csv",
-        RESEARCH_CANDIDATE_FIELDNAMES,
-        research_candidates,
-        "Research Candidates",
-    )
-    write_collector_workbook(
-        output_dir / "collector_workbook.xlsx",
-        catalog_items=catalog_items,
-        acquisitions=acquisitions,
-        research_candidates=research_candidates,
-        collector_reviews=collector_reviews,
-        metadata_rows=metadata_rows,
-        latest_import=str(amazon_input),
-    )
-    save_cache(isbn_cache_path, isbn_cache)
-    save_cache(search_cache_path, search_cache)
-    manifest_repository = ImportManifestRepository(paths.import_manifest_path)
-    manifest_repository.append(
-        build_import_manifest_row(
-            filename=manifest_source_filename,
-            file_hash=manifest_source_hash,
-            amazon_row_count=amazon_row_count,
-            purchases=purchases,
-            metadata_rows=metadata_rows,
-            existing_catalog_item_ids=existing_catalog_item_ids,
-            catalog_items=catalog_items,
-            acquisitions=acquisitions,
-        )
     )
     final_catalog_item_ids = {row.get("catalog_item_id", "") for row in catalog_items if row.get("catalog_item_id")}
     assessed_catalog_item_ids = {
@@ -963,6 +934,49 @@ def update_library(
         if row.get("catalog_item_id")
     }
     created_assessment_catalog_item_ids = final_assessed_catalog_item_ids - assessed_catalog_item_ids
+    manifest_row = build_import_manifest_row(
+        filename=manifest_source_filename,
+        file_hash=manifest_source_hash,
+        amazon_row_count=amazon_row_count,
+        purchases=purchases,
+        metadata_rows=metadata_rows,
+        existing_catalog_item_ids=existing_catalog_item_ids,
+        catalog_items=catalog_items,
+        acquisitions=acquisitions,
+    )
+    run_summary = {
+        "imported_at": manifest_row.get("imported_at", ""),
+        "amazon_row_count": amazon_row_count,
+        "purchase_rows": len(purchases),
+        "catalog_new": len(current_metadata_catalog_item_ids - existing_catalog_item_ids),
+        "acquisition_new": new_acquisition_count,
+        "research_durable_total": len(final_assessed_catalog_item_ids),
+        "research_reused": len(current_metadata_catalog_item_ids & assessed_catalog_item_ids),
+        "research_created": len(current_metadata_catalog_item_ids & created_assessment_catalog_item_ids),
+    }
+
+    write_table_outputs(output_dir / "book_metadata.csv", BOOK_METADATA_FIELDNAMES, metadata_rows, "Book Metadata")
+    write_table_outputs(output_dir / "library_catalog.csv", LIBRARY_CATALOG_FIELDNAMES, catalog_rows, "Library Catalog")
+    write_table_outputs(
+        output_dir / "research_candidates.csv",
+        RESEARCH_CANDIDATE_FIELDNAMES,
+        research_candidates,
+        "Research Candidates",
+    )
+    write_collector_workbook(
+        output_dir / "collector_workbook.xlsx",
+        catalog_items=catalog_items,
+        acquisitions=acquisitions,
+        research_candidates=research_candidates,
+        collector_reviews=collector_reviews,
+        metadata_rows=metadata_rows,
+        latest_import=str(amazon_input),
+        run_summary=run_summary,
+    )
+    save_cache(isbn_cache_path, isbn_cache)
+    save_cache(search_cache_path, search_cache)
+    manifest_repository = ImportManifestRepository(paths.import_manifest_path)
+    manifest_repository.append(manifest_row)
 
     return {
         "amazon_export": str(amazon_input),
@@ -977,6 +991,7 @@ def update_library(
         "catalog_existing": len(current_metadata_catalog_item_ids & existing_catalog_item_ids),
         "catalog_new": len(current_metadata_catalog_item_ids - existing_catalog_item_ids),
         "acquisition_rows": len(acquisitions),
+        "acquisition_new": new_acquisition_count,
         "research_durable_total": len(final_assessed_catalog_item_ids),
         "research_reused": len(current_metadata_catalog_item_ids & assessed_catalog_item_ids),
         "research_created": len(current_metadata_catalog_item_ids & created_assessment_catalog_item_ids),
@@ -1674,6 +1689,7 @@ def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> st
             f"  New this run:             {summary.get('catalog_new', 0)}",
             "Acquisitions",
             f"  Rebuilt:                  {summary.get('acquisition_rows', 0)}",
+            f"  New this run:             {summary.get('acquisition_new', 0)}",
             "Research Assessments",
             f"  Durable total:            {summary.get('research_durable_total', 0)}",
             f"  Reused for export:        {summary.get('research_reused', 0)}",
@@ -1684,6 +1700,9 @@ def format_update_summary(summary: dict[str, int | str], output_dir: Path) -> st
             f"  {output_dir / 'book_purchases.xlsx'}",
             f"  {output_dir / 'book_metadata.xlsx'}",
             f"  {output_dir / 'library_catalog.xlsx'}",
+            f"  {output_dir / 'research_candidates.csv'}",
+            f"  {output_dir / 'research_candidates.xlsx'}",
+            f"  {output_dir / 'collector_workbook.xlsx'}",
         ]
     )
 

@@ -73,6 +73,11 @@ The main `update-library` command writes:
 - `book_metadata.csv` and `book_metadata.xlsx`: one row per unique ISBN-13.
 - `library_catalog.csv` and `library_catalog.xlsx`: purchase rows joined to
   metadata for browsing.
+- `research_candidates.csv` and `research_candidates.xlsx`: generated
+  collector-facing candidate list.
+- `collector_workbook.xlsx`: generated dashboard workbook with Summary,
+  Research Candidates, Current Acquisitions, Reviewed Items, Metadata Gaps, and
+  Collector Reviews sheets.
 
 The workflow also reuses:
 
@@ -157,7 +162,8 @@ Current generated outputs include:
   generated from current catalog items, acquisitions, metadata, and Research
   Assessments.
 - `collector_workbook.xlsx`: generated multi-sheet collector workbook over
-  current durable state and generated Research Candidate rows.
+  current durable state and generated Research Candidate rows. Its Summary
+  sheet is a collector dashboard, and workbook edits are not imported.
 
 ### Identity And Matching
 

@@ -1498,6 +1498,7 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
         "catalog_existing": 3,
         "catalog_new": 1,
         "acquisition_rows": 4,
+        "acquisition_new": 2,
         "research_durable_total": 5,
         "research_reused": 3,
         "research_created": 1,
@@ -1515,11 +1516,15 @@ def test_format_update_summary_includes_selected_export_and_key_counts():
     assert "  Existing in export:       3" in output
     assert "  New this run:             1" in output
     assert "  Rebuilt:                  4" in output
+    assert "  New this run:             2" in output
     assert "  Reused for export:        3" in output
     assert "  Created this run:         1" in output
     assert "  Research Candidates:      4" in output
     assert "Manifest entries:           2" in output
     assert "output/library_catalog.xlsx" in output
+    assert "output/research_candidates.csv" in output
+    assert "output/research_candidates.xlsx" in output
+    assert "output/collector_workbook.xlsx" in output
 
 
 def test_write_table_outputs_creates_csv_and_xlsx(tmp_path):

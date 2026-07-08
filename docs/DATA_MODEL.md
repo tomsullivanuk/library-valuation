@@ -817,12 +817,15 @@ artifact over canonical entities.
 
 Expected workbook tabs can map directly to the model:
 
-- `Summary`: generated counts and a generated-output-only note.
-- `Research Candidates`: generated Research Candidate rows in candidate order.
+- `Summary`: generated import, catalog, acquisition, assessment, candidate,
+  review, and metadata-gap counts plus a generated-output-only note.
+- `Research Candidates`: generated Research Candidate rows in candidate order,
+  with collector-facing Research Rationale instead of signal-code internals.
 - `Current Acquisitions`: acquisition rows from the selected full-history
   import.
 - `Reviewed Items`: Collector Review rows with review activity.
-- `Metadata Gaps`: catalog items missing important metadata fields.
+- `Metadata Gaps`: catalog items missing important metadata fields, including
+  gap category and gap count.
 - `Collector Reviews`: read-only presentation of `data/collector_reviews.csv`.
 - `Catalog`: current `Catalog Item` view plus acquisition summary.
 - `Acquisitions`: source-linked acquisition history.

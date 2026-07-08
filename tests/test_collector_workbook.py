@@ -17,6 +17,9 @@ def test_write_collector_workbook_creates_expected_sheets_and_content(tmp_path):
             "title": "High Candidate",
             "research_priority_score": "30",
             "research_priority_band": "high",
+            "research_signal_codes": "old_publication_year",
+            "research_signal_summary": "old_publication_year:+12",
+            "research_signal_explanations": "Published before the configured threshold.",
         },
         {
             "catalog_item_id": "BK000001",
@@ -24,6 +27,9 @@ def test_write_collector_workbook_creates_expected_sheets_and_content(tmp_path):
             "title": "Low Candidate",
             "research_priority_score": "13",
             "research_priority_band": "low",
+            "research_signal_codes": "missing_lcc",
+            "research_signal_summary": "missing_lcc:+8",
+            "research_signal_explanations": "Missing Library of Congress Classification.",
         },
     ]
     collector_reviews = [
@@ -75,6 +81,16 @@ def test_write_collector_workbook_creates_expected_sheets_and_content(tmp_path):
         collector_reviews=collector_reviews,
         metadata_rows=[],
         latest_import="input/amazon/orders.csv",
+        run_summary={
+            "imported_at": "2026-07-08T00:00:00Z",
+            "amazon_row_count": 10,
+            "purchase_rows": 2,
+            "catalog_new": 1,
+            "acquisition_new": 1,
+            "research_durable_total": 2,
+            "research_reused": 1,
+            "research_created": 1,
+        },
     )
 
     with zipfile.ZipFile(output_path) as workbook:
@@ -86,12 +102,26 @@ def test_write_collector_workbook_creates_expected_sheets_and_content(tmp_path):
         reviews_xml = workbook.read("xl/worksheets/sheet6.xml").decode("utf-8")
 
     assert GENERATED_WORKBOOK_NOTE in summary_xml
-    assert "Research Candidates total" in summary_xml
+    assert "Import Summary" in summary_xml
+    assert "Amazon rows processed" in summary_xml
+    assert "New catalog items from this import" in summary_xml
+    assert "New acquisitions from this import" in summary_xml
+    assert "Research Assessments" in summary_xml
+    assert "Newly generated" in summary_xml
+    assert "Metadata Gap count" in summary_xml
     assert candidates_xml.index("BK000002") < candidates_xml.index("BK000001")
+    assert "Research Rationale" in candidates_xml
+    assert "Published before the configured threshold." in candidates_xml
+    assert "research_signal_codes" not in candidates_xml
+    assert "research_signal_summary" not in candidates_xml
     assert "Already checked." in reviewed_xml
     assert "Already checked." in reviews_xml
-    assert "authors; publisher; publication_year; lcc; oclc; metadata_source; metadata_confidence" in metadata_gaps_xml
+    assert "gap_category" in metadata_gaps_xml
+    assert "gap_count" in metadata_gaps_xml
+    assert "Missing Publication Metadata" in metadata_gaps_xml
+    assert "authors; publisher; publication_year" in metadata_gaps_xml
     assert '<pane ySplit="1"' in summary_xml
+    assert ' s="2"' in candidates_xml
 
 
 def workbook_sheet_names(workbook):

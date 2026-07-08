@@ -188,6 +188,9 @@ Produce an Excel workbook designed for collector workflow.
 - Information is organized around collector decisions rather than internal implementation.
 - Workbook is generated output only; edits are not imported.
 - Durable review state remains in `data/collector_reviews.csv`.
+- Summary sheet acts as a collector dashboard for the latest run.
+- Metadata Gaps include category and count columns.
+- Research Candidates workbook sheet uses collector-facing Research Rationale.
 
 ---
 

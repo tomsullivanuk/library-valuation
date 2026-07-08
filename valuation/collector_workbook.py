@@ -26,11 +26,22 @@ COLLECTOR_WORKBOOK_SHEETS = [
     "Collector Reviews",
 ]
 
-SUMMARY_FIELDNAMES = ["metric", "value", "note"]
+SUMMARY_FIELDNAMES = ["section", "metric", "value", "note"]
+WORKBOOK_RESEARCH_CANDIDATE_FIELDNAMES = [
+    field
+    for field in RESEARCH_CANDIDATE_FIELDNAMES
+    if field not in {"research_signal_codes", "research_signal_summary", "research_signal_explanations"}
+]
+WORKBOOK_RESEARCH_CANDIDATE_FIELDNAMES.insert(
+    WORKBOOK_RESEARCH_CANDIDATE_FIELDNAMES.index("acquisition_count"),
+    "Research Rationale",
+)
 METADATA_GAP_FIELDNAMES = [
     "catalog_item_id",
     "isbn13",
     "title",
+    "gap_category",
+    "gap_count",
     "missing_fields",
     "metadata_source",
     "metadata_confidence",
@@ -48,6 +59,7 @@ def write_collector_workbook(
     collector_reviews: list[dict[str, str]],
     metadata_rows: list[dict[str, str]],
     latest_import: str,
+    run_summary: Mapping[str, str | int] | None = None,
 ) -> None:
     sheets = [
         (
@@ -60,9 +72,14 @@ def write_collector_workbook(
                 collector_reviews,
                 metadata_rows,
                 latest_import,
+                run_summary=run_summary,
             ),
         ),
-        ("Research Candidates", RESEARCH_CANDIDATE_FIELDNAMES, research_candidates),
+        (
+            "Research Candidates",
+            WORKBOOK_RESEARCH_CANDIDATE_FIELDNAMES,
+            workbook_research_candidate_rows(research_candidates),
+        ),
         ("Current Acquisitions", ACQUISITION_FIELDNAMES, acquisitions),
         ("Reviewed Items", COLLECTOR_REVIEW_FIELDNAMES, reviewed_items(collector_reviews)),
         ("Metadata Gaps", METADATA_GAP_FIELDNAMES, metadata_gap_rows(catalog_items, metadata_rows)),
@@ -78,7 +95,9 @@ def summary_rows(
     collector_reviews: list[dict[str, str]],
     metadata_rows: list[dict[str, str]],
     latest_import: str,
+    run_summary: Mapping[str, str | int] | None = None,
 ) -> list[dict[str, str]]:
+    run_summary = run_summary or {}
     band_counts = Counter(row.get("research_priority_band", "") for row in research_candidates)
     reviewed = reviewed_items(collector_reviews)
     ignored_or_excluded = [
@@ -89,28 +108,50 @@ def summary_rows(
     ]
     metadata_gaps = metadata_gap_rows(catalog_items, metadata_rows)
     return [
-        {"metric": "Generated output note", "value": GENERATED_WORKBOOK_NOTE, "note": ""},
-        {"metric": "Total catalog items", "value": str(len(catalog_items)), "note": ""},
-        {"metric": "Total acquisitions", "value": str(len(acquisitions)), "note": ""},
-        {"metric": "Research Candidates total", "value": str(len(research_candidates)), "note": ""},
-        {"metric": "High Research Candidates", "value": str(band_counts.get("high", 0)), "note": ""},
-        {"metric": "Medium Research Candidates", "value": str(band_counts.get("medium", 0)), "note": ""},
-        {"metric": "Low Research Candidates", "value": str(band_counts.get("low", 0)), "note": ""},
-        {"metric": "Collector review rows", "value": str(len(collector_reviews)), "note": ""},
-        {"metric": "Reviewed items", "value": str(len(reviewed)), "note": ""},
-        {"metric": "Ignored or excluded items", "value": str(len(ignored_or_excluded)), "note": ""},
-        {"metric": "Metadata gaps count", "value": str(len(metadata_gaps)), "note": ""},
+        summary_row("", "Generated output note", GENERATED_WORKBOOK_NOTE),
+        summary_row("Import Summary", "Import source", latest_import),
+        summary_row("Import Summary", "Import date", run_summary.get("imported_at", "")),
+        summary_row("Import Summary", "Amazon rows processed", run_summary.get("amazon_row_count", "")),
+        summary_row("Import Summary", "Book candidates detected", run_summary.get("purchase_rows", "")),
+        summary_row("Catalog", "Total catalog items", len(catalog_items)),
+        summary_row("Catalog", "New catalog items from this import", run_summary.get("catalog_new", "")),
+        summary_row("Acquisitions", "Total acquisitions", len(acquisitions)),
+        summary_row("Acquisitions", "New acquisitions from this import", run_summary.get("acquisition_new", "")),
+        summary_row("Research Assessments", "Total assessments", run_summary.get("research_durable_total", "")),
+        summary_row("Research Assessments", "Reused", run_summary.get("research_reused", "")),
+        summary_row("Research Assessments", "Newly generated", run_summary.get("research_created", "")),
+        summary_row("Research Candidates", "Total", len(research_candidates)),
+        summary_row("Research Candidates", "High", band_counts.get("high", 0)),
+        summary_row("Research Candidates", "Medium", band_counts.get("medium", 0)),
+        summary_row("Research Candidates", "Low", band_counts.get("low", 0)),
+        summary_row("Collector Reviews", "Total review rows", len(collector_reviews)),
+        summary_row("Collector Reviews", "Reviewed", len(reviewed)),
+        summary_row("Collector Reviews", "Ignored", len(ignored_or_excluded)),
+        summary_row("Metadata", "Metadata Gap count", len(metadata_gaps)),
         {
-            "metric": "Latest import",
-            "value": latest_import,
-            "note": "Latest selected import path for this generated workbook.",
-        },
-        {
+            "section": "Current Acquisitions",
             "metric": "Current Acquisitions note",
             "value": "Current acquisition rows",
             "note": "The pipeline currently rebuilds acquisitions from the selected full-history export.",
         },
     ]
+
+
+def summary_row(section: str, metric: str, value: str | int, note: str = "") -> dict[str, str]:
+    return {"section": section, "metric": metric, "value": str(value), "note": note}
+
+
+def workbook_research_candidate_rows(research_candidates: Iterable[Mapping[str, str]]) -> list[dict[str, str]]:
+    rows = []
+    for candidate in research_candidates:
+        row = {
+            field: candidate.get(field, "")
+            for field in WORKBOOK_RESEARCH_CANDIDATE_FIELDNAMES
+            if field != "Research Rationale"
+        }
+        row["Research Rationale"] = candidate.get("research_signal_explanations", "")
+        rows.append(row)
+    return rows
 
 
 def reviewed_items(collector_reviews: Iterable[Mapping[str, str]]) -> list[dict[str, str]]:
@@ -149,26 +190,31 @@ def metadata_gap_rows(
             "metadata_source": metadata.get("resolution_source") or metadata.get("openlibrary_status", ""),
             "metadata_confidence": metadata.get("resolution_confidence") or item.get("match_confidence", ""),
         }
-        missing = [
-            label
-            for label, field in (
-                ("title", "title"),
-                ("authors", "authors"),
-                ("publisher", "publisher"),
-                ("publication_year", "publication_year"),
-                ("lcc", "lcc"),
-                ("oclc", "oclc"),
-                ("metadata_source", "metadata_source"),
-                ("metadata_confidence", "metadata_confidence"),
-            )
-            if not merged.get(field)
+        required_fields = [
+            ("title", "title"),
+            ("authors", "authors"),
+            ("publisher", "publisher"),
+            ("publication_year", "publication_year"),
         ]
+        if metadata:
+            required_fields.extend(
+                [
+                    ("lcc", "lcc"),
+                    ("oclc", "oclc"),
+                    ("metadata_source", "metadata_source"),
+                    ("metadata_confidence", "metadata_confidence"),
+                ]
+            )
+        missing = [label for label, field in required_fields if not merged.get(field)]
         if missing:
+            gap_categories = metadata_gap_categories(missing)
             rows.append(
                 {
                     "catalog_item_id": merged["catalog_item_id"],
                     "isbn13": merged["isbn13"],
                     "title": merged["title"],
+                    "gap_category": gap_category(gap_categories),
+                    "gap_count": str(len(missing)),
                     "missing_fields": "; ".join(missing),
                     "metadata_source": merged["metadata_source"],
                     "metadata_confidence": merged["metadata_confidence"],
@@ -177,6 +223,26 @@ def metadata_gap_rows(
                 }
             )
     return sorted(rows, key=lambda row: row.get("catalog_item_id", ""))
+
+
+def metadata_gap_categories(missing_fields: Iterable[str]) -> list[str]:
+    categories = []
+    missing_set = set(missing_fields)
+    if "lcc" in missing_set:
+        categories.append("Missing Classification")
+    if "oclc" in missing_set:
+        categories.append("Missing Identifier")
+    if {"title", "authors", "publisher", "publication_year"} & missing_set:
+        categories.append("Missing Publication Metadata")
+    if {"metadata_source", "metadata_confidence"} & missing_set:
+        categories.append("Missing Subject Metadata")
+    return categories
+
+
+def gap_category(categories: list[str]) -> str:
+    if len(categories) > 1:
+        return "Multiple Metadata Gaps"
+    return categories[0] if categories else "Metadata Gap"
 
 
 def write_workbook(output_path: Path, sheets: list[tuple[str, list[str], list[dict[str, str]]]]) -> None:
@@ -190,10 +256,18 @@ def write_workbook(output_path: Path, sheets: list[tuple[str, list[str], list[di
         archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels_xml(len(sheets)))
         archive.writestr("xl/styles.xml", STYLES_XML)
         for index, (_, fieldnames, rows) in enumerate(sheets, start=1):
-            archive.writestr(f"xl/worksheets/sheet{index}.xml", sheet_xml(fieldnames, rows, selected=index == 1))
+            archive.writestr(
+                f"xl/worksheets/sheet{index}.xml",
+                sheet_xml(fieldnames, rows, selected=index == 1, wrap_fields=wrapped_text_fields(fieldnames)),
+            )
 
 
-def sheet_xml(fieldnames: list[str], rows: list[dict[str, str]], selected: bool = False) -> str:
+def sheet_xml(
+    fieldnames: list[str],
+    rows: list[dict[str, str]],
+    selected: bool = False,
+    wrap_fields: set[str] | None = None,
+) -> str:
     row_count = len(rows) + 1
     col_count = max(len(fieldnames), 1)
     dimension = f"A1:{excel_col(col_count)}{row_count}"
@@ -205,7 +279,14 @@ def sheet_xml(fieldnames: list[str], rows: list[dict[str, str]], selected: bool 
     tab_selected = ' tabSelected="1"' if selected else ""
     body = [row_xml(1, fieldnames, style="1")]
     for index, row in enumerate(rows, start=2):
-        body.append(row_xml(index, [row.get(field, "") for field in fieldnames]))
+        body.append(
+            row_xml(
+                index,
+                [row.get(field, "") for field in fieldnames],
+                fieldnames=fieldnames,
+                wrap_fields=wrap_fields,
+            )
+        )
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
@@ -223,14 +304,31 @@ def sheet_xml(fieldnames: list[str], rows: list[dict[str, str]], selected: bool 
     )
 
 
-def row_xml(row_index: int, values: list[str], style: str | None = None) -> str:
-    style_attr = f' s="{style}"' if style else ""
+def row_xml(
+    row_index: int,
+    values: list[str],
+    style: str | None = None,
+    fieldnames: list[str] | None = None,
+    wrap_fields: set[str] | None = None,
+) -> str:
     cells = []
     for col_index, value in enumerate(values, start=1):
         cell_ref = f"{excel_col(col_index)}{row_index}"
         text = escape(xml_safe_text(value))
+        cell_style = style
+        if not cell_style and fieldnames and wrap_fields and fieldnames[col_index - 1] in wrap_fields:
+            cell_style = "2"
+        style_attr = f' s="{cell_style}"' if cell_style else ""
         cells.append(f'<c r="{cell_ref}" t="inlineStr"{style_attr}><is><t>{text}</t></is></c>')
     return f'<row r="{row_index}">{"".join(cells)}</row>'
+
+
+def wrapped_text_fields(fieldnames: list[str]) -> set[str]:
+    return {
+        field
+        for field in fieldnames
+        if field in {"Research Rationale", "review_notes", "missing_fields", "note"}
+    }
 
 
 def column_widths(fieldnames: list[str], rows: list[dict[str, str]]) -> list[int]:
@@ -343,6 +441,6 @@ STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
   <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+  <cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>"""

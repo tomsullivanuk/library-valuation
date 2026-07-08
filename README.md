@@ -150,6 +150,8 @@ Default behavior:
 - Assess only newly discovered catalog items by default.
 - Preserve prior assessments for known catalog items.
 - Regenerate output files.
+  Generated outputs include `research_candidates.csv`,
+  `research_candidates.xlsx`, and `collector_workbook.xlsx`.
 
 The standard directory flags remain available for non-default workspaces:
 
@@ -168,6 +170,7 @@ data/import_manifest.csv              import audit log
 data/catalog_items.csv                one row per catalog item identity
 data/acquisitions.csv                 one row per purchase/acquisition event
 data/research_priority_assessments.csv
+data/collector_reviews.csv            collector-owned review workflow state
 cache/openlibrary/isbn.json           Open Library ISBN lookup cache
 cache/openlibrary/search.json         Open Library title-search cache
 output/                               generated CSV, XLSX, and reports only
