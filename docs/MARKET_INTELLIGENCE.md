@@ -174,6 +174,11 @@ Likely future generated outputs include:
 - `market_values.csv`
 - `market_validation_report.md`
 
+`market_validation_sample.csv` and `market_validation_sample.xlsx` are the
+first generated inputs for the spike. They select books across Research Score
+bands and preserve triggered Research Signals so later Market Intelligence work
+can compare individual signals against external market evidence.
+
 These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by
 accident.

@@ -10,7 +10,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 ### Valuation
 - [ ] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
 - [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
-- [ ] Generate a stratified Research Score sample
+- [ ] Generate a stratified Research Score sample with `generate-market-validation-sample`
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Analyze Research Score association with observed market value
 - [ ] Persistent valuation repository

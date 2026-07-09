@@ -78,6 +78,20 @@ temporary research artifact:
 This is a planning document only. It does not define a new durable schema,
 change existing data models, or require implementation work.
 
+The v0.4.0 sample-generation command creates the initial input dataset:
+
+```bash
+python3 library_pipeline.py generate-market-validation-sample \
+  --output-dir output \
+  --sample-size-per-band 6 \
+  --seed 42
+```
+
+It writes `output/market_validation_sample.csv` and
+`output/market_validation_sample.xlsx`. These generated artifacts include
+catalog identifiers, bibliographic context, Research Score bands, and triggered
+Research Signals. They intentionally do not include valuation fields.
+
 ## Proposed Analysis
 
 Analyze the sampled books using measures that can show whether Research Score

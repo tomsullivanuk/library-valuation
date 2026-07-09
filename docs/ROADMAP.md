@@ -238,7 +238,7 @@ Plan:
 - Use the experimental design in
   [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
 - Sample books across Research Score bands instead of only high-scoring
-  candidates.
+  candidates using `generate-market-validation-sample`.
 - Collect externally observed market-value estimates in a temporary research
   artifact.
 - Analyze whether higher Research Scores are associated with higher observed

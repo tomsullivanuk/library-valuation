@@ -199,6 +199,22 @@ For v0.4.0, the next valuation step is a documentation-first Market Validation
 Spike to test whether higher Research Scores are associated with higher observed
 market values before building valuation workflow features.
 
+Generate the deterministic input dataset for that spike after a successful
+monthly update:
+
+```bash
+python3 library_pipeline.py generate-market-validation-sample \
+  --output-dir output \
+  --sample-size-per-band 6 \
+  --seed 42
+```
+
+This writes `market_validation_sample.csv` and
+`market_validation_sample.xlsx` under `output/`. The sample includes Research
+Score bands and triggered Research Signals, but no valuation or marketplace
+fields. It reads the generated library catalog and current Research Assessment
+state.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

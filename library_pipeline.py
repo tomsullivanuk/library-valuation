@@ -26,6 +26,10 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from valuation.collector_workbook import write_collector_workbook
+from valuation.market_validation import (
+    MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+    build_market_validation_sample_rows,
+)
 from valuation.research_assessments import (
     RESEARCH_MODEL_VERSION,
     acquisition_snapshot_hash,
@@ -248,6 +252,19 @@ def write_csv(output_path: Path, fieldnames: list[str], rows: list[dict[str, str
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def read_csv_rows(input_path: Path) -> list[dict[str, str]]:
+    if not input_path.exists():
+        raise UserFacingError(f"Required input file not found: {input_path}")
+    with input_path.open(newline="", encoding="utf-8-sig") as handle:
+        return [dict(row) for row in csv.DictReader(handle)]
+
+
+def read_optional_csv_rows(input_path: Path) -> list[dict[str, str]]:
+    if not input_path.exists():
+        return []
+    return read_csv_rows(input_path)
 
 
 def write_xlsx(output_path: Path, fieldnames: list[str], rows: list[dict[str, str]], sheet_name: str) -> None:
@@ -1018,6 +1035,43 @@ def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
+def generate_market_validation_sample(
+    output_dir: Path,
+    data_dir: Path = Path("data"),
+    sample_size_per_band: int = 20,
+    seed: int = 42,
+    sampled_at: str | None = None,
+) -> int:
+    if sample_size_per_band < 1:
+        raise UserFacingError("sample-size-per-band must be at least 1")
+    catalog_rows = read_csv_rows(output_dir / "library_catalog.csv")
+    catalog_item_rows = read_optional_csv_rows(data_dir / "catalog_items.csv")
+    acquisition_rows = read_optional_csv_rows(data_dir / "acquisitions.csv")
+    generated_assessments_path = output_dir / "research_assessments.csv"
+    durable_assessments_path = data_dir / "research_priority_assessments.csv"
+    assessment_rows = read_csv_rows(
+        generated_assessments_path
+        if generated_assessments_path.exists()
+        else durable_assessments_path
+    )
+    sample_rows = build_market_validation_sample_rows(
+        catalog_rows,
+        assessment_rows,
+        catalog_item_rows=catalog_item_rows,
+        acquisition_rows=acquisition_rows,
+        sample_size_per_band=sample_size_per_band,
+        seed=seed,
+        sampled_at=sampled_at or utc_timestamp(),
+    )
+    write_table_outputs(
+        output_dir / "market_validation_sample.csv",
+        MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+        sample_rows,
+        "Market Validation Sample",
+    )
+    return len(sample_rows)
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -1764,6 +1818,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     update_parser.add_argument("--delay", type=float, default=0.25)
 
+    market_sample_parser = subparsers.add_parser("generate-market-validation-sample")
+    market_sample_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    market_sample_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    market_sample_parser.add_argument("--sample-size-per-band", type=int, default=20)
+    market_sample_parser.add_argument("--seed", type=int, default=42)
+
     return parser
 
 
@@ -1817,6 +1877,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(format_update_summary(summary, args.output_dir))
             send_macos_notification("Library update complete")
+            return 0
+        if args.command == "generate-market-validation-sample":
+            count = generate_market_validation_sample(
+                output_dir=args.output_dir,
+                data_dir=args.data_dir,
+                sample_size_per_band=args.sample_size_per_band,
+                seed=args.seed,
+            )
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_validation_sample.csv")
+            print(f"Wrote {count} market validation sample rows to {csv_path} and {xlsx_path}")
             return 0
     except UserFacingError as error:
         print(f"Error: {error}", file=sys.stderr)
