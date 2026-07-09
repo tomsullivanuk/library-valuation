@@ -55,6 +55,8 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
+- `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether
+  Research Score predicts market value.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -190,6 +192,10 @@ be reproducible from `input/`, `data/`, `cache/`, `config/`, and code.
 Research Assessments are separate from market valuation. A Research Assessment
 answers whether a book should be researched and why; a future market valuation
 layer should answer what the book is likely worth.
+
+For v0.4.0, the next valuation step is a documentation-first Market Validation
+Spike to test whether higher Research Scores are associated with higher observed
+market values before building valuation workflow features.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

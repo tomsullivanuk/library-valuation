@@ -5,11 +5,13 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ---
 
-## Next Release Candidates (v0.3.x)
+## Next Release Candidates (v0.4.0)
 
 ### Valuation
-- [ ] Research Assessment v1
-- [ ] Empirically validate Research Assessment effectiveness
+- [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
+- [ ] Generate a stratified Research Score sample
+- [ ] Create a temporary valuation workbook for sampled books
+- [ ] Analyze Research Score association with observed market value
 - [ ] Persistent valuation repository
 - [ ] First external valuation source (AbeBooks or eBay)
 - [ ] "Books Worth Investigating" report
@@ -58,12 +60,11 @@ Items move from this backlog into the Roadmap when they are selected for a relea
     excluded by current ISBN-like ASIN heuristics.
   - Evaluate title/category/export-field heuristics or lookup fallbacks.
 - Empirically validate Research Assessment effectiveness:
-  - Sample books across High, Medium, Low, and None bands.
-  - Perform manual market research.
-  - Compare Research Assessment scores/bands against actual collector value,
-    scarcity, dealer interest, and research usefulness.
-  - Use results to tune future signal weights before adding automated
-    valuation.
+  - Follow the plan in `docs/MARKET_VALIDATION_SPIKE.md`.
+  - Sample books across Research Score bands.
+  - Compare Research Score against externally observed market value.
+  - Use results to decide whether valuation workflow, automated valuation, or
+    model refinement should come next.
 - Improve Metadata Gap classification:
   - Classify metadata gaps by type/severity.
   - Distinguish critical bibliographic gaps from research-enhancement gaps such

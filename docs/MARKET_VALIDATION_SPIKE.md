@@ -1,0 +1,118 @@
+# Market Validation Spike
+
+## Purpose
+
+This spike exists to determine whether Research Score contains predictive
+information about externally observed market value.
+
+The Research Assessment model is not itself a valuation model. It ranks books by
+signals that suggest research priority, ambiguity, scarcity, or potential
+collector interest. The v0.4.0 validation question is whether those scores are
+also useful evidence for deciding which books are materially more likely to have
+meaningful market value.
+
+## Hypothesis
+
+Research Score is positively associated with externally observed market value,
+such that books with higher Research Scores are significantly more likely to
+possess meaningful market value than books with lower Research Scores.
+
+## Objectives
+
+- Validate the usefulness of the current Research Assessment model.
+- Determine whether additional investment in automated valuation is justified.
+- Identify strengths and weaknesses of the current scoring model.
+- Establish an evidence-based direction for later releases.
+
+## Non-Goals
+
+This spike does not:
+
+- Build a production valuation engine.
+- Scrape marketplaces.
+- Modify Research Score weights.
+- Perform detailed bibliographic research.
+- Produce appraisal-quality valuations.
+
+## Experimental Design
+
+Use stratified sampling across Research Score bands so the experiment evaluates
+the full scoring range instead of only the most promising books.
+
+Suggested score bands:
+
+- 0-1
+- 2-3
+- 4-5
+- 6-7
+- 8-10
+
+Sample approximately 20 books per band, for about 100 books total. The exact
+sample size may be adjusted based on the actual catalog distribution. If a band
+contains fewer than 20 eligible books, include all available books in that band
+and record the limitation in the analysis.
+
+Stratified sampling avoids bias toward only high-scoring books. A top-score-only
+sample could show whether some high-scoring books are valuable, but it would not
+show whether higher Research Scores are more informative than lower Research
+Scores. Sampling across bands allows comparison of market outcomes throughout
+the model's range.
+
+## Data to Collect
+
+For each sampled book, collect the following fields in a planning workbook or
+temporary research artifact:
+
+- `catalog_id`
+- `title`
+- `author`
+- `ISBN`
+- `Research Score`
+- `score band`
+- `estimated market value`
+- `value bucket`
+- `valuation source`
+- `valuation confidence`
+- `notes`
+
+This is a planning document only. It does not define a new durable schema,
+change existing data models, or require implementation work.
+
+## Proposed Analysis
+
+Analyze the sampled books using measures that can show whether Research Score
+has practical predictive value:
+
+- Median market value by score band.
+- Percentage of books above selected value thresholds.
+- Distribution of value buckets by score band.
+- Spearman rank correlation between Research Score and estimated market value.
+- Identification of notable false positives and false negatives.
+
+Rank-based measures are preferred over simple linear correlation because book
+market values are likely to be highly skewed. A small number of unusually
+valuable books can dominate linear statistics, while rank-based analysis better
+captures whether higher-scored books generally tend to appear higher in the
+observed value ordering.
+
+## Success Criteria
+
+Qualitative success means the evidence shows that higher Research Score bands
+consistently contain books with higher estimated market values and higher
+frequencies of valuable books.
+
+This spike should avoid arbitrary statistical thresholds at this stage. The
+first goal is to learn whether the signal is directionally useful enough to
+justify follow-on valuation work, and where the current model appears strong or
+weak.
+
+## Future Work
+
+Likely follow-on work includes:
+
+- Sample generation.
+- Valuation workbook.
+- Valuation import.
+- Reporting.
+- Automated valuation research.
+- Model refinement.

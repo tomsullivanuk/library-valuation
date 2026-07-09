@@ -224,10 +224,36 @@ Exit condition:
 - A user can regenerate a Collector Workbook from project data and use it to
   guide review without hand-editing the canonical catalog.
 
-## Sprint 4: Top-25 Market Research Workflow
+## v0.4.0: Market Validation Spike
 
-Sprint 4 should create a focused workflow for researching the highest-priority
-books first.
+Version 0.4.0 should begin as a documentation-first research experiment rather
+than a valuation implementation effort. The goal is to validate whether the
+existing Research Assessment model identifies books that are materially more
+likely to possess meaningful market value.
+
+Plan:
+
+- Use the experimental design in
+  [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
+- Sample books across Research Score bands instead of only high-scoring
+  candidates.
+- Collect externally observed market-value estimates in a temporary research
+  artifact.
+- Analyze whether higher Research Scores are associated with higher observed
+  values and higher frequencies of valuable books.
+- Use the results to decide whether automated valuation, valuation import, or
+  model refinement should come next.
+
+Exit condition:
+
+- The project has evidence about whether Research Score contains predictive
+  information about market value, and follow-on valuation work is grounded in
+  that evidence.
+
+## Later: Top-25 Market Research Workflow
+
+After the Market Validation Spike, the project may create a focused workflow
+for researching the highest-priority books first.
 
 Goals:
 
