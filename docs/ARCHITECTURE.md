@@ -258,6 +258,12 @@ Bibliographic facts should remain stable. Market observations can expire.
 Valuation estimates may change as pricing strategy improves. Decisions may
 depend on family goals, time constraints, and risk tolerance.
 
+The Market Intelligence subsystem is the future boundary for collecting
+external market observations. Its architecture is described in
+[Market Intelligence](MARKET_INTELLIGENCE.md). It should gather evidence for
+later valuation components without making appraisal claims or final
+recommendations itself.
+
 Research Assessment must not be mixed with future market valuation. Research
 Assessment answers "Should this book be researched?" Market valuation answers
 "What is this book likely worth?" A future durable file such as

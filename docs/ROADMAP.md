@@ -233,6 +233,8 @@ likely to possess meaningful market value.
 
 Plan:
 
+- Use the subsystem architecture in
+  [Market Intelligence](MARKET_INTELLIGENCE.md).
 - Use the experimental design in
   [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
 - Sample books across Research Score bands instead of only high-scoring

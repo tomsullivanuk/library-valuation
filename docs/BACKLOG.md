@@ -8,6 +8,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 ## Next Release Candidates (v0.4.0)
 
 ### Valuation
+- [ ] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
 - [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
 - [ ] Generate a stratified Research Score sample
 - [ ] Create a temporary valuation workbook for sampled books
@@ -60,6 +61,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
     excluded by current ISBN-like ASIN heuristics.
   - Evaluate title/category/export-field heuristics or lookup fallbacks.
 - Empirically validate Research Assessment effectiveness:
+  - Use `docs/MARKET_INTELLIGENCE.md` to separate market observations from
+    valuation estimates and recommendations.
   - Follow the plan in `docs/MARKET_VALIDATION_SPIKE.md`.
   - Sample books across Research Score bands.
   - Compare Research Score against externally observed market value.
