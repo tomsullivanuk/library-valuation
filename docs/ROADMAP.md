@@ -81,9 +81,9 @@ Goals:
 - Treat ISBN-13 and ISBN-10 as preferred matching attributes, not canonical
   identity.
 - Keep catalog items and acquisitions clearly separated.
-- Preserve existing research priority assessments for known catalog items.
+- Preserve existing Research Assessments for known catalog items.
 - Assess only newly discovered catalog items by default.
-- Keep research priority separate from future market valuation.
+- Keep Research Assessments separate from future market valuation.
 
 Durable files:
 
@@ -128,7 +128,7 @@ Implementation status:
 - Done: `data/acquisitions.csv` rebuilt from the current full-history Amazon
   export and linked to durable catalog items.
 - Done: `data/import_manifest.csv` append-only audit log.
-- Done: persistent research-priority assessments in
+- Done: persistent Research Assessments in
   `data/research_priority_assessments.csv`.
 - Done: latest `.csv`/`.zip` discovery in `input/amazon`.
 - Done: Amazon ZIP and compatible `Retail.OrderHistory.1` package support.
@@ -188,28 +188,28 @@ Implementation status:
   workflow fields and notes.
 - Not yet done: reviewed-item filtering or priority override behavior.
 
-## Sprint 3: Collector Review State And Generated Workbook
+## v0.3.0: Collector Review State And Generated Workbook
 
-Sprint 3 should introduce collector-owned review state and generate a workbook
-designed for review and valuation planning, without making the workbook the
-source of truth.
+Version 0.3.0 introduces collector-owned review state and a generated workbook
+designed for research planning, without making the workbook the source of
+truth.
 
 Goals:
 
-- Produce a professional valuation workbook from normalized data.
-- Separate catalog facts from market evidence, valuation estimates, and
-  decisions.
+- Produce a professional Collector Workbook from normalized data.
+- Separate catalog facts, Research Assessments, Collector Reviews, and generated
+  outputs.
 - Make review efficient for the highest-priority books.
 
 Likely workbook sections:
 
 - Catalog overview.
 - Research Candidates sorted by priority.
-- Manual-review candidates.
-- Market research input sheet or generated market-observation view.
-- Valuation estimate view.
-- Decision/recommendation view.
-- Summary metrics by subject, confidence, and recommendation.
+- Current Acquisitions.
+- Reviewed Items.
+- Metadata Gaps.
+- Collector Reviews.
+- Summary dashboard metrics.
 
 Policy:
 
@@ -221,7 +221,7 @@ Policy:
 
 Exit condition:
 
-- A user can regenerate a valuation workbook from project data and use it to
+- A user can regenerate a Collector Workbook from project data and use it to
   guide review without hand-editing the canonical catalog.
 
 ## Sprint 4: Top-25 Market Research Workflow

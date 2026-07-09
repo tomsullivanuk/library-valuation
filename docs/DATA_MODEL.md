@@ -346,7 +346,7 @@ Data classification:
   discovered, stale, or explicitly requested catalog items.
 - User-maintained: manual and overridden assessments are durable decisions and
   must not be silently replaced by automatic scoring.
-- Separated: research priority answers whether a book should be researched; it
+- Separated: a Research Assessment answers whether a book should be researched; it
   does not estimate what the book is worth.
 
 ### Market Observation
@@ -556,7 +556,7 @@ Examples:
 - ISBN-13 converted from ISBN-10;
 - canonical title selected from enrichment sources;
 - initial holdings generated from acquisition quantity;
-- research priority score and reasons;
+- Research Assessment score and reasons;
 - valuation estimate ranges;
 - proposed decision recommendations.
 
@@ -589,7 +589,7 @@ Durable files:
 - `data/import_manifest.csv`: audit log of processed full-history imports.
 - `data/catalog_items.csv`: one row per distinct catalog item/book identity.
 - `data/acquisitions.csv`: one row per purchase or acquisition event.
-- `data/research_priority_assessments.csv`: durable research-priority state
+- `data/research_priority_assessments.csv`: durable Research Assessment state
   linked by `catalog_item_id`.
 
 Provider-specific caches:
@@ -758,14 +758,14 @@ the strongest available evidence:
 Once matched, the acquisition references the existing or newly created
 `catalog_item_id`. A later, better match may update catalog metadata and mark a
 prior assessment as stale, but it should not replace the internal ID or
-silently rerun research priority for every known book.
+silently rerun Research Assessment generation for every known book.
 
 Implementations must preserve existing `catalog_item_id` values by reading
 `data/catalog_items.csv` before assigning IDs. New IDs should be monotonic,
 UUID-based, or otherwise independent of the latest import's row order. The
 current implementation uses monotonic `BK000001`-style IDs.
 
-Research priority and market valuation remain separate. A future durable file
+Research Assessment and market valuation remain separate. A future durable file
 such as `data/market_valuations.csv` may answer what a book is likely worth;
 `data/research_priority_assessments.csv` only answers whether the book deserves
 research attention.

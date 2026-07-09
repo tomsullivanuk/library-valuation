@@ -34,7 +34,7 @@ Version 0.3.0 shifts the project's emphasis from building infrastructure to deli
 
 The following decisions apply throughout the v0.3.0 release.
 
-### Research Priority is not Market Value
+### Research Assessment is not Market Value
 
 The pipeline identifies books that deserve human attention.
 
@@ -54,7 +54,7 @@ The authoritative data remains the durable catalog and associated state.
 
 ### Explainability Over Black Boxes
 
-Priority assessments should be explainable.
+Research Assessments should be explainable.
 
 Every research recommendation should include one or more reason codes describing why the book was surfaced.
 
@@ -114,7 +114,7 @@ Assessments.
 
 ## PR3 — Research Candidates
 
-**Status:** In progress
+**Status:** Done
 
 ### Goal
 
@@ -141,7 +141,7 @@ attention.
 
 ## PR4 — Durable Collector Review State
 
-**Status:** In progress
+**Status:** Done
 
 ### Goal
 
@@ -167,7 +167,7 @@ Introduce durable collector-owned review information that persists across monthl
 
 ## PR5 — Collector Workbook
 
-**Status:** In progress
+**Status:** Done
 
 ### Goal
 
@@ -194,30 +194,36 @@ Produce an Excel workbook designed for collector workflow.
 
 ---
 
-## PR6 — Pipeline Integration
+## PR6 — Workflow Polish
 
-**Status:** Planned
+**Status:** Done
 
 ### Goal
 
-Integrate the new workflow into the existing update process.
+Polish the end-to-end monthly workflow and Collector Workbook after acceptance
+testing with a real Amazon export.
 
 ### Deliverables
 
-- CLI updates
-- Pipeline integration
+- Terminal summary improvements
+- Collector Workbook Summary dashboard
+- More actionable Metadata Gaps
+- Collector-facing Research Candidate workbook columns
 - End-to-end tests
 
 ### Acceptance Criteria
 
 - A single monthly pipeline execution refreshes all outputs.
 - No additional manual workflow is required.
+- Terminal summary lists the generated Research Candidate and Collector
+  Workbook outputs.
+- Workbook edits remain generated output only and are not imported.
 
 ---
 
 ## PR7 — Documentation & Release
 
-**Status:** Planned
+**Status:** In progress
 
 ### Deliverables
 

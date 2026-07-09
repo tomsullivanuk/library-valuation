@@ -105,13 +105,13 @@ Default behavior:
 - Rebuild current acquisitions from the latest full-history file.
 - Reconcile acquisitions to `catalog_items` using ISBN-first matching.
 - Update catalog metadata from source data and Open Library cache lookups.
-- Load existing research priority assessments.
+- Load existing Research Assessments.
 - Assess only newly discovered catalog items by default.
 - Preserve prior assessments for known items.
 - Record an import-manifest row.
 - Regenerate output files from durable state.
 
-Research-priority re-evaluation remains future work and should be explicit:
+Research Assessment re-evaluation remains future work and should be explicit:
 
 ```text
 --reevaluate new       # default
@@ -137,8 +137,8 @@ Order History CSV or ZIP downloads under `input/amazon/`.
 - `import_manifest.csv`: audit log of processed imports.
 - `catalog_items.csv`: one row per distinct catalog item/book identity.
 - `acquisitions.csv`: one row per purchase or acquisition event.
-- `research_priority_assessments.csv`: latest durable research-priority
-  assessment per catalog item.
+- `research_priority_assessments.csv`: latest durable Research Assessment per
+  catalog item.
 - `collector_reviews.csv`: collector-owned workflow state and lightweight
   review notes, linked by `catalog_item_id`.
 
@@ -210,7 +210,7 @@ Open Library or another provider may later return better metadata for a known
 item. The catalog may accept better derived metadata while preserving the same
 `catalog_item_id`.
 
-If scoring-relevant metadata changes, the existing research priority assessment
+If scoring-relevant metadata changes, the existing Research Assessment
 should be marked stale rather than silently replaced during the default monthly
 run. The user can then choose `--reevaluate stale` or `--reevaluate all`.
 
@@ -258,8 +258,8 @@ Bibliographic facts should remain stable. Market observations can expire.
 Valuation estimates may change as pricing strategy improves. Decisions may
 depend on family goals, time constraints, and risk tolerance.
 
-Research priority must not be mixed with future market valuation. Research
-priority answers "Should this book be researched?" Market valuation answers
+Research Assessment must not be mixed with future market valuation. Research
+Assessment answers "Should this book be researched?" Market valuation answers
 "What is this book likely worth?" A future durable file such as
 `data/market_valuations.csv` should be separate from
 `data/research_priority_assessments.csv`.
