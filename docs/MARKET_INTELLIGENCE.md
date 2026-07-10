@@ -154,6 +154,20 @@ These are research targets, not production commitments. The spike should learn
 which sources provide useful, reviewable evidence before the project commits to
 marketplace integrations or automated source clients.
 
+The first experimental source command is:
+
+```bash
+python3 library_pipeline.py collect-abebooks-observations \
+  --output-dir output \
+  --limit 30
+```
+
+This command reads `output/market_validation_sample.csv` and writes generated
+AbeBooks observation rows to `output/market_observations.csv` and
+`output/market_observations.xlsx`. If AbeBooks returns no usable listing data or
+blocks automated retrieval, the spike records lookup-status rows rather than
+working around the source.
+
 ## Relationship To Market Validation Spike
 
 Market Intelligence supports the Market Validation Spike documented in

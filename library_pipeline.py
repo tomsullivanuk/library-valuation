@@ -25,6 +25,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from valuation.abebooks import (
+    MARKET_OBSERVATION_FIELDNAMES,
+    collect_abebooks_observation_rows,
+    fetch_url,
+)
 from valuation.collector_workbook import write_collector_workbook
 from valuation.market_validation import (
     MARKET_VALIDATION_SAMPLE_FIELDNAMES,
@@ -1072,6 +1077,40 @@ def generate_market_validation_sample(
     return len(sample_rows)
 
 
+def collect_abebooks_observations(
+    output_dir: Path,
+    limit: int = 30,
+    delay: float = 1.0,
+    max_results_per_book: int = 3,
+    fetch_html=fetch_url,
+    observation_date: str | None = None,
+    sleep=time.sleep,
+) -> int:
+    if limit < 1:
+        raise UserFacingError("limit must be at least 1")
+    if delay < 0:
+        raise UserFacingError("delay must be zero or greater")
+    if max_results_per_book < 1:
+        raise UserFacingError("max-results-per-book must be at least 1")
+    sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
+    observation_rows = collect_abebooks_observation_rows(
+        sample_rows,
+        fetch_html=fetch_html,
+        observation_date=observation_date or utc_timestamp(),
+        limit=limit,
+        max_results_per_book=max_results_per_book,
+        delay_seconds=delay,
+        sleep=sleep,
+    )
+    write_table_outputs(
+        output_dir / "market_observations.csv",
+        MARKET_OBSERVATION_FIELDNAMES,
+        observation_rows,
+        "Market Observations",
+    )
+    return len(observation_rows)
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -1824,6 +1863,12 @@ def build_parser() -> argparse.ArgumentParser:
     market_sample_parser.add_argument("--sample-size-per-band", type=int, default=20)
     market_sample_parser.add_argument("--seed", type=int, default=42)
 
+    abebooks_parser = subparsers.add_parser("collect-abebooks-observations")
+    abebooks_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    abebooks_parser.add_argument("--limit", type=int, default=30)
+    abebooks_parser.add_argument("--delay", type=float, default=1.0)
+    abebooks_parser.add_argument("--max-results-per-book", type=int, default=3)
+
     return parser
 
 
@@ -1887,6 +1932,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_validation_sample.csv")
             print(f"Wrote {count} market validation sample rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "collect-abebooks-observations":
+            count = collect_abebooks_observations(
+                output_dir=args.output_dir,
+                limit=args.limit,
+                delay=args.delay,
+                max_results_per_book=args.max_results_per_book,
+            )
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_observations.csv")
+            print(f"Wrote {count} AbeBooks market observation rows to {csv_path} and {xlsx_path}")
             return 0
     except UserFacingError as error:
         print(f"Error: {error}", file=sys.stderr)

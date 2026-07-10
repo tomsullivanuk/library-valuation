@@ -239,8 +239,9 @@ Plan:
   [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
 - Sample books across Research Score bands instead of only high-scoring
   candidates using `generate-market-validation-sample`.
-- Collect externally observed market-value estimates in a temporary research
-  artifact.
+- Collect lightweight AbeBooks market observations with
+  `collect-abebooks-observations`.
+- Interpret externally observed market evidence in a later research artifact.
 - Analyze whether higher Research Scores are associated with higher observed
   values and higher frequencies of valuable books.
 - Use the results to decide whether automated valuation, valuation import, or

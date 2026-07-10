@@ -11,6 +11,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
 - [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
 - [ ] Generate a stratified Research Score sample with `generate-market-validation-sample`
+- [ ] Collect experimental AbeBooks observations with `collect-abebooks-observations`
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Analyze Research Score association with observed market value
 - [ ] Persistent valuation repository
@@ -65,6 +66,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
     valuation estimates and recommendations.
   - Follow the plan in `docs/MARKET_VALIDATION_SPIKE.md`.
   - Sample books across Research Score bands.
+  - Collect bounded AbeBooks lookup observations without estimating value.
   - Compare Research Score against externally observed market value.
   - Use results to decide whether valuation workflow, automated valuation, or
     model refinement should come next.

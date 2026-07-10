@@ -215,6 +215,18 @@ Score bands and triggered Research Signals, but no valuation or marketplace
 fields. It reads the generated library catalog and current Research Assessment
 state.
 
+Collect a small experimental AbeBooks observation set from that sample:
+
+```bash
+python3 library_pipeline.py collect-abebooks-observations \
+  --output-dir output \
+  --limit 30
+```
+
+This writes `market_observations.csv` and `market_observations.xlsx` under
+`output/`. These rows are lightweight market observations or lookup-status
+records, not valuations or recommendations.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

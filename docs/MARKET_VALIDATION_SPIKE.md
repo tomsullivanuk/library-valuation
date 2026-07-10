@@ -92,6 +92,19 @@ It writes `output/market_validation_sample.csv` and
 catalog identifiers, bibliographic context, Research Score bands, and triggered
 Research Signals. They intentionally do not include valuation fields.
 
+The first market-observation spike can then collect a bounded AbeBooks evidence
+set:
+
+```bash
+python3 library_pipeline.py collect-abebooks-observations \
+  --output-dir output \
+  --limit 30
+```
+
+This produces generated `market_observations` artifacts containing observations
+or lookup-status rows. These are facts about external lookup attempts, not value
+estimates.
+
 ## Proposed Analysis
 
 Analyze the sampled books using measures that can show whether Research Score
