@@ -4,7 +4,9 @@ import pytest
 
 from library_pipeline import generate_market_validation_sample
 from valuation.market_validation import (
+    MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES,
     MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+    build_market_validation_sample_metadata_rows,
     build_market_validation_sample_rows,
     score_band_for_score,
 )
@@ -82,6 +84,91 @@ def test_build_market_validation_sample_rows_preserves_triggered_signals_without
     assert rows[0]["research_score"] == "10"
 
 
+def test_build_market_validation_sample_rows_supports_100_book_stratified_sample():
+    catalog_rows = []
+    assessments = []
+    scores_by_band = {
+        "0-1": "1",
+        "2-3": "3",
+        "4-5": "5",
+        "6-7": "7",
+        "8-10": "10",
+    }
+    for band_index, score in enumerate(scores_by_band.values(), start=1):
+        for item_index in range(25):
+            catalog_id = f"BK{band_index:03d}{item_index:03d}"
+            catalog_rows.append(catalog_row(catalog_id))
+            assessments.append(assessment(catalog_id, score, "signal"))
+
+    rows = build_market_validation_sample_rows(
+        list(reversed(catalog_rows)),
+        list(reversed(assessments)),
+        sample_size_per_band=20,
+        seed=42,
+        sampled_at="2026-07-09T00:00:00Z",
+    )
+
+    assert len(rows) == 100
+    assert {band: sum(1 for row in rows if row["score_band"] == band) for band in scores_by_band} == {
+        "0-1": 20,
+        "2-3": 20,
+        "4-5": 20,
+        "6-7": 20,
+        "8-10": 20,
+    }
+    assert rows == build_market_validation_sample_rows(
+        catalog_rows,
+        assessments,
+        sample_size_per_band=20,
+        seed=42,
+        sampled_at="2026-07-09T00:00:00Z",
+    )
+
+
+def test_build_market_validation_sample_metadata_rows_records_population_and_sample_counts():
+    sample_rows = [
+        {"catalog_id": "BK000001", "score_band": "0-1"},
+        {"catalog_id": "BK000002", "score_band": "6-7"},
+    ]
+    assessments = [
+        assessment("BK000001", "1", "old_publication_year") | {
+            "research_model_version": "0.3.0",
+            "research_config_hash": "hash-a",
+        },
+        assessment("BK000002", "7", "small_publisher") | {
+            "research_model_version": "0.3.0",
+            "research_config_hash": "hash-a",
+        },
+        assessment("BK000003", "10", "university_press") | {
+            "research_model_version": "0.3.0",
+            "research_config_hash": "hash-a",
+        },
+    ]
+
+    rows = build_market_validation_sample_metadata_rows(
+        sample_rows,
+        assessments,
+        sample_size_per_band=20,
+        seed=42,
+        sampled_at="2026-07-09T00:00:00Z",
+    )
+
+    assert [row["score_band"] for row in rows] == ["0-1", "2-3", "4-5", "6-7", "8-10"]
+    assert rows[0]["available_population_count"] == "1"
+    assert rows[0]["actual_sample_count"] == "1"
+    assert rows[1]["available_population_count"] == "0"
+    assert rows[1]["actual_sample_count"] == "0"
+    assert rows[3]["available_population_count"] == "1"
+    assert rows[3]["actual_sample_count"] == "1"
+    assert rows[4]["available_population_count"] == "1"
+    assert rows[4]["actual_sample_count"] == "0"
+    assert {row["target_sample_count"] for row in rows} == {"20"}
+    assert {row["total_available_population_count"] for row in rows} == {"3"}
+    assert {row["total_sample_count"] for row in rows} == {"2"}
+    assert {row["research_model_version"] for row in rows} == {"0.3.0"}
+    assert {row["research_config_hash"] for row in rows} == {"hash-a"}
+
+
 def test_generate_market_validation_sample_writes_required_columns_without_valuation_fields(tmp_path):
     output_dir = tmp_path / "output"
     data_dir = tmp_path / "data"
@@ -125,6 +212,8 @@ def test_generate_market_validation_sample_writes_required_columns_without_valua
     assert count == 1
     assert sample_path.exists()
     assert (output_dir / "market_validation_sample.xlsx").exists()
+    assert (output_dir / "market_validation_sample_metadata.csv").exists()
+    assert (output_dir / "market_validation_sample_metadata.xlsx").exists()
     with sample_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         assert reader.fieldnames == MARKET_VALIDATION_SAMPLE_FIELDNAMES
@@ -153,6 +242,13 @@ def test_generate_market_validation_sample_writes_required_columns_without_valua
         "valuation_notes",
     }
     assert forbidden_fields.isdisjoint(reader.fieldnames or [])
+    with (output_dir / "market_validation_sample_metadata.csv").open(newline="", encoding="utf-8") as handle:
+        metadata_reader = csv.DictReader(handle)
+        metadata_rows = list(metadata_reader)
+    assert metadata_reader.fieldnames == MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES
+    assert len(metadata_rows) == 5
+    assert metadata_rows[-1]["score_band"] == "8-10"
+    assert metadata_rows[-1]["actual_sample_count"] == "1"
 
 
 def test_generate_market_validation_sample_accepts_generated_assessment_input_without_data_files(tmp_path):

@@ -32,7 +32,9 @@ from valuation.abebooks import (
 )
 from valuation.collector_workbook import write_collector_workbook
 from valuation.market_validation import (
+    MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES,
     MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+    build_market_validation_sample_metadata_rows,
     build_market_validation_sample_rows,
 )
 from valuation.market_observation_coverage import (
@@ -1063,6 +1065,7 @@ def generate_market_validation_sample(
         if generated_assessments_path.exists()
         else durable_assessments_path
     )
+    sample_timestamp = sampled_at or utc_timestamp()
     sample_rows = build_market_validation_sample_rows(
         catalog_rows,
         assessment_rows,
@@ -1070,13 +1073,26 @@ def generate_market_validation_sample(
         acquisition_rows=acquisition_rows,
         sample_size_per_band=sample_size_per_band,
         seed=seed,
-        sampled_at=sampled_at or utc_timestamp(),
+        sampled_at=sample_timestamp,
+    )
+    metadata_rows = build_market_validation_sample_metadata_rows(
+        sample_rows,
+        assessment_rows,
+        sample_size_per_band=sample_size_per_band,
+        seed=seed,
+        sampled_at=sample_timestamp,
     )
     write_table_outputs(
         output_dir / "market_validation_sample.csv",
         MARKET_VALIDATION_SAMPLE_FIELDNAMES,
         sample_rows,
         "Market Validation Sample",
+    )
+    write_table_outputs(
+        output_dir / "market_validation_sample_metadata.csv",
+        MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES,
+        metadata_rows,
+        "Market Validation Metadata",
     )
     return len(sample_rows)
 
@@ -1951,7 +1967,9 @@ def main(argv: list[str] | None = None) -> int:
                 seed=args.seed,
             )
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_validation_sample.csv")
+            metadata_csv_path, metadata_xlsx_path = paired_output_paths(args.output_dir / "market_validation_sample_metadata.csv")
             print(f"Wrote {count} market validation sample rows to {csv_path} and {xlsx_path}")
+            print(f"Wrote market validation sample metadata to {metadata_csv_path} and {metadata_xlsx_path}")
             return 0
         if args.command == "collect-abebooks-observations":
             count = collect_abebooks_observations(

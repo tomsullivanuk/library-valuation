@@ -238,14 +238,15 @@ Plan:
 - Use the experimental design in
   [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
 - Sample books across Research Score bands instead of only high-scoring
-  candidates using `generate-market-validation-sample`.
+  candidates using `generate-market-validation-sample`, targeting 100 books
+  across five score bands when the catalog distribution supports it.
 - Collect lightweight AbeBooks market observations with
   `collect-abebooks-observations`.
 - Treat AbeBooks as feasible for small ISBN-first observation runs, while
   keeping the integration experimental.
 - Report observation coverage and source-access diagnostics with
   `report-market-observation-coverage`.
-- Interpret externally observed market evidence in a later research artifact.
+- Interpret externally observed market evidence in PR8.
 - Analyze whether higher Research Scores are associated with higher observed
   values and higher frequencies of valuable books.
 - Use the results to decide whether automated valuation, valuation import, or

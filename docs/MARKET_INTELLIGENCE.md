@@ -165,7 +165,7 @@ The first experimental source command is:
 ```bash
 python3 library_pipeline.py collect-abebooks-observations \
   --output-dir output \
-  --limit 30
+  --limit 100
 ```
 
 This command reads `output/market_validation_sample.csv` and writes generated
@@ -204,6 +204,7 @@ meaningful market value.
 Likely future generated outputs include:
 
 - `market_validation_sample.csv`
+- `market_validation_sample_metadata.csv`
 - `market_observations.csv`
 - `market_observation_coverage_report.csv`
 - `market_values.csv`
@@ -213,6 +214,10 @@ Likely future generated outputs include:
 first generated inputs for the spike. They select books across Research Score
 bands and preserve triggered Research Signals so later Market Intelligence work
 can compare individual signals against external market evidence.
+`market_validation_sample_metadata.csv` and
+`market_validation_sample_metadata.xlsx` preserve band-level sample targets,
+available population counts, actual sample counts, seed, timestamp, Research
+Assessment model version, and configuration hash for reproducibility.
 
 These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by

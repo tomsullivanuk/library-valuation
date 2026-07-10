@@ -83,22 +83,26 @@ The v0.4.0 sample-generation command creates the initial input dataset:
 ```bash
 python3 library_pipeline.py generate-market-validation-sample \
   --output-dir output \
-  --sample-size-per-band 6 \
+  --sample-size-per-band 20 \
   --seed 42
 ```
 
 It writes `output/market_validation_sample.csv` and
-`output/market_validation_sample.xlsx`. These generated artifacts include
-catalog identifiers, bibliographic context, Research Score bands, and triggered
-Research Signals. They intentionally do not include valuation fields.
+`output/market_validation_sample.xlsx`, targeting 20 books per score band and
+100 books total when enough catalog records are available. It also writes
+`output/market_validation_sample_metadata.csv` and
+`output/market_validation_sample_metadata.xlsx` to preserve target counts,
+available population counts, actual sample counts, seed, timestamp, Research
+Assessment model version, and configuration hash. These generated artifacts
+include catalog identifiers, bibliographic context, Research Score bands, and
+triggered Research Signals. They intentionally do not include valuation fields.
 
-The first market-observation spike can then collect a bounded AbeBooks evidence
-set:
+The market-observation workflow can then collect a bounded AbeBooks evidence set:
 
 ```bash
 python3 library_pipeline.py collect-abebooks-observations \
   --output-dir output \
-  --limit 30
+  --limit 100
 ```
 
 This produces generated `market_observations` artifacts containing observations
@@ -109,7 +113,8 @@ The AbeBooks feasibility spike showed that bounded ISBN-first lookup can produce
 real observations with title, author, price, currency, condition, seller, URL,
 and match-confidence fields. This is enough evidence to keep AbeBooks as a
 candidate observation source while treating the parser and source coverage as
-experimental.
+experimental. PR7 prepares the analysis-scale dataset for PR8; it does not
+perform correlation analysis, estimate value, or change Research Score weights.
 
 Coverage and source-access diagnostics can be summarized with:
 

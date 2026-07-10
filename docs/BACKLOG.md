@@ -10,12 +10,12 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 ### Valuation
 - [ ] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
 - [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
-- [ ] Generate a stratified Research Score sample with `generate-market-validation-sample`
-- [ ] Collect experimental AbeBooks observations with `collect-abebooks-observations`
+- [ ] Generate a 100-book stratified Research Score sample with `generate-market-validation-sample`
+- [ ] Collect bounded AbeBooks observations for the 100-book sample
 - [ ] Report observation coverage with `report-market-observation-coverage`
 - [ ] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
+- [ ] Analyze Research Score association with observed market signals in PR8
 - [ ] Create a temporary valuation workbook for sampled books
-- [ ] Analyze Research Score association with observed market value
 - [ ] Persistent valuation repository
 - [ ] First external valuation source (AbeBooks or eBay)
 - [ ] "Books Worth Investigating" report

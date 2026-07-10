@@ -199,28 +199,31 @@ For v0.4.0, the next valuation step is a documentation-first Market Validation
 Spike to test whether higher Research Scores are associated with higher observed
 market values before building valuation workflow features.
 
-Generate the deterministic input dataset for that spike after a successful
-monthly update:
+Generate the deterministic analysis-scale input dataset for that spike after a
+successful monthly update:
 
 ```bash
 python3 library_pipeline.py generate-market-validation-sample \
   --output-dir output \
-  --sample-size-per-band 6 \
+  --sample-size-per-band 20 \
   --seed 42
 ```
 
 This writes `market_validation_sample.csv` and
-`market_validation_sample.xlsx` under `output/`. The sample includes Research
-Score bands and triggered Research Signals, but no valuation or marketplace
-fields. It reads the generated library catalog and current Research Assessment
-state.
+`market_validation_sample.xlsx` under `output/`, targeting 100 books across five
+Research Score bands when the catalog distribution supports it. It also writes
+`market_validation_sample_metadata.csv` and
+`market_validation_sample_metadata.xlsx` with band-level population counts,
+actual sample counts, seed, timestamp, Research Assessment model version, and
+configuration hash. The sample includes Research Score bands and triggered
+Research Signals, but no valuation or marketplace fields.
 
-Collect a small experimental AbeBooks observation set from that sample:
+Collect bounded AbeBooks observations for the analysis sample:
 
 ```bash
 python3 library_pipeline.py collect-abebooks-observations \
   --output-dir output \
-  --limit 30
+  --limit 100
 ```
 
 This writes `market_observations.csv` and `market_observations.xlsx` under
@@ -230,7 +233,8 @@ records, not valuations or recommendations.
 The AbeBooks feasibility spike confirmed that small, bounded ISBN-first runs can
 return real listing observations in the current environment when Python uses a
 valid CA bundle. The collector remains experimental and should not be treated as
-a production marketplace integration.
+a production marketplace integration. PR7 prepares the generated data needed for
+PR8 analysis; it does not draw valuation conclusions.
 
 Summarize observation coverage and source-access diagnostics:
 

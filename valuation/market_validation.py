@@ -24,6 +24,19 @@ MARKET_VALIDATION_SAMPLE_FIELDNAMES = [
     "sampled_at",
 ]
 
+MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES = [
+    "score_band",
+    "target_sample_count",
+    "available_population_count",
+    "actual_sample_count",
+    "sample_seed",
+    "sampled_at",
+    "research_model_version",
+    "research_config_hash",
+    "total_available_population_count",
+    "total_sample_count",
+]
+
 SCORE_BANDS = ("0-1", "2-3", "4-5", "6-7", "8-10")
 SCORE_BAND_ORDER = {band: index for index, band in enumerate(SCORE_BANDS)}
 
@@ -96,6 +109,57 @@ def build_market_validation_sample_rows(
             selected_rows.extend(sorted(rng.sample(band_rows, sample_size), key=stable_sample_sort_key))
 
     return sorted(selected_rows, key=sample_output_sort_key)
+
+
+def build_market_validation_sample_metadata_rows(
+    sample_rows: Iterable[Mapping[str, str]],
+    assessment_rows: Iterable[Mapping[str, str]],
+    *,
+    sample_size_per_band: int = 20,
+    seed: int = 42,
+    sampled_at: str = "",
+) -> list[dict[str, str]]:
+    if sample_size_per_band < 1:
+        raise ValueError("sample_size_per_band must be at least 1")
+
+    sample_rows = list(sample_rows)
+    assessment_rows = list(assessment_rows)
+    population_counts = {band: 0 for band in SCORE_BANDS}
+    sample_counts = {band: 0 for band in SCORE_BANDS}
+    model_versions = set()
+    config_hashes = set()
+
+    for assessment in assessment_rows:
+        population_counts[score_band_for_score(assessment.get("research_priority_score", ""))] += 1
+        model_version = assessment.get("research_model_version", "").strip()
+        config_hash = assessment.get("research_config_hash", "").strip()
+        if model_version:
+            model_versions.add(model_version)
+        if config_hash:
+            config_hashes.add(config_hash)
+
+    for row in sample_rows:
+        band = row.get("score_band", "")
+        if band in sample_counts:
+            sample_counts[band] += 1
+
+    total_population = sum(population_counts.values())
+    total_sample = sum(sample_counts.values())
+    return [
+        {
+            "score_band": band,
+            "target_sample_count": str(sample_size_per_band),
+            "available_population_count": str(population_counts[band]),
+            "actual_sample_count": str(sample_counts[band]),
+            "sample_seed": str(seed),
+            "sampled_at": sampled_at,
+            "research_model_version": stable_join(model_versions),
+            "research_config_hash": stable_join(config_hashes),
+            "total_available_population_count": str(total_population),
+            "total_sample_count": str(total_sample),
+        }
+        for band in SCORE_BANDS
+    ]
 
 
 def triggered_signals(assessment: Mapping[str, str]) -> str:
