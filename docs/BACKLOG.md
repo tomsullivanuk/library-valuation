@@ -12,6 +12,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
 - [ ] Generate a stratified Research Score sample with `generate-market-validation-sample`
 - [ ] Collect experimental AbeBooks observations with `collect-abebooks-observations`
+- [ ] Report observation coverage with `report-market-observation-coverage`
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Analyze Research Score association with observed market value
 - [ ] Persistent valuation repository

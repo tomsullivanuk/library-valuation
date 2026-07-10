@@ -105,6 +105,17 @@ This produces generated `market_observations` artifacts containing observations
 or lookup-status rows. These are facts about external lookup attempts, not value
 estimates.
 
+Coverage and source-access diagnostics can be summarized with:
+
+```bash
+python3 library_pipeline.py report-market-observation-coverage \
+  --output-dir output
+```
+
+The coverage report shows whether the observation run produced listings, no
+results, unavailable-source rows, or no-query rows. It also preserves grouped
+diagnostic details and lookup URLs for manual inspection.
+
 ## Proposed Analysis
 
 Analyze the sampled books using measures that can show whether Research Score

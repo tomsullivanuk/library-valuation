@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import html
 import re
+import socket
+import ssl
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,6 +40,7 @@ MARKET_OBSERVATION_FIELDNAMES = [
     "listing_author",
     "listing_url",
     "match_confidence",
+    "diagnostic_code",
     "match_notes",
     "raw_reference",
 ]
@@ -47,6 +50,10 @@ FetchHtml = Callable[[str], str]
 
 class SourceUnavailable(RuntimeError):
     """Raised when a market source cannot be reached or parsed usefully."""
+
+    def __init__(self, message: str, diagnostic_code: str = "unknown_source_error") -> None:
+        super().__init__(message)
+        self.diagnostic_code = diagnostic_code
 
 
 def collect_abebooks_observation_rows(
@@ -97,6 +104,7 @@ def collect_observations_for_sample(
                 lookup_status="no_query",
                 lookup_strategy="none",
                 search_query="",
+                diagnostic_code="no_query",
                 match_notes="No ISBN, title, or author available for lookup.",
             )
         ]
@@ -114,6 +122,7 @@ def collect_observations_for_sample(
                     lookup_status="source_unavailable",
                     lookup_strategy=attempt["strategy"],
                     search_query=attempt["query"],
+                    diagnostic_code=error.diagnostic_code,
                     match_notes=str(error),
                     raw_reference=attempt["url"],
                 )
@@ -128,6 +137,7 @@ def collect_observations_for_sample(
                     lookup_status="source_unavailable",
                     lookup_strategy=attempt["strategy"],
                     search_query=attempt["query"],
+                    diagnostic_code=error.diagnostic_code,
                     match_notes=str(error),
                     raw_reference=attempt["url"],
                 )
@@ -153,6 +163,7 @@ def collect_observations_for_sample(
             lookup_status="no_results",
             lookup_strategy=last_attempt["strategy"],
             search_query=last_attempt["query"],
+            diagnostic_code="parse_unavailable",
             match_notes=last_error,
             raw_reference=last_attempt["url"],
         )
@@ -199,12 +210,18 @@ def fetch_url(url: str, timeout: float = 20.0) -> str:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             content_type = response.headers.get("Content-Type", "")
             if "text/html" not in content_type and "application/xhtml" not in content_type:
-                raise SourceUnavailable(f"Unexpected content type from AbeBooks: {content_type}")
+                raise SourceUnavailable(
+                    f"Unexpected content type from AbeBooks: {content_type}",
+                    "unexpected_content_type",
+                )
             return response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as error:
-        raise SourceUnavailable(f"AbeBooks HTTP {error.code}") from error
+        raise SourceUnavailable(f"AbeBooks HTTP {error.code}", "http_error") from error
     except (urllib.error.URLError, TimeoutError, OSError) as error:
-        raise SourceUnavailable(f"AbeBooks request failed: {error}") from error
+        raise SourceUnavailable(
+            f"AbeBooks request failed: {error}",
+            source_error_diagnostic_code(error),
+        ) from error
 
 
 def parse_abebooks_listings(document: str) -> list[dict[str, str]]:
@@ -214,8 +231,23 @@ def parse_abebooks_listings(document: str) -> list[dict[str, str]]:
     if listings:
         return listings
     if looks_blocked_or_unavailable(document):
-        raise SourceUnavailable("AbeBooks returned a blocked or unavailable page.")
+        raise SourceUnavailable(
+            "AbeBooks returned a blocked or unavailable page.",
+            "blocked_or_unavailable",
+        )
     return []
+
+
+def source_error_diagnostic_code(error: BaseException) -> str:
+    text = str(error).casefold()
+    reason = getattr(error, "reason", None)
+    if isinstance(reason, ssl.SSLCertVerificationError) or "certificate_verify_failed" in text or "certificate verify" in text:
+        return "tls_certificate_error"
+    if isinstance(reason, socket.gaierror) or "nodename nor servname" in text or "name or service not known" in text:
+        return "dns_error"
+    if isinstance(error, TimeoutError) or "timed out" in text or "timeout" in text:
+        return "timeout"
+    return "unknown_source_error"
 
 
 def looks_blocked_or_unavailable(document: str) -> bool:
@@ -329,6 +361,7 @@ def listing_observation_row(
         "listing_author": listing.get("listing_author", ""),
         "listing_url": listing.get("listing_url", ""),
         "match_confidence": confidence,
+        "diagnostic_code": "",
         "match_notes": notes,
         "raw_reference": raw_reference,
     }
@@ -341,6 +374,7 @@ def status_observation_row(
     lookup_status: str,
     lookup_strategy: str,
     search_query: str,
+    diagnostic_code: str,
     match_notes: str,
     raw_reference: str = "",
 ) -> dict[str, str]:
@@ -358,6 +392,7 @@ def status_observation_row(
         "listing_author": "",
         "listing_url": "",
         "match_confidence": "unknown",
+        "diagnostic_code": diagnostic_code,
         "match_notes": match_notes,
         "raw_reference": raw_reference,
     }
@@ -387,6 +422,7 @@ def base_observation_row(sample: Mapping[str, str], *, observation_date: str) ->
         "listing_author": "",
         "listing_url": "",
         "match_confidence": "",
+        "diagnostic_code": "",
         "match_notes": "",
         "raw_reference": "",
     }

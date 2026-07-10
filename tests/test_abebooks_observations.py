@@ -1,4 +1,5 @@
 import csv
+import urllib.error
 
 import library_pipeline
 from library_pipeline import collect_abebooks_observations, main
@@ -8,6 +9,7 @@ from valuation.abebooks import (
     collect_abebooks_observation_rows,
     lookup_attempts,
     parse_abebooks_listings,
+    source_error_diagnostic_code,
 )
 
 
@@ -99,7 +101,7 @@ def test_collect_abebooks_observation_rows_writes_no_results_status_row():
 def test_collect_abebooks_observation_rows_writes_source_unavailable_status_row():
     rows = collect_abebooks_observation_rows(
         [sample_row()],
-        fetch_html=lambda _url: (_ for _ in ()).throw(SourceUnavailable("AbeBooks HTTP 403")),
+        fetch_html=lambda _url: (_ for _ in ()).throw(SourceUnavailable("AbeBooks HTTP 403", "http_error")),
         observation_date="2026-07-09T00:00:00Z",
         limit=1,
         delay_seconds=0,
@@ -107,6 +109,7 @@ def test_collect_abebooks_observation_rows_writes_source_unavailable_status_row(
 
     assert len(rows) == 1
     assert rows[0]["lookup_status"] == "source_unavailable"
+    assert rows[0]["diagnostic_code"] == "http_error"
     assert rows[0]["match_notes"] == "AbeBooks HTTP 403"
 
 
@@ -137,6 +140,17 @@ def test_collect_abebooks_observations_writes_required_columns_without_value_fie
     assert rows[0]["observation_date"] == "2026-07-09T00:00:00Z"
     forbidden_fields = {"estimated_value", "value_bucket", "valuation_notes", "recommendation"}
     assert forbidden_fields.isdisjoint(reader.fieldnames or [])
+
+
+def test_source_error_diagnostic_code_classifies_common_access_failures():
+    assert source_error_diagnostic_code(
+        urllib.error.URLError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed")
+    ) == "tls_certificate_error"
+    assert source_error_diagnostic_code(
+        urllib.error.URLError("[Errno 8] nodename nor servname provided")
+    ) == "dns_error"
+    assert source_error_diagnostic_code(TimeoutError("timed out")) == "timeout"
+    assert source_error_diagnostic_code(urllib.error.URLError("connection reset")) == "unknown_source_error"
 
 
 def test_collect_abebooks_observations_command_wiring(capsys, monkeypatch, tmp_path):

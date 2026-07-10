@@ -227,6 +227,18 @@ This writes `market_observations.csv` and `market_observations.xlsx` under
 `output/`. These rows are lightweight market observations or lookup-status
 records, not valuations or recommendations.
 
+Summarize observation coverage and source-access diagnostics:
+
+```bash
+python3 library_pipeline.py report-market-observation-coverage \
+  --output-dir output
+```
+
+This writes `market_observation_coverage_report.csv` and
+`market_observation_coverage_report.xlsx` under `output/`. The report describes
+lookup coverage, failure diagnostics, and generated search URLs; it does not
+estimate value.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

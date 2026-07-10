@@ -168,6 +168,17 @@ AbeBooks observation rows to `output/market_observations.csv` and
 blocks automated retrieval, the spike records lookup-status rows rather than
 working around the source.
 
+Observation coverage can be summarized with:
+
+```bash
+python3 library_pipeline.py report-market-observation-coverage \
+  --output-dir output
+```
+
+This report keeps source diagnostics separate from valuation. It counts lookup
+statuses, strategies, match confidence levels, diagnostic codes, and grouped
+failure details, including generated search URLs in `raw_reference`.
+
 ## Relationship To Market Validation Spike
 
 Market Intelligence supports the Market Validation Spike documented in
@@ -185,6 +196,7 @@ Likely future generated outputs include:
 
 - `market_validation_sample.csv`
 - `market_observations.csv`
+- `market_observation_coverage_report.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 

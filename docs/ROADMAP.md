@@ -241,6 +241,8 @@ Plan:
   candidates using `generate-market-validation-sample`.
 - Collect lightweight AbeBooks market observations with
   `collect-abebooks-observations`.
+- Report observation coverage and source-access diagnostics with
+  `report-market-observation-coverage`.
 - Interpret externally observed market evidence in a later research artifact.
 - Analyze whether higher Research Scores are associated with higher observed
   values and higher frequencies of valuable books.
