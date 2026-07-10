@@ -198,7 +198,20 @@ def lookup_attempt(strategy: str, query: str, title: str = "", author: str = "")
     }
 
 
-def fetch_url(url: str, timeout: float = 20.0) -> str:
+def certifi_ca_file() -> str:
+    try:
+        import certifi
+    except ImportError:
+        return ""
+    return certifi.where()
+
+
+def default_ssl_context() -> ssl.SSLContext:
+    cafile = certifi_ca_file()
+    return ssl.create_default_context(cafile=cafile or None)
+
+
+def fetch_url(url: str, timeout: float = 20.0, ssl_context: ssl.SSLContext | None = None) -> str:
     request = urllib.request.Request(
         url,
         headers={
@@ -207,7 +220,7 @@ def fetch_url(url: str, timeout: float = 20.0) -> str:
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=timeout, context=ssl_context or default_ssl_context()) as response:
             content_type = response.headers.get("Content-Type", "")
             if "text/html" not in content_type and "application/xhtml" not in content_type:
                 raise SourceUnavailable(
@@ -267,15 +280,22 @@ class AbeBooksSearchParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.listings: list[dict[str, str]] = []
         self._current: dict[str, str] | None = None
+        self._item_depth = 0
         self._field = ""
         self._link_href = ""
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"script", "style"}:
+            self._field = ""
+            return
         attributes = {name.lower(): value or "" for name, value in attrs}
         classes = attributes.get("class", "").lower()
+        test_id = attributes.get("data-test-id", "").lower()
         itemtype = attributes.get("itemtype", "").lower()
-        if tag in {"div", "li", "article"} and (
-            "result-item" in classes
+        if self._current is None and tag in {"div", "li", "article"} and (
+            "listing-item" in test_id
+            or attributes.get("data-srp-item-role", "").lower() == "listing"
+            or "result-item" in classes
             or "cf result" in classes
             or "search-result" in classes
             or "listresult" in classes
@@ -283,28 +303,58 @@ class AbeBooksSearchParser(HTMLParser):
         ):
             self._finish_current()
             self._current = {}
+            self._item_depth = 1
             self._field = ""
             return
         if self._current is None:
             return
-        if tag == "a" and ("title" in classes or "BookDetails" in attributes.get("href", "")):
+        if tag in {"div", "li", "article"}:
+            self._item_depth += 1
+
+        itemprop = attributes.get("itemprop", "").lower()
+        content = attributes.get("content", "")
+        if tag == "meta" and content:
+            if itemprop == "name":
+                self._current.setdefault("listing_title", clean_text(content))
+            elif itemprop == "author":
+                self._current.setdefault("listing_author", clean_text(content))
+            elif itemprop == "price":
+                self._current.setdefault("asking_price", clean_text(content))
+            elif itemprop == "pricecurrency":
+                self._current.setdefault("currency", clean_text(content).upper())
+            elif itemprop in {"about", "itemcondition"}:
+                self._current.setdefault("condition", clean_text(content))
+            return
+
+        href = attributes.get("href", "")
+        if tag == "a" and (
+            "title" in classes
+            or "listing-title" in test_id
+            or itemprop == "url"
+            or "/bd" in href
+            or "BookDetails" in href
+        ):
             self._field = "listing_title"
-            self._link_href = attributes.get("href", "")
+            self._link_href = href
             if self._link_href:
                 self._current["listing_url"] = absolute_abebooks_url(self._link_href)
             return
-        if "author" in classes:
+        if tag == "a" and "listing-seller-link" in test_id:
+            self._field = "seller"
+        elif "author" in classes or "listing-author" in test_id:
             self._field = "listing_author"
-        elif "price" in classes:
+        elif "price" in classes or "item-price" in test_id or "listing-price" in test_id:
             self._field = "asking_price"
-        elif "condition" in classes:
+        elif "condition" in classes or "listing-book-condition" in test_id or "listing-optional-condition" in test_id:
             self._field = "condition"
         elif "seller" in classes or "bookseller" in classes:
             self._field = "seller"
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in {"div", "li", "article"}:
-            self._finish_current()
+        if self._current is not None and tag in {"div", "li", "article"}:
+            self._item_depth -= 1
+            if self._item_depth <= 0:
+                self._finish_current()
         self._field = ""
 
     def handle_data(self, data: str) -> None:
@@ -314,17 +364,22 @@ class AbeBooksSearchParser(HTMLParser):
         if not value:
             return
         existing = self._current.get(self._field, "")
+        if existing and (value in existing or existing in value):
+            return
         self._current[self._field] = clean_text(f"{existing} {value}" if existing else value)
 
     def _finish_current(self) -> None:
-        if self._current and (self._current.get("listing_title") or self._current.get("listing_url")):
+        if self._current and self._current.get("listing_url") and (
+            self._current.get("asking_price") or self._current.get("seller") or self._current.get("condition")
+        ):
             self.listings.append(normalize_listing(self._current))
         self._current = None
+        self._item_depth = 0
         self._field = ""
 
 
 def normalize_listing(listing: Mapping[str, str]) -> dict[str, str]:
-    price, currency = parse_price(listing.get("asking_price", ""))
+    price, currency = parse_price(listing.get("asking_price", ""), listing.get("currency", ""))
     return {
         "asking_price": price,
         "currency": currency,
@@ -456,13 +511,16 @@ def meaningful_tokens(value: str) -> set[str]:
     }
 
 
-def parse_price(value: str) -> tuple[str, str]:
+def parse_price(value: str, currency_hint: str = "") -> tuple[str, str]:
     value = clean_text(value)
     match = re.search(r"(?P<symbol>[$£€])\s*(?P<amount>[0-9][0-9,]*(?:\.[0-9]{2})?)", value)
-    if not match:
-        return "", ""
-    currency = {"$": "USD", "£": "GBP", "€": "EUR"}.get(match.group("symbol"), "")
-    return match.group("amount").replace(",", ""), currency
+    if match:
+        currency = {"$": "USD", "£": "GBP", "€": "EUR"}.get(match.group("symbol"), "")
+        return match.group("amount").replace(",", ""), currency
+    numeric_match = re.search(r"(?P<amount>[0-9][0-9,]*(?:\.[0-9]{2})?)", value)
+    if numeric_match and currency_hint:
+        return numeric_match.group("amount").replace(",", ""), currency_hint
+    return "", ""
 
 
 def strip_label(value: str, label: str) -> str:

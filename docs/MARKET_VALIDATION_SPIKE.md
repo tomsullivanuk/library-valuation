@@ -105,6 +105,12 @@ This produces generated `market_observations` artifacts containing observations
 or lookup-status rows. These are facts about external lookup attempts, not value
 estimates.
 
+The AbeBooks feasibility spike showed that bounded ISBN-first lookup can produce
+real observations with title, author, price, currency, condition, seller, URL,
+and match-confidence fields. This is enough evidence to keep AbeBooks as a
+candidate observation source while treating the parser and source coverage as
+experimental.
+
 Coverage and source-access diagnostics can be summarized with:
 
 ```bash

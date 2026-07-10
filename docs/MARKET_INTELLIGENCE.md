@@ -154,6 +154,12 @@ These are research targets, not production commitments. The spike should learn
 which sources provide useful, reviewable evidence before the project commits to
 marketplace integrations or automated source clients.
 
+The AbeBooks feasibility spike established that AbeBooks can return usable
+listing observations for a small ISBN-first sample in the current environment.
+The earlier source-access failure was caused by the local Python environment
+lacking default CA certificates; requests now use the installed trusted CA
+bundle rather than disabling TLS verification.
+
 The first experimental source command is:
 
 ```bash
@@ -178,6 +184,9 @@ python3 library_pipeline.py report-market-observation-coverage \
 This report keeps source diagnostics separate from valuation. It counts lookup
 statuses, strategies, match confidence levels, diagnostic codes, and grouped
 failure details, including generated search URLs in `raw_reference`.
+
+Known limitations remain: AbeBooks markup can change, condition text is not yet
+normalized, and the spike does not guarantee broad catalog coverage.
 
 ## Relationship To Market Validation Spike
 

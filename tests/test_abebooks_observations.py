@@ -1,12 +1,16 @@
 import csv
 import urllib.error
+import urllib.request
 
 import library_pipeline
+import valuation.abebooks as abebooks
 from library_pipeline import collect_abebooks_observations, main
 from valuation.abebooks import (
     MARKET_OBSERVATION_FIELDNAMES,
     SourceUnavailable,
     collect_abebooks_observation_rows,
+    default_ssl_context,
+    fetch_url,
     lookup_attempts,
     parse_abebooks_listings,
     source_error_diagnostic_code,
@@ -18,11 +22,35 @@ LISTING_HTML = """
   <body>
     <div class="cf result-item">
       <a class="title" href="/servlet/BookDetailsPL?bi=123">The Test Book</a>
+      <script>var ignoredTitleText = "not part of the title";</script>
       <p class="author">Author: Ada Author</p>
       <p class="item-price">$12.50</p>
       <p class="condition">Condition: Very Good</p>
       <p class="seller">Seller: Example Books</p>
     </div>
+  </body>
+</html>
+"""
+
+CURRENT_ABEBOOKS_HTML = """
+<html>
+  <body>
+    <ul data-test-id="srp-search-results-list">
+      <li data-test-id="listing-item-32308890943" data-srp-item-role="listing">
+        <meta itemprop="name" content="A Patriot&#39;s History of the United States" />
+        <meta itemprop="author" content="Larry Schweikart; Michael Allen" />
+        <meta itemprop="price" content="6.32" />
+        <meta itemprop="priceCurrency" content="USD" />
+        <meta itemprop="about" content="Paperback. Condition: Fair." />
+        <a itemprop="url" href="/Patriots-History-United-States/32308890943/bd">
+          A Patriot's History of the United States
+        </a>
+        <p data-test-id="seller-info">
+          Seller:
+          <a data-test-id="listing-seller-link" href="/Gulf-Coast-Books/65078731/sf">Gulf Coast Books</a>
+        </p>
+      </li>
+    </ul>
   </body>
 </html>
 """
@@ -50,6 +78,22 @@ def test_parse_abebooks_listings_extracts_lightweight_listing_fields():
             "listing_title": "The Test Book",
             "listing_author": "Ada Author",
             "listing_url": "https://www.abebooks.com/servlet/BookDetailsPL?bi=123",
+        }
+    ]
+
+
+def test_parse_abebooks_listings_extracts_current_search_result_markup():
+    listings = parse_abebooks_listings(CURRENT_ABEBOOKS_HTML)
+
+    assert listings == [
+        {
+            "asking_price": "6.32",
+            "currency": "USD",
+            "condition": "Paperback. Condition: Fair.",
+            "seller": "Gulf Coast Books",
+            "listing_title": "A Patriot's History of the United States",
+            "listing_author": "Larry Schweikart; Michael Allen",
+            "listing_url": "https://www.abebooks.com/Patriots-History-United-States/32308890943/bd",
         }
     ]
 
@@ -151,6 +195,46 @@ def test_source_error_diagnostic_code_classifies_common_access_failures():
     ) == "dns_error"
     assert source_error_diagnostic_code(TimeoutError("timed out")) == "timeout"
     assert source_error_diagnostic_code(urllib.error.URLError("connection reset")) == "unknown_source_error"
+
+
+def test_default_ssl_context_uses_certifi_ca_file_when_available(monkeypatch):
+    calls = []
+
+    def fake_create_default_context(*, cafile=None):
+        calls.append(cafile)
+        return "ssl-context"
+
+    monkeypatch.setattr(abebooks, "certifi_ca_file", lambda: "/tmp/certifi.pem")
+    monkeypatch.setattr(abebooks.ssl, "create_default_context", fake_create_default_context)
+
+    assert default_ssl_context() == "ssl-context"
+    assert calls == ["/tmp/certifi.pem"]
+
+
+def test_fetch_url_uses_verified_ssl_context(monkeypatch):
+    calls = []
+
+    class Response:
+        headers = {"Content-Type": "text/html; charset=utf-8"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b"<html>ok</html>"
+
+    def fake_urlopen(request, *, timeout, context):
+        calls.append((request, timeout, context))
+        return Response()
+
+    ssl_context = object()
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    assert fetch_url("https://www.abebooks.com/servlet/SearchResults?isbn=123", timeout=5, ssl_context=ssl_context) == "<html>ok</html>"
+    assert calls[0][1:] == (5, ssl_context)
 
 
 def test_collect_abebooks_observations_command_wiring(capsys, monkeypatch, tmp_path):

@@ -241,6 +241,8 @@ Plan:
   candidates using `generate-market-validation-sample`.
 - Collect lightweight AbeBooks market observations with
   `collect-abebooks-observations`.
+- Treat AbeBooks as feasible for small ISBN-first observation runs, while
+  keeping the integration experimental.
 - Report observation coverage and source-access diagnostics with
   `report-market-observation-coverage`.
 - Interpret externally observed market evidence in a later research artifact.

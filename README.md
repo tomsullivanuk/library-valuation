@@ -227,6 +227,11 @@ This writes `market_observations.csv` and `market_observations.xlsx` under
 `output/`. These rows are lightweight market observations or lookup-status
 records, not valuations or recommendations.
 
+The AbeBooks feasibility spike confirmed that small, bounded ISBN-first runs can
+return real listing observations in the current environment when Python uses a
+valid CA bundle. The collector remains experimental and should not be treated as
+a production marketplace integration.
+
 Summarize observation coverage and source-access diagnostics:
 
 ```bash
