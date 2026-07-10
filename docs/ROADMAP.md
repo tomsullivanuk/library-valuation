@@ -248,6 +248,8 @@ Plan:
   `report-market-observation-coverage`.
 - Interpret externally observed market evidence in PR8 with
   `analyze-market-validation`.
+- Review individual signal effectiveness and model calibration in PR9 with
+  `review-research-signal-effectiveness`.
 - Analyze whether higher Research Scores are associated with stronger observed
   asking-price signals and higher observation coverage.
 - Use the results to decide whether automated valuation, valuation import, or
@@ -261,6 +263,14 @@ PR8 findings:
 - AbeBooks returned observations for all sampled books.
 - Higher-score books showed stronger maximum observed asking prices, but
   low-score false-negative candidates remain important follow-up evidence.
+
+PR9 findings:
+
+- Signal effectiveness is mixed when judged by medians rather than maxima.
+- `university_press` and `missing_lcc` meet the sample median, while several
+  other signals remain weak, inconsistent, or too sparse to classify.
+- The observed score-band medians do not form a monotonic gradient.
+- Candidate model changes remain future work; PR9 does not alter scoring.
 
 Exit condition:
 

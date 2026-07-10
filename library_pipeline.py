@@ -56,6 +56,10 @@ from valuation.research_candidates import (
     RESEARCH_CANDIDATE_FIELDNAMES,
     build_research_candidate_rows,
 )
+from valuation.research_signal_effectiveness import (
+    RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
+    build_research_signal_effectiveness_rows,
+)
 from valuation.research_signals import (
     ResearchSignalConfig,
     default_research_signal_config,
@@ -1162,6 +1166,23 @@ def analyze_market_validation(output_dir: Path) -> int:
     return len(analysis_rows)
 
 
+def review_research_signal_effectiveness(output_dir: Path) -> int:
+    review_rows = build_research_signal_effectiveness_rows(
+        read_csv_rows(output_dir / "market_validation_sample.csv"),
+        read_csv_rows(output_dir / "market_observations.csv"),
+        read_csv_rows(output_dir / "market_validation_sample_metadata.csv"),
+        read_csv_rows(output_dir / "market_observation_coverage_report.csv"),
+        read_csv_rows(output_dir / "market_validation_analysis.csv"),
+    )
+    write_table_outputs(
+        output_dir / "research_signal_effectiveness_review.csv",
+        RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
+        review_rows,
+        "Research Signal Effectiveness",
+    )
+    return len(review_rows)
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -1926,6 +1947,9 @@ def build_parser() -> argparse.ArgumentParser:
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
+    signal_review_parser = subparsers.add_parser("review-research-signal-effectiveness")
+    signal_review_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+
     return parser
 
 
@@ -2011,6 +2035,11 @@ def main(argv: list[str] | None = None) -> int:
             count = analyze_market_validation(args.output_dir)
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_validation_analysis.csv")
             print(f"Wrote {count} market validation analysis rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "review-research-signal-effectiveness":
+            count = review_research_signal_effectiveness(args.output_dir)
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "research_signal_effectiveness_review.csv")
+            print(f"Wrote {count} research signal effectiveness rows to {csv_path} and {xlsx_path}")
             return 0
     except UserFacingError as error:
         print(f"Error: {error}", file=sys.stderr)

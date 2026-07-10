@@ -261,6 +261,18 @@ This writes `market_validation_analysis.csv` and
 bands, signals, observation coverage, and asking-price summaries. Asking prices
 remain market observations, not valuations or appraisal conclusions.
 
+Review individual Research Signal effectiveness and model calibration:
+
+```bash
+python3 library_pipeline.py review-research-signal-effectiveness \
+  --output-dir output
+```
+
+This writes `research_signal_effectiveness_review.csv` and
+`research_signal_effectiveness_review.xlsx` under `output/`. The generated
+review uses sample-relative classifications, signal combinations, and relative
+false-positive/false-negative candidates without changing Research Score logic.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

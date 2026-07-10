@@ -166,6 +166,20 @@ Initial PR8 findings:
 - `scholarly_lc_subject` and `university_press` were associated with the
   strongest maximum observed asking prices in this sample.
 
+PR9 reviews why those aggregate patterns appear:
+
+```bash
+python3 library_pipeline.py review-research-signal-effectiveness \
+  --output-dir output
+```
+
+The generated review reports per-signal price distributions and coverage,
+sample-relative classifications, common signal combinations, candidate misses,
+and calibration notes. Initial results show that maximum prices alone can
+overstate a signal's consistency: `scholarly_lc_subject` has a high maximum but
+a below-sample median asking price. These findings are diagnostic and do not
+change signal definitions or weights.
+
 ## Success Criteria
 
 Qualitative success means the evidence shows that higher Research Score bands

@@ -15,6 +15,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Report observation coverage with `report-market-observation-coverage`
 - [ ] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
 - [ ] Generate PR8 Research Score market validation analysis with `analyze-market-validation`
+- [ ] Review individual Research Signal effectiveness with `review-research-signal-effectiveness`
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository
@@ -73,6 +74,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   - Use AbeBooks feasibility results as evidence, not as a production source
     commitment.
   - Compare Research Score against externally observed market value.
+  - Review signal-level coverage, asking-price distributions, combinations, and
+    candidate misses before proposing model changes.
   - Use results to decide whether valuation workflow, automated valuation, or
     model refinement should come next.
 - Improve Metadata Gap classification:

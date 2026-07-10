@@ -197,6 +197,18 @@ observations. It stays downstream of Market Intelligence: observations remain
 facts, while the analysis reports descriptive evidence about Research Scores and
 Research Signals. It does not create valuation estimates or recommendations.
 
+PR9 adds a downstream diagnostic review:
+
+```bash
+python3 library_pipeline.py review-research-signal-effectiveness \
+  --output-dir output
+```
+
+The review classifies signal evidence using transparent sample-relative rules,
+surfaces common signal combinations, and records model-calibration notes. These
+interpretations remain separate from both market observations and Research
+Assessment scoring logic.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
@@ -220,6 +232,7 @@ Likely future generated outputs include:
 - `market_observations.csv`
 - `market_observation_coverage_report.csv`
 - `market_validation_analysis.csv`
+- `research_signal_effectiveness_review.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 
@@ -234,6 +247,9 @@ Assessment model version, and configuration hash for reproducibility.
 `market_validation_analysis.csv` and `market_validation_analysis.xlsx` are
 generated descriptive analysis artifacts. They should not become canonical
 market data or valuation records.
+`research_signal_effectiveness_review.csv` and
+`research_signal_effectiveness_review.xlsx` are generated PR9 diagnostic
+artifacts and are likewise non-canonical.
 
 These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by
