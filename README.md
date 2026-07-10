@@ -248,6 +248,19 @@ This writes `market_observation_coverage_report.csv` and
 lookup coverage, failure diagnostics, and generated search URLs; it does not
 estimate value.
 
+Analyze Research Score, triggered Research Signals, and observed AbeBooks asking
+prices:
+
+```bash
+python3 library_pipeline.py analyze-market-validation \
+  --output-dir output
+```
+
+This writes `market_validation_analysis.csv` and
+`market_validation_analysis.xlsx` under `output/`. The analysis compares score
+bands, signals, observation coverage, and asking-price summaries. Asking prices
+remain market observations, not valuations or appraisal conclusions.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

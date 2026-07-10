@@ -246,11 +246,21 @@ Plan:
   keeping the integration experimental.
 - Report observation coverage and source-access diagnostics with
   `report-market-observation-coverage`.
-- Interpret externally observed market evidence in PR8.
-- Analyze whether higher Research Scores are associated with higher observed
-  values and higher frequencies of valuable books.
+- Interpret externally observed market evidence in PR8 with
+  `analyze-market-validation`.
+- Analyze whether higher Research Scores are associated with stronger observed
+  asking-price signals and higher observation coverage.
 - Use the results to decide whether automated valuation, valuation import, or
   model refinement should come next.
+
+PR8 findings:
+
+- Current Research Scores are heavily concentrated in the `8-10` band.
+- The validation sample reached 65 books because the `2-3` band is empty and
+  the `6-7` band has only five available books.
+- AbeBooks returned observations for all sampled books.
+- Higher-score books showed stronger maximum observed asking prices, but
+  low-score false-negative candidates remain important follow-up evidence.
 
 Exit condition:
 

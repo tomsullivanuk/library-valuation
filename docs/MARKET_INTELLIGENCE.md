@@ -185,6 +185,18 @@ This report keeps source diagnostics separate from valuation. It counts lookup
 statuses, strategies, match confidence levels, diagnostic codes, and grouped
 failure details, including generated search URLs in `raw_reference`.
 
+The Market Validation analysis can be generated with:
+
+```bash
+python3 library_pipeline.py analyze-market-validation \
+  --output-dir output
+```
+
+This analysis consumes the generated sample, sample metadata, and AbeBooks
+observations. It stays downstream of Market Intelligence: observations remain
+facts, while the analysis reports descriptive evidence about Research Scores and
+Research Signals. It does not create valuation estimates or recommendations.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
@@ -207,6 +219,7 @@ Likely future generated outputs include:
 - `market_validation_sample_metadata.csv`
 - `market_observations.csv`
 - `market_observation_coverage_report.csv`
+- `market_validation_analysis.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 
@@ -218,6 +231,9 @@ can compare individual signals against external market evidence.
 `market_validation_sample_metadata.xlsx` preserve band-level sample targets,
 available population counts, actual sample counts, seed, timestamp, Research
 Assessment model version, and configuration hash for reproducibility.
+`market_validation_analysis.csv` and `market_validation_analysis.xlsx` are
+generated descriptive analysis artifacts. They should not become canonical
+market data or valuation records.
 
 These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by

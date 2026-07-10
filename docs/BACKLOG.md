@@ -14,8 +14,9 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Collect bounded AbeBooks observations for the 100-book sample
 - [ ] Report observation coverage with `report-market-observation-coverage`
 - [ ] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
-- [ ] Analyze Research Score association with observed market signals in PR8
+- [ ] Generate PR8 Research Score market validation analysis with `analyze-market-validation`
 - [ ] Create a temporary valuation workbook for sampled books
+- [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository
 - [ ] First external valuation source (AbeBooks or eBay)
 - [ ] "Books Worth Investigating" report

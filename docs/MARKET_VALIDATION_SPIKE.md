@@ -127,28 +127,51 @@ The coverage report shows whether the observation run produced listings, no
 results, unavailable-source rows, or no-query rows. It also preserves grouped
 diagnostic details and lookup URLs for manual inspection.
 
+PR8 adds the generated analysis command:
+
+```bash
+python3 library_pipeline.py analyze-market-validation \
+  --output-dir output
+```
+
+This produces `output/market_validation_analysis.csv` and
+`output/market_validation_analysis.xlsx`. The analysis reports Research Score
+distribution, validation dataset characteristics, score-band market indicators,
+Research Signal indicators, and relative false-positive/false-negative
+candidates. It uses AbeBooks asking prices only as observed market signals.
+
 ## Proposed Analysis
 
 Analyze the sampled books using measures that can show whether Research Score
 has practical predictive value:
 
-- Median market value by score band.
-- Percentage of books above selected value thresholds.
-- Distribution of value buckets by score band.
-- Spearman rank correlation between Research Score and estimated market value.
-- Identification of notable false positives and false negatives.
+- Observation coverage by score band.
+- Median, average, and maximum observed asking price by score band.
+- Triggered Research Signal coverage and asking-price summaries.
+- Identification of notable relative false positives and false negatives.
 
-Rank-based measures are preferred over simple linear correlation because book
-market values are likely to be highly skewed. A small number of unusually
-valuable books can dominate linear statistics, while rank-based analysis better
-captures whether higher-scored books generally tend to appear higher in the
-observed value ordering.
+Book-market signals are expected to be highly skewed. Later rank-based measures
+may be useful because one unusually expensive listing could dominate averages
+and make a weak model look stronger than it is. PR8 keeps the first analysis
+transparent and descriptive rather than fitting a statistical model.
+
+Initial PR8 findings:
+
+- Current Research Scores are heavily concentrated in the `8-10` band.
+- The validation sample has no `2-3` books and only five `6-7` books because the
+  catalog population does not contain enough records in those bands.
+- AbeBooks observation coverage was complete for the generated sample.
+- The `8-10` band showed the highest average and maximum observed asking prices,
+  but low-score false-negative candidates also appeared.
+- `scholarly_lc_subject` and `university_press` were associated with the
+  strongest maximum observed asking prices in this sample.
 
 ## Success Criteria
 
 Qualitative success means the evidence shows that higher Research Score bands
-consistently contain books with higher estimated market values and higher
-frequencies of valuable books.
+consistently contain books with stronger observed market signals. In PR8 those
+signals are AbeBooks asking prices and observation coverage, not valuation
+estimates.
 
 This spike should avoid arbitrary statistical thresholds at this stage. The
 first goal is to learn whether the signal is directionally useful enough to

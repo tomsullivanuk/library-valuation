@@ -37,6 +37,10 @@ from valuation.market_validation import (
     build_market_validation_sample_metadata_rows,
     build_market_validation_sample_rows,
 )
+from valuation.market_validation_analysis import (
+    MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
+    build_market_validation_analysis_rows,
+)
 from valuation.market_observation_coverage import (
     MARKET_OBSERVATION_COVERAGE_FIELDNAMES,
     build_market_observation_coverage_rows,
@@ -1144,6 +1148,20 @@ def report_market_observation_coverage(output_dir: Path) -> int:
     return len(report_rows)
 
 
+def analyze_market_validation(output_dir: Path) -> int:
+    sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
+    observation_rows = read_csv_rows(output_dir / "market_observations.csv")
+    metadata_rows = read_csv_rows(output_dir / "market_validation_sample_metadata.csv")
+    analysis_rows = build_market_validation_analysis_rows(sample_rows, observation_rows, metadata_rows)
+    write_table_outputs(
+        output_dir / "market_validation_analysis.csv",
+        MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
+        analysis_rows,
+        "Market Validation Analysis",
+    )
+    return len(analysis_rows)
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -1905,6 +1923,9 @@ def build_parser() -> argparse.ArgumentParser:
     coverage_parser = subparsers.add_parser("report-market-observation-coverage")
     coverage_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
+    analysis_parser = subparsers.add_parser("analyze-market-validation")
+    analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+
     return parser
 
 
@@ -1985,6 +2006,11 @@ def main(argv: list[str] | None = None) -> int:
             count = report_market_observation_coverage(args.output_dir)
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_observation_coverage_report.csv")
             print(f"Wrote {count} market observation coverage rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "analyze-market-validation":
+            count = analyze_market_validation(args.output_dir)
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_validation_analysis.csv")
+            print(f"Wrote {count} market validation analysis rows to {csv_path} and {xlsx_path}")
             return 0
     except UserFacingError as error:
         print(f"Error: {error}", file=sys.stderr)
