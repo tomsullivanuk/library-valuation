@@ -183,6 +183,9 @@ change signal definitions or weights.
 The combined evidence, limitations, and calibration guardrails are synthesized
 in [Market Validation Findings and Calibration Principles](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
 That document should guide PR11 proposals before any model change is implemented.
+The resulting [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md)
+recommends simulation of signal-role rebalancing before production scoring is
+changed.
 
 ## Success Criteria
 

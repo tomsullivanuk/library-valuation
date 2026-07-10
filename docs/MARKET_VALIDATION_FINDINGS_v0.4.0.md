@@ -163,10 +163,10 @@ The recommended next PR is:
 
 **PR11 — Research Assessment Calibration Proposal**
 
-PR11 should propose specific model refinements using the PR8 analysis, PR9
-signal review, and the interpretation guardrails in this document. It should
-show expected score and classification effects for review, but should not
-implement scoring changes until the proposal is accepted.
+PR11's proposed refinements, alternatives, and acceptance criteria are recorded
+in the [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
+The proposal recommends a before/after simulation before any scoring change is
+implemented.
 
 ## Non-Goals
 

@@ -252,6 +252,8 @@ Plan:
   `review-research-signal-effectiveness`.
 - Synthesize interpretation limits and calibration guardrails in
   [Market Validation Findings](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
+- Review calibration alternatives and future acceptance criteria in the
+  [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
 - Analyze whether higher Research Scores are associated with stronger observed
   asking-price signals and higher observation coverage.
 - Use the results to decide whether automated valuation, valuation import, or
@@ -278,6 +280,11 @@ PR10 records the provisional findings and calibration principles without
 changing the model. The recommended next step is PR11, a reviewed Research
 Assessment Calibration Proposal that defines specific refinements before any
 scoring implementation.
+
+PR11 recommends signal-role rebalancing as the preferred direction, subject to
+a before/after simulation. PR12 should compare hypothetical score distributions,
+priority bands, candidate rankings, and known candidate misses without changing
+production configuration or persisted assessments.
 
 Exit condition:
 

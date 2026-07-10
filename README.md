@@ -61,6 +61,8 @@ tracking number, payment method, gift fields, and other personal columns.
   Research Score predicts market value.
 - `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`: provisional findings and
   calibration guardrails from the v0.4.0 experiment.
+- `docs/RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md`: proposed future
+  model refinements and simulation requirements; no scoring changes.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -276,6 +278,8 @@ review uses sample-relative classifications, signal combinations, and relative
 false-positive/false-negative candidates without changing Research Score logic.
 The resulting evidence and its interpretation limits are summarized in
 [Market Validation Findings](docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md).
+Possible future refinements are evaluated in the
+[Research Assessment Calibration Proposal](docs/RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

@@ -215,6 +215,11 @@ from PR8 and PR9 are summarized in
 They do not change the separation between observations, analysis, valuation,
 and recommendations.
 
+Possible Research Assessment refinements are documented separately in the
+[Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
+That proposal does not change Market Intelligence or reinterpret observations
+as valuations.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
