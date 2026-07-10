@@ -59,6 +59,8 @@ tracking number, payment method, gift fields, and other personal columns.
   observations and future valuation evidence.
 - `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether
   Research Score predicts market value.
+- `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`: provisional findings and
+  calibration guardrails from the v0.4.0 experiment.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -272,6 +274,8 @@ This writes `research_signal_effectiveness_review.csv` and
 `research_signal_effectiveness_review.xlsx` under `output/`. The generated
 review uses sample-relative classifications, signal combinations, and relative
 false-positive/false-negative candidates without changing Research Score logic.
+The resulting evidence and its interpretation limits are summarized in
+[Market Validation Findings](docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md).
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

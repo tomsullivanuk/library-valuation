@@ -209,6 +209,12 @@ surfaces common signal combinations, and records model-calibration notes. These
 interpretations remain separate from both market observations and Research
 Assessment scoring logic.
 
+The interpretation boundaries and provisional calibration principles derived
+from PR8 and PR9 are summarized in
+[Market Validation Findings and Calibration Principles](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
+They do not change the separation between observations, analysis, valuation,
+and recommendations.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 

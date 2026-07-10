@@ -250,6 +250,8 @@ Plan:
   `analyze-market-validation`.
 - Review individual signal effectiveness and model calibration in PR9 with
   `review-research-signal-effectiveness`.
+- Synthesize interpretation limits and calibration guardrails in
+  [Market Validation Findings](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
 - Analyze whether higher Research Scores are associated with stronger observed
   asking-price signals and higher observation coverage.
 - Use the results to decide whether automated valuation, valuation import, or
@@ -271,6 +273,11 @@ PR9 findings:
   other signals remain weak, inconsistent, or too sparse to classify.
 - The observed score-band medians do not form a monotonic gradient.
 - Candidate model changes remain future work; PR9 does not alter scoring.
+
+PR10 records the provisional findings and calibration principles without
+changing the model. The recommended next step is PR11, a reviewed Research
+Assessment Calibration Proposal that defines specific refinements before any
+scoring implementation.
 
 Exit condition:
 

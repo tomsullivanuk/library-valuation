@@ -16,6 +16,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
 - [ ] Generate PR8 Research Score market validation analysis with `analyze-market-validation`
 - [ ] Review individual Research Signal effectiveness with `review-research-signal-effectiveness`
+- [ ] Prepare PR11 Research Assessment Calibration Proposal using
+  `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository

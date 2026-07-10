@@ -180,6 +180,10 @@ overstate a signal's consistency: `scholarly_lc_subject` has a high maximum but
 a below-sample median asking price. These findings are diagnostic and do not
 change signal definitions or weights.
 
+The combined evidence, limitations, and calibration guardrails are synthesized
+in [Market Validation Findings and Calibration Principles](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
+That document should guide PR11 proposals before any model change is implemented.
+
 ## Success Criteria
 
 Qualitative success means the evidence shows that higher Research Score bands
