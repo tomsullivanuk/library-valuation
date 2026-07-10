@@ -324,9 +324,11 @@ A future implementation PR should demonstrate that:
 
 The recommended next PR is:
 
-**PR12 — Before/After Calibration Simulation**
+**PR13 — Before/After Calibration Simulation**
 
-PR12 should apply a small set of explicitly hypothetical calibration scenarios
+PR12 first expands the AbeBooks-backed validation evidence while preserving the
+original sample and observations. PR13 should then apply a small set of
+explicitly hypothetical calibration scenarios
 to existing assessments without changing production configuration or persisted
 Research Assessment state. It should compare score distributions, priority
 bands, Research Candidate rankings, and known candidate misses. The simulation

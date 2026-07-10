@@ -281,6 +281,28 @@ The resulting evidence and its interpretation limits are summarized in
 Possible future refinements are evaluated in the
 [Research Assessment Calibration Proposal](docs/RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
 
+Expand the validation evidence base while preserving the original sample:
+
+```bash
+python3 library_pipeline.py generate-expanded-market-validation-sample \
+  --output-dir output \
+  --additional-candidate-target 140 \
+  --seed 42
+```
+
+This writes an expanded sample and metadata as paired CSV/XLSX artifacts. To
+reuse existing observations and collect only newly selected books, run:
+
+```bash
+python3 library_pipeline.py collect-expanded-abebooks-observations \
+  --output-dir output \
+  --limit 140
+```
+
+The expanded collector remains bounded and writes
+`expanded_market_observations.csv` and `.xlsx` without replacing the original
+sample or observation artifacts.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

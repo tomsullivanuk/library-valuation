@@ -32,8 +32,11 @@ from valuation.abebooks import (
 )
 from valuation.collector_workbook import write_collector_workbook
 from valuation.market_validation import (
+    EXPANDED_MARKET_VALIDATION_METADATA_FIELDNAMES,
     MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES,
     MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+    build_expanded_market_validation_metadata_rows,
+    build_expanded_market_validation_sample_rows,
     build_market_validation_sample_metadata_rows,
     build_market_validation_sample_rows,
 )
@@ -1105,6 +1108,58 @@ def generate_market_validation_sample(
     return len(sample_rows)
 
 
+def generate_expanded_market_validation_sample(
+    output_dir: Path,
+    data_dir: Path = Path("data"),
+    additional_candidate_target: int = 140,
+    seed: int = 42,
+    sampled_at: str | None = None,
+) -> int:
+    if additional_candidate_target < 1:
+        raise UserFacingError("additional-candidate-target must be at least 1")
+    catalog_rows = read_csv_rows(output_dir / "library_catalog.csv")
+    catalog_item_rows = read_optional_csv_rows(data_dir / "catalog_items.csv")
+    acquisition_rows = read_optional_csv_rows(data_dir / "acquisitions.csv")
+    assessment_rows = read_csv_rows(
+        output_dir / "research_assessments.csv"
+        if (output_dir / "research_assessments.csv").exists()
+        else data_dir / "research_priority_assessments.csv"
+    )
+    existing_sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
+    sample_timestamp = sampled_at or utc_timestamp()
+    expanded_rows = build_expanded_market_validation_sample_rows(
+        existing_sample_rows,
+        catalog_rows,
+        assessment_rows,
+        catalog_item_rows=catalog_item_rows,
+        acquisition_rows=acquisition_rows,
+        additional_candidate_target=additional_candidate_target,
+        seed=seed,
+        sampled_at=sample_timestamp,
+    )
+    metadata_rows = build_expanded_market_validation_metadata_rows(
+        expanded_rows,
+        existing_sample_rows,
+        assessment_rows,
+        additional_candidate_target=additional_candidate_target,
+        seed=seed,
+        sampled_at=sample_timestamp,
+    )
+    write_table_outputs(
+        output_dir / "expanded_market_validation_sample.csv",
+        MARKET_VALIDATION_SAMPLE_FIELDNAMES,
+        expanded_rows,
+        "Expanded Validation Sample",
+    )
+    write_table_outputs(
+        output_dir / "expanded_market_validation_sample_metadata.csv",
+        EXPANDED_MARKET_VALIDATION_METADATA_FIELDNAMES,
+        metadata_rows,
+        "Expanded Sample Metadata",
+    )
+    return len(expanded_rows)
+
+
 def collect_abebooks_observations(
     output_dir: Path,
     limit: int = 30,
@@ -1135,6 +1190,45 @@ def collect_abebooks_observations(
         MARKET_OBSERVATION_FIELDNAMES,
         observation_rows,
         "Market Observations",
+    )
+    return len(observation_rows)
+
+
+def collect_expanded_abebooks_observations(
+    output_dir: Path,
+    limit: int = 140,
+    delay: float = 1.0,
+    max_results_per_book: int = 3,
+    fetch_html=fetch_url,
+    observation_date: str | None = None,
+    sleep=time.sleep,
+) -> int:
+    if limit < 1:
+        raise UserFacingError("limit must be at least 1")
+    if delay < 0:
+        raise UserFacingError("delay must be zero or greater")
+    if max_results_per_book < 1:
+        raise UserFacingError("max-results-per-book must be at least 1")
+    expanded_rows = read_csv_rows(output_dir / "expanded_market_validation_sample.csv")
+    existing_sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
+    existing_observation_rows = read_csv_rows(output_dir / "market_observations.csv")
+    existing_ids = {row.get("catalog_id", "") for row in existing_sample_rows}
+    additional_rows = [row for row in expanded_rows if row.get("catalog_id", "") not in existing_ids]
+    new_observation_rows = collect_abebooks_observation_rows(
+        additional_rows,
+        fetch_html=fetch_html,
+        observation_date=observation_date or utc_timestamp(),
+        limit=limit,
+        max_results_per_book=max_results_per_book,
+        delay_seconds=delay,
+        sleep=sleep,
+    )
+    observation_rows = existing_observation_rows + new_observation_rows
+    write_table_outputs(
+        output_dir / "expanded_market_observations.csv",
+        MARKET_OBSERVATION_FIELDNAMES,
+        observation_rows,
+        "Expanded Market Observations",
     )
     return len(observation_rows)
 
@@ -1935,11 +2029,23 @@ def build_parser() -> argparse.ArgumentParser:
     market_sample_parser.add_argument("--sample-size-per-band", type=int, default=20)
     market_sample_parser.add_argument("--seed", type=int, default=42)
 
+    expanded_sample_parser = subparsers.add_parser("generate-expanded-market-validation-sample")
+    expanded_sample_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    expanded_sample_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    expanded_sample_parser.add_argument("--additional-candidate-target", type=int, default=140)
+    expanded_sample_parser.add_argument("--seed", type=int, default=42)
+
     abebooks_parser = subparsers.add_parser("collect-abebooks-observations")
     abebooks_parser.add_argument("--output-dir", type=Path, default=Path("output"))
     abebooks_parser.add_argument("--limit", type=int, default=30)
     abebooks_parser.add_argument("--delay", type=float, default=1.0)
     abebooks_parser.add_argument("--max-results-per-book", type=int, default=3)
+
+    expanded_abebooks_parser = subparsers.add_parser("collect-expanded-abebooks-observations")
+    expanded_abebooks_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    expanded_abebooks_parser.add_argument("--limit", type=int, default=140)
+    expanded_abebooks_parser.add_argument("--delay", type=float, default=1.0)
+    expanded_abebooks_parser.add_argument("--max-results-per-book", type=int, default=3)
 
     coverage_parser = subparsers.add_parser("report-market-observation-coverage")
     coverage_parser.add_argument("--output-dir", type=Path, default=Path("output"))
@@ -2016,6 +2122,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Wrote {count} market validation sample rows to {csv_path} and {xlsx_path}")
             print(f"Wrote market validation sample metadata to {metadata_csv_path} and {metadata_xlsx_path}")
             return 0
+        if args.command == "generate-expanded-market-validation-sample":
+            count = generate_expanded_market_validation_sample(
+                output_dir=args.output_dir,
+                data_dir=args.data_dir,
+                additional_candidate_target=args.additional_candidate_target,
+                seed=args.seed,
+            )
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "expanded_market_validation_sample.csv")
+            metadata_csv_path, metadata_xlsx_path = paired_output_paths(
+                args.output_dir / "expanded_market_validation_sample_metadata.csv"
+            )
+            print(f"Wrote {count} expanded market validation sample rows to {csv_path} and {xlsx_path}")
+            print(f"Wrote expanded sample metadata to {metadata_csv_path} and {metadata_xlsx_path}")
+            return 0
         if args.command == "collect-abebooks-observations":
             count = collect_abebooks_observations(
                 output_dir=args.output_dir,
@@ -2025,6 +2145,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_observations.csv")
             print(f"Wrote {count} AbeBooks market observation rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "collect-expanded-abebooks-observations":
+            count = collect_expanded_abebooks_observations(
+                output_dir=args.output_dir,
+                limit=args.limit,
+                delay=args.delay,
+                max_results_per_book=args.max_results_per_book,
+            )
+            csv_path, xlsx_path = paired_output_paths(args.output_dir / "expanded_market_observations.csv")
+            print(f"Wrote {count} expanded AbeBooks observation rows to {csv_path} and {xlsx_path}")
             return 0
         if args.command == "report-market-observation-coverage":
             count = report_market_observation_coverage(args.output_dir)

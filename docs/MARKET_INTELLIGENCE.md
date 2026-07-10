@@ -220,6 +220,11 @@ Possible Research Assessment refinements are documented separately in the
 That proposal does not change Market Intelligence or reinterpret observations
 as valuations.
 
+PR12 expands the evidence base with `generate-expanded-market-validation-sample`
+and `collect-expanded-abebooks-observations`. The expanded collector queries
+only books added beyond the original sample, reuses existing observation rows,
+and preserves the original generated artifacts.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
@@ -244,6 +249,9 @@ Likely future generated outputs include:
 - `market_observation_coverage_report.csv`
 - `market_validation_analysis.csv`
 - `research_signal_effectiveness_review.csv`
+- `expanded_market_validation_sample.csv`
+- `expanded_market_validation_sample_metadata.csv`
+- `expanded_market_observations.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 

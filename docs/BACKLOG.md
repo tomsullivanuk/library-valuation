@@ -18,7 +18,9 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Review individual Research Signal effectiveness with `review-research-signal-effectiveness`
 - [ ] Prepare PR11 Research Assessment Calibration Proposal using
   `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`
-- [ ] Run PR12 before/after calibration simulation without changing production
+- [ ] Generate the PR12 expanded validation sample and collect bounded AbeBooks
+  observations for newly selected books
+- [ ] Run PR13 before/after calibration simulation without changing production
   Research Assessment configuration
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8

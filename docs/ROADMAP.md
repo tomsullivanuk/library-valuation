@@ -282,9 +282,12 @@ Assessment Calibration Proposal that defines specific refinements before any
 scoring implementation.
 
 PR11 recommends signal-role rebalancing as the preferred direction, subject to
-a before/after simulation. PR12 should compare hypothetical score distributions,
-priority bands, candidate rankings, and known candidate misses without changing
-production configuration or persisted assessments.
+a before/after simulation. PR12 expands the original validation evidence first:
+it preserves 65 existing books, selects 140 additional candidates across
+available bands, records exhausted-band deficits, and supports bounded AbeBooks
+collection without replacing prior artifacts. PR13 should compare hypothetical
+score distributions, priority bands, candidate rankings, and known candidate
+misses without changing production configuration or persisted assessments.
 
 Exit condition:
 

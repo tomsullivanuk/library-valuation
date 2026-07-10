@@ -187,6 +187,11 @@ The resulting [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CAL
 recommends simulation of signal-role rebalancing before production scoring is
 changed.
 
+PR12 expands the original 65-book sample before that simulation. The deterministic
+workflow preserves all original books, targets 140 additional candidates,
+balances available score bands, and prioritizes sparse signals and candidate
+signal combinations. Exhausted bands remain visible in expanded metadata.
+
 ## Success Criteria
 
 Qualitative success means the evidence shows that higher Research Score bands
