@@ -196,6 +196,27 @@ percentages in the expanded sample should not be interpreted as catalog
 prevalence. The larger evidence base supports a before/after calibration
 simulation, not immediate production scoring changes.
 
+## Calibration Simulation Findings
+
+PR14 compares the current model with conservative signal-role rebalancing and a
+more assertive market-likelihood scenario across all 205 expanded-sample books.
+Both scenarios are hypothetical and leave production configuration untouched.
+
+The conservative scenario lowers the average score from 10.99 to 10.12 and the
+median from 5 to 3. It moves 31 books up, 107 down, and eight across production
+band thresholds. The market-likelihood scenario raises the average slightly to
+11.17 while lowering the median to 1; it moves 61 books up, 77 down, and ten
+across thresholds.
+
+Neither scenario changes top-50 membership, top-50 median or average observed
+asking price, the 16 false-positive references in the top 50, or the six
+outlier-sensitive top-50 books. Each moves three false-positive references down
+in rank, but neither moves a false-negative reference up.
+
+The simulation therefore shows that the proposed weights behave differently,
+but not yet demonstrably better against the expanded market evidence. A focused
+scenario review should precede any production scoring implementation.
+
 ## Non-Goals
 
 This document does not change application code, CLI behavior, generated artifact

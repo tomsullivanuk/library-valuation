@@ -315,6 +315,18 @@ This writes paired CSV/XLSX artifacts for expanded validation analysis, signal
 effectiveness, and observation coverage. It compares the 205-book evidence base
 with the original 65-book results without changing Research Assessment scoring.
 
+Simulate hypothetical Research Assessment calibration scenarios:
+
+```bash
+python3 library_pipeline.py simulate-research-assessment-calibration \
+  --output-dir output \
+  --top-n 50
+```
+
+The simulation compares the persisted baseline with conservative rebalancing
+and market-likelihood emphasis. It writes per-book, summary, and candidate-
+movement artifacts without changing production configuration or assessments.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

@@ -30,6 +30,12 @@ from valuation.abebooks import (
     collect_abebooks_observation_rows,
     fetch_url,
 )
+from valuation.calibration_simulation import (
+    CALIBRATION_SIMULATION_FIELDNAMES,
+    CALIBRATION_SIMULATION_MOVEMENT_FIELDNAMES,
+    CALIBRATION_SIMULATION_SUMMARY_FIELDNAMES,
+    build_calibration_simulation,
+)
 from valuation.collector_workbook import write_collector_workbook
 from valuation.expanded_market_validation_analysis import (
     EXPANDED_MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
@@ -1333,6 +1339,40 @@ def analyze_expanded_market_validation(output_dir: Path) -> dict[str, int]:
     }
 
 
+def simulate_research_assessment_calibration(output_dir: Path, top_n: int = 50) -> dict[str, int]:
+    if top_n < 1:
+        raise UserFacingError("top-n must be at least 1")
+    simulation_rows, summary_rows, movement_rows = build_calibration_simulation(
+        read_csv_rows(output_dir / "expanded_market_validation_sample.csv"),
+        read_csv_rows(output_dir / "expanded_market_observations.csv"),
+        read_csv_rows(output_dir / "expanded_research_signal_effectiveness_review.csv"),
+        top_n=top_n,
+    )
+    write_table_outputs(
+        output_dir / "calibration_simulation.csv",
+        CALIBRATION_SIMULATION_FIELDNAMES,
+        simulation_rows,
+        "Calibration Simulation",
+    )
+    write_table_outputs(
+        output_dir / "calibration_simulation_summary.csv",
+        CALIBRATION_SIMULATION_SUMMARY_FIELDNAMES,
+        summary_rows,
+        "Simulation Summary",
+    )
+    write_table_outputs(
+        output_dir / "calibration_simulation_candidate_movements.csv",
+        CALIBRATION_SIMULATION_MOVEMENT_FIELDNAMES,
+        movement_rows,
+        "Candidate Movements",
+    )
+    return {
+        "simulation_rows": len(simulation_rows),
+        "summary_rows": len(summary_rows),
+        "movement_rows": len(movement_rows),
+    }
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -2115,6 +2155,10 @@ def build_parser() -> argparse.ArgumentParser:
     expanded_analysis_parser = subparsers.add_parser("analyze-expanded-market-validation")
     expanded_analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
+    simulation_parser = subparsers.add_parser("simulate-research-assessment-calibration")
+    simulation_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    simulation_parser.add_argument("--top-n", type=int, default=50)
+
     return parser
 
 
@@ -2252,6 +2296,30 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"Wrote {counts['coverage_rows']} expanded coverage rows "
                 f"to {coverage_csv} and {coverage_xlsx}"
+            )
+            return 0
+        if args.command == "simulate-research-assessment-calibration":
+            counts = simulate_research_assessment_calibration(args.output_dir, args.top_n)
+            simulation_csv, simulation_xlsx = paired_output_paths(
+                args.output_dir / "calibration_simulation.csv"
+            )
+            summary_csv, summary_xlsx = paired_output_paths(
+                args.output_dir / "calibration_simulation_summary.csv"
+            )
+            movement_csv, movement_xlsx = paired_output_paths(
+                args.output_dir / "calibration_simulation_candidate_movements.csv"
+            )
+            print(
+                f"Wrote {counts['simulation_rows']} calibration simulation rows "
+                f"to {simulation_csv} and {simulation_xlsx}"
+            )
+            print(
+                f"Wrote {counts['summary_rows']} calibration summary rows "
+                f"to {summary_csv} and {summary_xlsx}"
+            )
+            print(
+                f"Wrote {counts['movement_rows']} candidate movement rows "
+                f"to {movement_csv} and {movement_xlsx}"
             )
             return 0
     except UserFacingError as error:

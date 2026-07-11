@@ -24,6 +24,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   using `analyze-expanded-market-validation`
 - [ ] Run PR14 before/after calibration simulation without changing production
   Research Assessment configuration
+- [ ] Review PR14 scenario assumptions and decide whether to revise calibration,
+  gather more market evidence, or stop before production scoring changes
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository

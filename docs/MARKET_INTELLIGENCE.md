@@ -230,6 +230,11 @@ Market observations remain facts; score-band comparisons, signal
 classifications, outlier interpretations, and calibration implications remain
 derived analytical artifacts.
 
+PR14 adds `simulate-research-assessment-calibration` as a downstream,
+non-production analytical workflow. Scenario scores and rankings are
+interpretations of existing signals and observations; they are not market
+observations, valuations, or persisted Research Assessments.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
@@ -260,6 +265,9 @@ Likely future generated outputs include:
 - `expanded_market_observation_coverage_report.csv`
 - `expanded_market_validation_analysis.csv`
 - `expanded_research_signal_effectiveness_review.csv`
+- `calibration_simulation.csv`
+- `calibration_simulation_summary.csv`
+- `calibration_simulation_candidate_movements.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 

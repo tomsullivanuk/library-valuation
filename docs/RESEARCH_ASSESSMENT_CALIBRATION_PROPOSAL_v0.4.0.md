@@ -324,21 +324,22 @@ A future implementation PR should demonstrate that:
 
 The recommended next PR is:
 
-**PR14 — Before/After Calibration Simulation**
+**PR15 — Calibration Scenario Review and Decision**
 
 PR12 first expands the AbeBooks-backed validation evidence while preserving the
 original sample and observations. PR13 refreshes the score-band, signal, and
 candidate analysis using that evidence. The refresh supports signal-role
 rebalancing for simulation: `multiple_acquisitions` and
 `scholarly_lc_subject` strengthen, while `missing_oclc` and
-`low_metadata_confidence` remain concerns. PR14 should apply a small set of
-explicitly hypothetical calibration scenarios
-to existing assessments without changing production configuration or persisted
-Research Assessment state. It should compare score distributions, priority
-bands, Research Candidate rankings, and known candidate misses. The simulation
-should provide the evidence needed to decide whether a later v0.5.0 scoring-
-change PR is justified or whether another market source should be validated
-first.
+`low_metadata_confidence` remain concerns. PR14 applies explicitly hypothetical
+calibration scenarios without changing production configuration or persisted
+Research Assessment state.
+
+The simulation changes score and band distributions but does not improve top-50
+membership, market evidence, false-positive representation, false-negative
+surfacing, or outlier exposure. PR15 should review scenario assumptions and
+decide whether to revise the simulations, gather additional market evidence, or
+stop calibration work. A production scoring-change PR is not yet justified.
 
 ## Non-Goals
 

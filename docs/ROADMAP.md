@@ -292,6 +292,19 @@ uncertain signals. PR14 should compare hypothetical score distributions,
 priority bands, candidate rankings, and known candidate misses without changing
 production configuration or persisted assessments.
 
+PR14 simulation result:
+
+- Conservative and market-likelihood scenarios alter many scores and several
+  production bands.
+- Neither scenario changes top-50 membership or its observed asking-price
+  profile.
+- Three false-positive references move down under each scenario, but no false-
+  negative references move up.
+- Outlier-sensitive top-50 representation remains unchanged.
+
+PR15 should be a calibration scenario review and decision, not an automatic
+production scoring implementation.
+
 Exit condition:
 
 - The project has evidence about whether Research Score contains predictive
