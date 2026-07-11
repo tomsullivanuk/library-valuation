@@ -20,7 +20,9 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`
 - [ ] Generate the PR12 expanded validation sample and collect bounded AbeBooks
   observations for newly selected books
-- [ ] Run PR13 before/after calibration simulation without changing production
+- [ ] Refresh PR13 expanded coverage, score-band, signal, and candidate analysis
+  using `analyze-expanded-market-validation`
+- [ ] Run PR14 before/after calibration simulation without changing production
   Research Assessment configuration
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8

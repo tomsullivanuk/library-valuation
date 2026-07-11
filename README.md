@@ -303,6 +303,18 @@ The expanded collector remains bounded and writes
 `expanded_market_observations.csv` and `.xlsx` without replacing the original
 sample or observation artifacts.
 
+Refresh coverage, score-band analysis, and Research Signal effectiveness using
+the expanded evidence:
+
+```bash
+python3 library_pipeline.py analyze-expanded-market-validation \
+  --output-dir output
+```
+
+This writes paired CSV/XLSX artifacts for expanded validation analysis, signal
+effectiveness, and observation coverage. It compares the 205-book evidence base
+with the original 65-book results without changing Research Assessment scoring.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

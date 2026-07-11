@@ -225,6 +225,11 @@ and `collect-expanded-abebooks-observations`. The expanded collector queries
 only books added beyond the original sample, reuses existing observation rows,
 and preserves the original generated artifacts.
 
+PR13 refreshes downstream analysis with `analyze-expanded-market-validation`.
+Market observations remain facts; score-band comparisons, signal
+classifications, outlier interpretations, and calibration implications remain
+derived analytical artifacts.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
@@ -252,6 +257,9 @@ Likely future generated outputs include:
 - `expanded_market_validation_sample.csv`
 - `expanded_market_validation_sample_metadata.csv`
 - `expanded_market_observations.csv`
+- `expanded_market_observation_coverage_report.csv`
+- `expanded_market_validation_analysis.csv`
+- `expanded_research_signal_effectiveness_review.csv`
 - `market_values.csv`
 - `market_validation_report.md`
 

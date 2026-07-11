@@ -286,8 +286,11 @@ a before/after simulation. PR12 expands the original validation evidence first:
 it preserves 65 existing books, selects 140 additional candidates across
 available bands, records exhausted-band deficits, and supports bounded AbeBooks
 collection without replacing prior artifacts. PR13 should compare hypothetical
-score distributions, priority bands, candidate rankings, and known candidate
-misses without changing production configuration or persisted assessments.
+evidence with the original 65-book findings. The refreshed results retain a
+non-monotonic median pattern but strengthen the `8+` band and two previously
+uncertain signals. PR14 should compare hypothetical score distributions,
+priority bands, candidate rankings, and known candidate misses without changing
+production configuration or persisted assessments.
 
 Exit condition:
 

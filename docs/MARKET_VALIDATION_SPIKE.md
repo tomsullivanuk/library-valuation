@@ -192,6 +192,11 @@ workflow preserves all original books, targets 140 additional candidates,
 balances available score bands, and prioritizes sparse signals and candidate
 signal combinations. Exhausted bands remain visible in expanded metadata.
 
+PR13 refreshes the analytical layer with `analyze-expanded-market-validation`.
+The expanded evidence strengthens the directional distinction of the `8+` band
+but does not create a monotonic score gradient. Signal-role rebalancing remains
+appropriate for simulation, with no scoring change in PR13.
+
 ## Success Criteria
 
 Qualitative success means the evidence shows that higher Research Score bands

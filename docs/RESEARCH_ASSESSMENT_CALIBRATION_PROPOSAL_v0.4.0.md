@@ -324,10 +324,14 @@ A future implementation PR should demonstrate that:
 
 The recommended next PR is:
 
-**PR13 — Before/After Calibration Simulation**
+**PR14 — Before/After Calibration Simulation**
 
 PR12 first expands the AbeBooks-backed validation evidence while preserving the
-original sample and observations. PR13 should then apply a small set of
+original sample and observations. PR13 refreshes the score-band, signal, and
+candidate analysis using that evidence. The refresh supports signal-role
+rebalancing for simulation: `multiple_acquisitions` and
+`scholarly_lc_subject` strengthen, while `missing_oclc` and
+`low_metadata_confidence` remain concerns. PR14 should apply a small set of
 explicitly hypothetical calibration scenarios
 to existing assessments without changing production configuration or persisted
 Research Assessment state. It should compare score distributions, priority

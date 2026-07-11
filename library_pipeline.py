@@ -31,6 +31,12 @@ from valuation.abebooks import (
     fetch_url,
 )
 from valuation.collector_workbook import write_collector_workbook
+from valuation.expanded_market_validation_analysis import (
+    EXPANDED_MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
+    EXPANDED_RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
+    build_expanded_market_validation_analysis_rows,
+    build_expanded_research_signal_effectiveness_rows,
+)
 from valuation.market_validation import (
     EXPANDED_MARKET_VALIDATION_METADATA_FIELDNAMES,
     MARKET_VALIDATION_SAMPLE_METADATA_FIELDNAMES,
@@ -1277,6 +1283,56 @@ def review_research_signal_effectiveness(output_dir: Path) -> int:
     return len(review_rows)
 
 
+def analyze_expanded_market_validation(output_dir: Path) -> dict[str, int]:
+    expanded_sample_rows = read_csv_rows(output_dir / "expanded_market_validation_sample.csv")
+    expanded_observation_rows = read_csv_rows(output_dir / "expanded_market_observations.csv")
+    expanded_metadata_rows = read_csv_rows(output_dir / "expanded_market_validation_sample_metadata.csv")
+    original_sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
+    original_observation_rows = read_csv_rows(output_dir / "market_observations.csv")
+    original_metadata_rows = read_csv_rows(output_dir / "market_validation_sample_metadata.csv")
+
+    analysis_rows = build_expanded_market_validation_analysis_rows(
+        expanded_sample_rows,
+        expanded_observation_rows,
+        expanded_metadata_rows,
+        original_sample_rows,
+        original_observation_rows,
+        original_metadata_rows,
+    )
+    signal_rows = build_expanded_research_signal_effectiveness_rows(
+        expanded_sample_rows,
+        expanded_observation_rows,
+        expanded_metadata_rows,
+        original_sample_rows,
+        original_observation_rows,
+        original_metadata_rows,
+    )
+    coverage_rows = build_market_observation_coverage_rows(expanded_sample_rows, expanded_observation_rows)
+    write_table_outputs(
+        output_dir / "expanded_market_validation_analysis.csv",
+        EXPANDED_MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
+        analysis_rows,
+        "Expanded Validation Analysis",
+    )
+    write_table_outputs(
+        output_dir / "expanded_research_signal_effectiveness_review.csv",
+        EXPANDED_RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
+        signal_rows,
+        "Expanded Signal Review",
+    )
+    write_table_outputs(
+        output_dir / "expanded_market_observation_coverage_report.csv",
+        MARKET_OBSERVATION_COVERAGE_FIELDNAMES,
+        coverage_rows,
+        "Expanded Observation Coverage",
+    )
+    return {
+        "analysis_rows": len(analysis_rows),
+        "signal_rows": len(signal_rows),
+        "coverage_rows": len(coverage_rows),
+    }
+
+
 def build_import_manifest_row(
     filename: str,
     file_hash: str,
@@ -2056,6 +2112,9 @@ def build_parser() -> argparse.ArgumentParser:
     signal_review_parser = subparsers.add_parser("review-research-signal-effectiveness")
     signal_review_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
+    expanded_analysis_parser = subparsers.add_parser("analyze-expanded-market-validation")
+    expanded_analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+
     return parser
 
 
@@ -2170,6 +2229,30 @@ def main(argv: list[str] | None = None) -> int:
             count = review_research_signal_effectiveness(args.output_dir)
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "research_signal_effectiveness_review.csv")
             print(f"Wrote {count} research signal effectiveness rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "analyze-expanded-market-validation":
+            counts = analyze_expanded_market_validation(args.output_dir)
+            analysis_csv, analysis_xlsx = paired_output_paths(
+                args.output_dir / "expanded_market_validation_analysis.csv"
+            )
+            signal_csv, signal_xlsx = paired_output_paths(
+                args.output_dir / "expanded_research_signal_effectiveness_review.csv"
+            )
+            coverage_csv, coverage_xlsx = paired_output_paths(
+                args.output_dir / "expanded_market_observation_coverage_report.csv"
+            )
+            print(
+                f"Wrote {counts['analysis_rows']} expanded market validation analysis rows "
+                f"to {analysis_csv} and {analysis_xlsx}"
+            )
+            print(
+                f"Wrote {counts['signal_rows']} expanded signal effectiveness rows "
+                f"to {signal_csv} and {signal_xlsx}"
+            )
+            print(
+                f"Wrote {counts['coverage_rows']} expanded coverage rows "
+                f"to {coverage_csv} and {coverage_xlsx}"
+            )
             return 0
     except UserFacingError as error:
         print(f"Error: {error}", file=sys.stderr)

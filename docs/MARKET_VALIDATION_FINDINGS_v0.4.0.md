@@ -168,6 +168,34 @@ in the [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATIO
 The proposal recommends a before/after simulation before any scoring change is
 implemented.
 
+## Expanded Evidence Refresh
+
+PR13 refreshes these findings using 205 sampled books and 596 AbeBooks
+observation rows. All 205 books had observations, with no source or diagnostic
+failures in the expanded run.
+
+The `8-10` validation band, which contains every raw score of 8 or greater, now
+has the strongest median and average asking-price evidence. Score-band medians
+remain non-monotonic, however, and all populated bands remain sensitive to high
+maximum-price outliers. The low-score band also contains the largest observed
+maximum, reinforcing that maxima are investigation leads rather than proof of
+value.
+
+Signal conclusions are more stable with two notable changes:
+
+- `multiple_acquisitions` strengthened from weak or inconclusive to moderate.
+- `scholarly_lc_subject` strengthened from a possible false-positive driver to
+  moderate, while remaining outlier-sensitive.
+- `university_press` and `missing_lcc` remain moderate signals.
+- `missing_oclc` remains weak, and `low_metadata_confidence` remains a possible
+  false-positive driver.
+- `specialist_publisher` remains too sparse to classify.
+
+Because PR12 intentionally prioritized sparse signals and combinations, signal
+percentages in the expanded sample should not be interpreted as catalog
+prevalence. The larger evidence base supports a before/after calibration
+simulation, not immediate production scoring changes.
+
 ## Non-Goals
 
 This document does not change application code, CLI behavior, generated artifact
