@@ -320,11 +320,13 @@ A future implementation PR should demonstrate that:
 - Simulation improvements could reflect the current sample while failing on the
   broader catalog or a future market snapshot.
 
-## Recommended Next PR
+## Decision Outcome
 
-The recommended next PR is:
-
-**PR15 — Calibration Scenario Review and Decision**
+PR15 completed the scenario review in
+[Calibration Scenario Review and Decision](CALIBRATION_SCENARIO_REVIEW_v0.4.0.md).
+It rejects production scoring changes for v0.4.0 because neither simulated
+alternative improved the practical top candidate set. Current scoring, signal
+definitions, weights, and persisted assessments remain unchanged.
 
 PR12 first expands the AbeBooks-backed validation evidence while preserving the
 original sample and observations. PR13 refreshes the score-band, signal, and
@@ -337,9 +339,10 @@ Research Assessment state.
 
 The simulation changes score and band distributions but does not improve top-50
 membership, market evidence, false-positive representation, false-negative
-surfacing, or outlier exposure. PR15 should review scenario assumptions and
-decide whether to revise the simulations, gather additional market evidence, or
-stop calibration work. A production scoring-change PR is not yet justified.
+surfacing, or outlier exposure. The next release step is **PR16 — v0.4.0 Release
+Readiness Review**. Future model work should consider separating market
+likelihood from research effort rather than continuing weight tuning against
+the same sample.
 
 ## Non-Goals
 

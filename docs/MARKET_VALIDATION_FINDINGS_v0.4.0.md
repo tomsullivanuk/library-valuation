@@ -214,8 +214,21 @@ outlier-sensitive top-50 books. Each moves three false-positive references down
 in rank, but neither moves a false-negative reference up.
 
 The simulation therefore shows that the proposed weights behave differently,
-but not yet demonstrably better against the expanded market evidence. A focused
-scenario review should precede any production scoring implementation.
+but not yet demonstrably better against the expanded market evidence. PR15's
+focused scenario review confirms that production scoring should remain
+unchanged in v0.4.0.
+
+## Calibration Decision
+
+PR15 concludes that v0.4.0 should not implement production Research Assessment
+scoring changes. Neither simulated alternative improved the practical top-50
+candidate set, and further tuning against the same evidence would risk
+overfitting. The full decision and rejected options are recorded in
+[Calibration Scenario Review and Decision](CALIBRATION_SCENARIO_REVIEW_v0.4.0.md).
+
+Future model design should investigate separating market likelihood from
+research effort rather than assuming one additive score can cleanly express
+both concepts.
 
 ## Non-Goals
 

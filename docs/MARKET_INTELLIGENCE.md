@@ -235,6 +235,12 @@ non-production analytical workflow. Scenario scores and rankings are
 interpretations of existing signals and observations; they are not market
 observations, valuations, or persisted Research Assessments.
 
+PR15 records the resulting decision in
+[Calibration Scenario Review and Decision](CALIBRATION_SCENARIO_REVIEW_v0.4.0.md):
+v0.4.0 will preserve production Research Assessment scoring. Future design may
+separate market likelihood from research effort, while Market Intelligence
+continues to supply observations independently from either concept.
+
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 

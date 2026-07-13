@@ -24,8 +24,10 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   using `analyze-expanded-market-validation`
 - [ ] Run PR14 before/after calibration simulation without changing production
   Research Assessment configuration
-- [ ] Review PR14 scenario assumptions and decide whether to revise calibration,
-  gather more market evidence, or stop before production scoring changes
+- [x] Review PR14 scenario assumptions and stop v0.4.0 calibration before
+  production scoring changes
+- [ ] Complete the v0.4.0 release-readiness review with production Research
+  Assessment scoring unchanged
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository
@@ -70,6 +72,13 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ## Research / Open Questions
 
+- Design a future separation between market likelihood and research effort.
+- Evaluate another market source, including the feasibility of sold-price
+  evidence, before revisiting production calibration.
+- Refine calibration scenarios only after independent evidence or a revised
+  model design is available.
+- Revisit score bands after clarifying the purpose of each future score.
+- Validate Research Assessment behavior against future monthly imports.
 - Improve physical book detection for modern Amazon ASINs:
   - Investigate Amazon `B0...` ASINs that may represent physical books.
   - June 2026 data included at least one likely book, `B0GTQMJ53N`, that was

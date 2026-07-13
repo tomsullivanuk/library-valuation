@@ -302,8 +302,14 @@ PR14 simulation result:
   negative references move up.
 - Outlier-sensitive top-50 representation remains unchanged.
 
-PR15 should be a calibration scenario review and decision, not an automatic
-production scoring implementation.
+PR15 records the decision not to implement production scoring changes in
+v0.4.0. The simulated alternatives behaved differently but did not improve the
+practical top candidate set. Current scoring, signals, weights, and persisted
+assessments remain unchanged. A future model-design effort should investigate
+separate market-likelihood and research-effort concepts.
+
+The next step is PR16, a v0.4.0 release-readiness review that closes the research
+spike without reopening calibration absent new evidence.
 
 Exit condition:
 

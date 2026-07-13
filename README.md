@@ -63,6 +63,8 @@ tracking number, payment method, gift fields, and other personal columns.
   calibration guardrails from the v0.4.0 experiment.
 - `docs/RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md`: proposed future
   model refinements and simulation requirements; no scoring changes.
+- `docs/CALIBRATION_SCENARIO_REVIEW_v0.4.0.md`: PR15 decision to preserve
+  production scoring in v0.4.0 and defer model redesign.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -326,6 +328,10 @@ python3 library_pipeline.py simulate-research-assessment-calibration \
 The simulation compares the persisted baseline with conservative rebalancing
 and market-likelihood emphasis. It writes per-book, summary, and candidate-
 movement artifacts without changing production configuration or assessments.
+The resulting [Calibration Scenario Review](docs/CALIBRATION_SCENARIO_REVIEW_v0.4.0.md)
+records the decision not to change production scoring in v0.4.0. A future model
+may separate market likelihood from research effort, but that redesign is not
+part of this release.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
