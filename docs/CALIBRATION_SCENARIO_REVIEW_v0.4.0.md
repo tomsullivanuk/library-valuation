@@ -149,15 +149,11 @@ research outcome.
 - Validate model behavior against future monthly imports.
 - Revisit score bands after the score's purpose and dimensions are clarified.
 
-## Recommended Next PR
+## Release Follow-Up
 
-The recommended next PR is:
-
-**PR16 — v0.4.0 Release Readiness Review**
-
-PR16 should verify documentation, generated-artifact policy, commands, tests,
-and release scope. It should not reopen production calibration unless new
-evidence changes this decision.
+PR16 verifies documentation, generated-artifact policy, commands, tests, and
+release scope without reopening production calibration. After PR16 is
+committed, the remaining work is to create the v0.4.0 tag and GitHub Release.
 
 ## Non-Goals
 

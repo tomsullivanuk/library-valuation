@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.4.0 - 2026-07-13
+
+Release focus: Market Validation and Market Intelligence research infrastructure.
+
+Added:
+
+- Deterministic stratified Market Validation sample generation.
+- Bounded ISBN-first AbeBooks observation collection with verified TLS, rate
+  controls, diagnostics, and preserved lookup references.
+- Market observation coverage, score-band analysis, and Research Signal
+  effectiveness reporting.
+- Expanded validation workflows covering 205 books and 596 AbeBooks observation
+  rows in the completed experiment.
+- Non-production Research Assessment calibration scenario simulation.
+- Market Validation findings, calibration principles, proposal, and decision
+  records.
+
+Changed:
+
+- Added opt-in CLI workflows for Market Validation data preparation, collection,
+  analysis, and simulation.
+- Documented the decision to preserve current production Research Assessment
+  scoring in v0.4.0.
+
+Unchanged:
+
+- Production Research Assessment logic, signals, weights, and bands.
+- Durable catalog, acquisition, assessment, and Collector Review data.
+- Monthly `update-library` behavior.
+
+Known limitations:
+
+- AbeBooks asking prices are single-source observations, not completed sales or
+  valuations.
+- Edition matching and condition interpretation remain lightweight.
+- The stratified evidence does not establish catalog-wide prevalence.
+- Simulated calibration alternatives did not improve the practical top
+  candidate set.
+
 ## v0.3.0 - 2026-07-09
 
 Release focus: Research Candidates and Collector Review workflow.

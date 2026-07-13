@@ -226,10 +226,10 @@ Exit condition:
 
 ## v0.4.0: Market Validation Spike
 
-Version 0.4.0 should begin as a documentation-first research experiment rather
-than a valuation implementation effort. The goal is to validate whether the
-existing Research Assessment model identifies books that are materially more
-likely to possess meaningful market value.
+Version 0.4.0 is a documentation-first research experiment rather than a
+valuation implementation effort. It validates whether the existing Research
+Assessment model identifies books that are materially more likely to show
+meaningful external market signals.
 
 Plan:
 
@@ -308,8 +308,9 @@ practical top candidate set. Current scoring, signals, weights, and persisted
 assessments remain unchanged. A future model-design effort should investigate
 separate market-likelihood and research-effort concepts.
 
-The next step is PR16, a v0.4.0 release-readiness review that closes the research
-spike without reopening calibration absent new evidence.
+PR16 confirms release readiness and closes the research spike without reopening
+calibration absent new evidence. The release is ready for final commit, tagging,
+and publication using `docs/RELEASE_NOTES_v0.4.0.md`.
 
 Exit condition:
 

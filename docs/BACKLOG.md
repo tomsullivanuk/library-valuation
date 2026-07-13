@@ -5,28 +5,28 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ---
 
-## Next Release Candidates (v0.4.0)
+## v0.4.0 Validation Work
 
 ### Valuation
-- [ ] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
-- [ ] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
-- [ ] Generate a 100-book stratified Research Score sample with `generate-market-validation-sample`
-- [ ] Collect bounded AbeBooks observations for the 100-book sample
-- [ ] Report observation coverage with `report-market-observation-coverage`
-- [ ] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
-- [ ] Generate PR8 Research Score market validation analysis with `analyze-market-validation`
-- [ ] Review individual Research Signal effectiveness with `review-research-signal-effectiveness`
-- [ ] Prepare PR11 Research Assessment Calibration Proposal using
+- [x] Market Intelligence architecture using `docs/MARKET_INTELLIGENCE.md`
+- [x] Market Validation Spike using `docs/MARKET_VALIDATION_SPIKE.md`
+- [x] Generate a stratified Research Score sample with `generate-market-validation-sample`
+- [x] Collect bounded AbeBooks observations for the validation sample
+- [x] Report observation coverage with `report-market-observation-coverage`
+- [x] Analyze AbeBooks observation quality and coverage from bounded ISBN-first runs
+- [x] Generate PR8 Research Score market validation analysis with `analyze-market-validation`
+- [x] Review individual Research Signal effectiveness with `review-research-signal-effectiveness`
+- [x] Prepare PR11 Research Assessment Calibration Proposal using
   `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`
-- [ ] Generate the PR12 expanded validation sample and collect bounded AbeBooks
+- [x] Generate the PR12 expanded validation sample and collect bounded AbeBooks
   observations for newly selected books
-- [ ] Refresh PR13 expanded coverage, score-band, signal, and candidate analysis
+- [x] Refresh PR13 expanded coverage, score-band, signal, and candidate analysis
   using `analyze-expanded-market-validation`
-- [ ] Run PR14 before/after calibration simulation without changing production
+- [x] Run PR14 before/after calibration simulation without changing production
   Research Assessment configuration
 - [x] Review PR14 scenario assumptions and stop v0.4.0 calibration before
   production scoring changes
-- [ ] Complete the v0.4.0 release-readiness review with production Research
+- [x] Complete the v0.4.0 release-readiness review with production Research
   Assessment scoring unchanged
 - [ ] Create a temporary valuation workbook for sampled books
 - [ ] Review false-positive and false-negative candidates from PR8

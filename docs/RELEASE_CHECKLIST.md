@@ -1,5 +1,49 @@
 # Release Checklist
 
+## v0.4.0
+
+Pre-release checks:
+
+- [x] Run `.venv/bin/python -m pytest`.
+- [x] Run `.venv/bin/python -m compileall .`.
+- [x] Run `git diff --check`.
+- [x] Confirm all v0.4.0 commands and documented options match the CLI.
+- [x] Confirm the expanded evidence artifacts represent 205 books and 596
+  AbeBooks observation rows from the completed experiment.
+- [x] Confirm production Research Assessment scoring, signals, weights, and
+  bands are unchanged.
+- [x] Confirm monthly `update-library` behavior and durable data are unchanged.
+- [x] Confirm generated Market Validation and simulation artifacts remain
+  ignored and untracked.
+- [x] Confirm internal Markdown links resolve.
+
+Release hygiene:
+
+- [x] Confirm `CHANGELOG.md` includes v0.4.0.
+- [x] Confirm `docs/RELEASE_NOTES_v0.4.0.md` is ready for the GitHub Release.
+- [x] Confirm `docs/RELEASE_READINESS_v0.4.0.md` records the final scope and
+  known limitations.
+- [x] Confirm README, architecture, roadmap, backlog, and decision documents
+  agree that production scoring is unchanged.
+- [ ] Confirm the working tree is clean after the PR16 commit.
+- [ ] Create the annotated tag with `git tag -a v0.4.0 -m "Release v0.4.0"`.
+- [ ] Push the commit and tag.
+- [ ] Create the GitHub Release using `docs/RELEASE_NOTES_v0.4.0.md`.
+
+Post-release smoke checks:
+
+- [ ] Confirm `library_pipeline.py --help` lists all v0.4.0 commands.
+- [ ] Run one non-network generated-analysis command against preserved local
+  artifacts.
+- [ ] Confirm the GitHub Release links to the correct tag and release notes.
+
+Known post-release follow-up:
+
+- Design a possible market-likelihood and research-effort split.
+- Evaluate another market source and completed-sale evidence.
+- Improve candidate review tooling.
+- Validate model behavior against future monthly imports.
+
 ## v0.3.0
 
 Pre-release checks:

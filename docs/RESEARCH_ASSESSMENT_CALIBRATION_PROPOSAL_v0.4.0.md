@@ -339,10 +339,10 @@ Research Assessment state.
 
 The simulation changes score and band distributions but does not improve top-50
 membership, market evidence, false-positive representation, false-negative
-surfacing, or outlier exposure. The next release step is **PR16 — v0.4.0 Release
-Readiness Review**. Future model work should consider separating market
-likelihood from research effort rather than continuing weight tuning against
-the same sample.
+surfacing, or outlier exposure. PR16 confirms v0.4.0 release readiness without
+reopening production calibration. Future model work should consider separating
+market likelihood from research effort rather than continuing weight tuning
+against the same sample.
 
 ## Non-Goals
 

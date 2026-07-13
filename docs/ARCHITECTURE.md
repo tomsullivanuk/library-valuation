@@ -214,6 +214,41 @@ If scoring-relevant metadata changes, the existing Research Assessment
 should be marked stale rather than silently replaced during the default monthly
 run. The user can then choose `--reevaluate stale` or `--reevaluate all`.
 
+## v0.4.0 Market Validation Architecture
+
+Version 0.4.0 adds opt-in research workflows around the existing durable
+catalog without changing the monthly import path:
+
+```text
+Durable catalog and Research Assessments
+        |
+        v
+Stratified validation samples
+        |
+        v
+AbeBooks market observations and diagnostics
+        |
+        v
+Coverage, score-band, and signal analysis
+        |
+        v
+Non-production calibration simulation and decision record
+```
+
+Market observations are external facts about listings and lookup attempts.
+Analysis rows and simulated scores are derived generated artifacts. Neither is
+a valuation estimate, recommendation, or durable Research Assessment.
+
+All v0.4.0 experiment artifacts are written under `output/` and remain ignored.
+The workflows do not modify `config/research_signals.yml`, production scoring,
+persisted assessments, durable catalog or acquisition data, or
+`update-library`. AbeBooks is an experimental first source; its asking prices do
+not represent completed sales or complete market truth.
+
+The v0.4.0 decision preserves the current single Research Score. Future model
+design may separate market likelihood from research effort, but no new score or
+schema is introduced in this release.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

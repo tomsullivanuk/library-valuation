@@ -65,6 +65,9 @@ tracking number, payment method, gift fields, and other personal columns.
   model refinements and simulation requirements; no scoring changes.
 - `docs/CALIBRATION_SCENARIO_REVIEW_v0.4.0.md`: PR15 decision to preserve
   production scoring in v0.4.0 and defer model redesign.
+- `docs/RELEASE_READINESS_v0.4.0.md`: verified v0.4.0 release scope, commands,
+  generated artifacts, limitations, and remaining release steps.
+- `docs/RELEASE_NOTES_v0.4.0.md`: concise user-facing v0.4.0 release summary.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -201,9 +204,10 @@ Research Assessments are separate from market valuation. A Research Assessment
 answers whether a book should be researched and why; a future market valuation
 layer should answer what the book is likely worth.
 
-For v0.4.0, the next valuation step is a documentation-first Market Validation
-Spike to test whether higher Research Scores are associated with higher observed
-market values before building valuation workflow features.
+v0.4.0 adds a Market Validation Spike to test whether higher Research Scores
+are associated with stronger observed market signals before building valuation
+workflow features. The completed experiment preserves production scoring and
+treats AbeBooks asking prices as observations, not valuations.
 
 Generate the deterministic analysis-scale input dataset for that spike after a
 successful monthly update:
