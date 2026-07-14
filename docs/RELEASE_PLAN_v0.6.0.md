@@ -379,41 +379,43 @@ prototypes needed to test assumptions. Recommend one of:
 PR2 must not wire a source into the production workflow unless the path is
 exceptionally straightforward and keeping it in the spike improves reviewability.
 
-### PR3 — Add the Easiest Useful Second Source Adapter
+### PR3 — Full-Library AbeBooks Baseline Workflow
 
-Implement the selected source behind an isolated adapter with bounded queries,
-rate-limit handling, failure diagnostics, captured fixtures, and clear evidence
-semantics. Keep it opt-in and independent of the monthly Amazon import. If PR2
-selects metadata-only evidence, name and test the adapter accordingly; do not
-present it as a second market-price source.
+Add an opt-in, conservatively throttled workflow that collects AbeBooks
+observations across the full assessed catalog or a bounded test subset. Write
+distinct full-baseline observation and Market Evidence Summary artifacts so
+validation-sample outputs are not overwritten. Use the baseline to quantify
+evidence coverage, review recommendations, confidence, outlier sensitivity,
+and the practical manual-review queue before adding another live source.
 
-### PR4 — Normalize the Multi-Source Observation Schema
+### PR4 — Baseline Summary Report / Review Queue Analysis
 
-Define or extend the source-neutral observation contract, normalize AbeBooks
-and the new adapter through the same boundary, preserve evidence type and
-provenance, and establish compatibility/version rules. Include synthetic
-second-source fixtures even if live access is unavailable in tests.
+Analyze the full-library baseline by evidence status, market confidence,
+outlier sensitivity, and review recommendation. Produce a compact generated
+report or documented review workflow that identifies the highest-priority books
+and where second-source evidence is most needed. This work may be folded into
+PR3 if it remains small.
 
-PR3 and PR4 may be reversed if the spike shows that a contract change is needed
-before the adapter can be implemented cleanly. That decision should be recorded
-in PR2.
+### PR5 — eBay Active Listings Access / Credential Spike
 
-### PR5 — Cross-Source Agreement / Conflict Summary
+Confirm developer enrollment, production access, credential handling, quotas,
+marketplace configuration, and a bounded ISBN/keyword query before committing
+to the live adapter. Do not add secrets to the repository.
+
+### PR6 — eBay Active Listing Adapter
+
+Implement eBay active listings behind an isolated adapter with bounded queries,
+rate-limit handling, failure diagnostics, captured fixtures, and observed
+asking-price semantics. Keep it opt-in and independent of monthly import.
+
+### PR7 — Multi-Source Agreement / Conflict Summary
 
 Extend the generated Market Evidence Summary to report source diversity,
 evidence-type composition, comparable groups, agreement, conflict, and
 non-comparability. Keep each source's contribution auditable. Prefer explicit
 conflict over a misleading averaged range.
 
-### PR6 — Update Market Confidence for Source Diversity
-
-Make confidence consume source-neutral diversity and conflict measures.
-Multiple sources must not automatically raise confidence: weak matches,
-duplicated/meta-search listings, incompatible evidence types, mixed currencies,
-or material conflict may leave confidence unchanged or reduce it. Avoid broad
-threshold retuning in this release.
-
-### PR7 — Documentation, Release Notes, and Acceptance Test Refresh
+### PR8 — Documentation, Release Notes, and Acceptance Test Refresh
 
 Align README, architecture, data model, Market Intelligence, roadmap, backlog,
 release notes, readiness evidence, and checklist with implemented behavior. Run

@@ -414,33 +414,30 @@ They must not enter existing asking-price statistics by accident.
 
 ## 13. Recommended PR3 Implementation Plan
 
-PR3 should be titled **Add Validated Market Observation Import Adapter** and
+The original spike recommended a validated manual/exported observation adapter
+as the lowest-friction second-source path. Product review subsequently chose to
+measure the full-library AbeBooks baseline before implementing any second-source
+adapter. The source recommendation remains useful, but it is deferred until the
+baseline quantifies the practical review queue and evidence gaps.
+
+Revised PR3 should be titled **Full-Library AbeBooks Baseline Workflow** and
 remain bounded:
 
-1. Define a small `MarketSourceAdapter` protocol or equivalent boundary that
-   returns normalized observation and diagnostic rows without knowing summary
-   logic.
-2. Add a `manual_export` adapter that reads one canonical CSV template but
-   preserves the actual underlying `source` on every row.
-3. Add `evidence_type` to the adapter-level contract and document compatibility
-   with the current AbeBooks asking-price rows.
-4. Normalize only validated asking-price rows into a combined generated
-   observation artifact. Reject sold, retail, availability, and metadata rows
-   with a stable deferred-evidence diagnostic until source-neutral aggregation
-   supports them explicitly.
-5. Validate required provenance, price/type consistency, currency, dates,
-   evidence type, source, and match context. Emit stable diagnostic codes.
-6. Generate deterministic observation IDs and report duplicates without
-   silently overwriting rows.
-7. Add tiny fixtures for a valid asking price, deferred sold evidence, invalid
-   currency/price combinations, missing provenance, duplicate rows, and an
-   unknown evidence type.
-8. Prove that monthly Amazon import, durable records, AbeBooks behavior, Market
-   Evidence Summary aggregation, and confidence/range/review logic remain
-   unchanged.
-9. Document a future eBay active-listing adapter as the next live-source path,
-   gated on developer credentials and production-access confirmation.
+1. Reuse the existing AbeBooks collector and source-neutral Market Evidence
+   Summary without changing their semantics.
+2. Select every assessed catalog item, while retaining a `--limit` option for a
+   safer bounded test.
+3. Default to a conservative delay and document that a 3,000-book run can take
+   several hours.
+4. Write distinct `full_abebooks_market_observations.csv/.xlsx` outputs rather
+   than replacing validation-sample observations.
+5. Summarize those rows into distinct full-baseline Market Evidence Summary
+   outputs.
+6. Review counts by recommendation, confidence, outlier sensitivity, and
+   evidence status before deciding where eBay evidence is most needed.
+7. Prove that monthly import, durable records, Research Assessments, AbeBooks
+   parsing, and confidence/range/review logic remain unchanged.
 
-PR3 should not add eBay credentials, scrape consumer pages, change durable data,
-or teach the summary layer to compare evidence types. Those remain later,
-reviewable changes.
+PR3 should not add eBay credentials, change the core AbeBooks parser, change
+durable data, or teach the summary layer to compare evidence types. Those remain
+later, reviewable changes.

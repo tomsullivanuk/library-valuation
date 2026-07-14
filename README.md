@@ -366,6 +366,58 @@ The range is derived from observed seller asking prices. It is not an
 appraisal, fair market value, realized sale price, definitive valuation, or
 guarantee of sale proceeds. Mixed currencies are not converted or combined.
 
+### v0.6.0 Full-Library AbeBooks Baseline
+
+Before adding another live marketplace, v0.6.0 establishes an AbeBooks-only
+directional baseline for the full assessed catalog. First refresh the catalog
+and Research Assessments from the current Amazon input:
+
+```bash
+.venv/bin/python library_pipeline.py update-library \
+  --amazon-input input/amazon \
+  --output-dir output
+```
+
+Then start with a bounded test:
+
+```bash
+.venv/bin/python library_pipeline.py collect-full-library-abebooks-observations \
+  --output-dir output \
+  --data-dir data \
+  --output output/full_abebooks_market_observations_test.csv \
+  --limit 100 \
+  --delay 2 \
+  --max-results-per-book 3
+```
+
+Inspect the test CSV/XLSX and source diagnostics before starting a full run.
+The full run may query more than 3,000 books and can take several hours. Do not
+remove the delay or run concurrent collectors. Use a distinct output name to
+preserve the test artifact if it matters.
+
+```bash
+.venv/bin/python library_pipeline.py collect-full-library-abebooks-observations \
+  --output-dir output \
+  --data-dir data \
+  --delay 2 \
+  --max-results-per-book 3
+
+.venv/bin/python library_pipeline.py summarize-market-evidence \
+  --observations output/full_abebooks_market_observations.csv \
+  --output-csv output/full_abebooks_market_evidence_summary.csv \
+  --output-xlsx output/full_abebooks_market_evidence_summary.xlsx
+```
+
+The collector writes `full_abebooks_market_observations.csv/.xlsx` by default;
+it does not replace `market_observations.csv/.xlsx`. Repeating the command with
+the same `--output` replaces that generated CSV/XLSX pair. The workflow is not
+resumable, so retain completed outputs before rerunning if they matter.
+
+The summary workbook supports filtering and pivoting by
+`review_recommendation`, `market_confidence`, `outlier_sensitivity`, and
+`evidence_status`. The baseline is observed AbeBooks asking-price evidence and
+review guidance, not an appraisal, fair market value, or realized sale estimate.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

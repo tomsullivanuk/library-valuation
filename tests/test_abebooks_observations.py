@@ -4,7 +4,7 @@ import urllib.request
 
 import library_pipeline
 import valuation.abebooks as abebooks
-from library_pipeline import collect_abebooks_observations, main
+from library_pipeline import collect_abebooks_observations, collect_full_library_abebooks_observations, main
 from valuation.abebooks import (
     MARKET_OBSERVATION_FIELDNAMES,
     SourceUnavailable,
@@ -262,6 +262,76 @@ def test_collect_abebooks_observations_command_wiring(capsys, monkeypatch, tmp_p
     assert result == 0
     assert calls == [(tmp_path, 5, 0.0, 2)]
     assert "Wrote 7 AbeBooks market observation rows" in captured
+
+
+def test_collect_full_library_abebooks_observations_uses_all_assessed_catalog_items(tmp_path):
+    output_dir = tmp_path / "output"
+    data_dir = tmp_path / "data"
+    write_rows(
+        output_dir / "library_catalog.csv",
+        ["catalog_item_id", "title", "authors", "isbn10", "isbn13"],
+        [
+            {"catalog_item_id": "BK000001", "title": "First", "authors": "One", "isbn13": "9780123456786"},
+            {"catalog_item_id": "BK000002", "title": "Second", "authors": "Two", "isbn13": "9780123456787"},
+        ],
+    )
+    write_rows(
+        data_dir / "research_priority_assessments.csv",
+        ["catalog_item_id", "research_priority_score", "research_priority_band", "triggered_signals"],
+        [
+            {"catalog_item_id": "BK000001", "research_priority_score": "8", "research_priority_band": "high"},
+            {"catalog_item_id": "BK000002", "research_priority_score": "4", "research_priority_band": "medium"},
+        ],
+    )
+
+    count = collect_full_library_abebooks_observations(
+        output_dir,
+        data_dir=data_dir,
+        delay=0,
+        fetch_html=lambda _url: LISTING_HTML,
+        observation_date="2026-07-14T00:00:00Z",
+        sleep=lambda _seconds: None,
+    )
+
+    assert count == 2
+    path = output_dir / "full_abebooks_market_observations.csv"
+    assert path.exists()
+    assert path.with_suffix(".xlsx").exists()
+    with path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert {row["catalog_id"] for row in rows} == {"BK000001", "BK000002"}
+
+
+def test_collect_full_library_abebooks_observations_command_wiring(capsys, monkeypatch, tmp_path):
+    calls = []
+
+    def fake_collect(output_dir, data_dir, output_path, limit, delay, max_results_per_book):
+        calls.append((output_dir, data_dir, output_path, limit, delay, max_results_per_book))
+        return 9
+
+    monkeypatch.setattr(library_pipeline, "collect_full_library_abebooks_observations", fake_collect)
+    custom_output = tmp_path / "test_observations.csv"
+
+    result = main([
+        "collect-full-library-abebooks-observations",
+        "--output-dir",
+        str(tmp_path / "output"),
+        "--data-dir",
+        str(tmp_path / "data"),
+        "--output",
+        str(custom_output),
+        "--limit",
+        "5",
+        "--delay",
+        "2",
+        "--max-results-per-book",
+        "2",
+    ])
+
+    captured = capsys.readouterr().out
+    assert result == 0
+    assert calls == [(tmp_path / "output", tmp_path / "data", custom_output, 5, 2.0, 2)]
+    assert "Wrote 9 full-library AbeBooks observation rows" in captured
 
 
 def sample_row(isbn13="9780123456786", isbn10="0123456789"):

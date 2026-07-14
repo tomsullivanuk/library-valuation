@@ -246,6 +246,31 @@ continues to supply observations independently from either concept.
 Known limitations remain: AbeBooks markup can change, condition text is not yet
 normalized, and the spike does not guarantee broad catalog coverage.
 
+### Full-library AbeBooks baseline
+
+Version 0.6.0 adds an opt-in full-library baseline before the first live
+second-source adapter. The command reads the current library catalog and
+Research Assessments, reuses the existing AbeBooks collector, and writes
+distinct generated artifacts:
+
+```bash
+.venv/bin/python library_pipeline.py collect-full-library-abebooks-observations \
+  --output-dir output \
+  --data-dir data \
+  --delay 2 \
+  --max-results-per-book 3
+```
+
+The default outputs are `full_abebooks_market_observations.csv/.xlsx`. A small
+`--limit 100` test is recommended first. The command refuses to describe a run
+as full-library when catalog items lack Research Assessments, and it remains
+separate from monthly import and durable state.
+
+The existing summary command converts the baseline observations into
+`full_abebooks_market_evidence_summary.csv/.xlsx`. These are observed AbeBooks
+asking-price evidence and review artifacts, not appraisals or realized-sale
+estimates.
+
 ## Relationship To Market Validation Spike
 
 Market Intelligence supports the Market Validation Spike documented in

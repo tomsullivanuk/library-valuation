@@ -17,6 +17,17 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Calibrate range and review thresholds against broader evidence.
 - [ ] Decide whether a future durable observation repository is justified.
 
+## v0.6.0 Multi-Source Market Evidence
+
+- [x] Define the multi-source release plan.
+- [x] Complete the source integration spike.
+- [ ] Run a bounded test and full-library AbeBooks baseline.
+- [ ] Analyze baseline review recommendations, confidence, evidence status, and
+  outlier sensitivity.
+- [ ] Confirm eBay active-listing credentials and production access.
+- [ ] Add an isolated eBay active-listing adapter.
+- [ ] Summarize cross-source agreement, conflict, and non-comparability.
+
 ---
 
 ## v0.4.0 Validation Work

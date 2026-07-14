@@ -1210,6 +1210,70 @@ def collect_abebooks_observations(
     return len(observation_rows)
 
 
+def collect_full_library_abebooks_observations(
+    output_dir: Path,
+    data_dir: Path = Path("data"),
+    output_path: Path | None = None,
+    limit: int | None = None,
+    delay: float = 2.0,
+    max_results_per_book: int = 3,
+    fetch_html=fetch_url,
+    observation_date: str | None = None,
+    sleep=time.sleep,
+) -> int:
+    if limit is not None and limit < 1:
+        raise UserFacingError("limit must be at least 1")
+    if delay < 0:
+        raise UserFacingError("delay must be zero or greater")
+    if max_results_per_book < 1:
+        raise UserFacingError("max-results-per-book must be at least 1")
+
+    catalog_rows = read_csv_rows(output_dir / "library_catalog.csv")
+    catalog_item_rows = read_optional_csv_rows(data_dir / "catalog_items.csv")
+    acquisition_rows = read_optional_csv_rows(data_dir / "acquisitions.csv")
+    assessment_rows = read_csv_rows(
+        output_dir / "research_assessments.csv"
+        if (output_dir / "research_assessments.csv").exists()
+        else data_dir / "research_priority_assessments.csv"
+    )
+    sample_rows = build_market_validation_sample_rows(
+        catalog_rows,
+        assessment_rows,
+        catalog_item_rows=catalog_item_rows,
+        acquisition_rows=acquisition_rows,
+        sample_size_per_band=max(1, len(assessment_rows)),
+        sampled_at=observation_date or utc_timestamp(),
+    )
+    catalog_ids = {row.get("catalog_item_id", "") for row in catalog_rows if row.get("catalog_item_id", "")}
+    sample_ids = {row.get("catalog_id", "") for row in sample_rows if row.get("catalog_id", "")}
+    missing_assessment_count = len(catalog_ids - sample_ids)
+    if missing_assessment_count:
+        raise UserFacingError(
+            f"Full-library baseline requires Research Assessments for every catalog item; "
+            f"{missing_assessment_count} catalog items are missing assessments. Run update-library first."
+        )
+    if not sample_rows:
+        raise UserFacingError("No catalog items are available for the full-library baseline")
+
+    effective_limit = min(limit, len(sample_rows)) if limit is not None else len(sample_rows)
+    observation_rows = collect_abebooks_observation_rows(
+        sample_rows,
+        fetch_html=fetch_html,
+        observation_date=observation_date or utc_timestamp(),
+        limit=effective_limit,
+        max_results_per_book=max_results_per_book,
+        delay_seconds=delay,
+        sleep=sleep,
+    )
+    write_table_outputs(
+        output_path or output_dir / "full_abebooks_market_observations.csv",
+        MARKET_OBSERVATION_FIELDNAMES,
+        observation_rows,
+        "Full AbeBooks Observations",
+    )
+    return len(observation_rows)
+
+
 def collect_expanded_abebooks_observations(
     output_dir: Path,
     limit: int = 140,
@@ -2148,6 +2212,14 @@ def build_parser() -> argparse.ArgumentParser:
     abebooks_parser.add_argument("--delay", type=float, default=1.0)
     abebooks_parser.add_argument("--max-results-per-book", type=int, default=3)
 
+    full_abebooks_parser = subparsers.add_parser("collect-full-library-abebooks-observations")
+    full_abebooks_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    full_abebooks_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    full_abebooks_parser.add_argument("--output", type=Path)
+    full_abebooks_parser.add_argument("--limit", type=int)
+    full_abebooks_parser.add_argument("--delay", type=float, default=2.0)
+    full_abebooks_parser.add_argument("--max-results-per-book", type=int, default=3)
+
     expanded_abebooks_parser = subparsers.add_parser("collect-expanded-abebooks-observations")
     expanded_abebooks_parser.add_argument("--output-dir", type=Path, default=Path("output"))
     expanded_abebooks_parser.add_argument("--limit", type=int, default=140)
@@ -2264,6 +2336,20 @@ def main(argv: list[str] | None = None) -> int:
             )
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_observations.csv")
             print(f"Wrote {count} AbeBooks market observation rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "collect-full-library-abebooks-observations":
+            count = collect_full_library_abebooks_observations(
+                output_dir=args.output_dir,
+                data_dir=args.data_dir,
+                output_path=args.output,
+                limit=args.limit,
+                delay=args.delay,
+                max_results_per_book=args.max_results_per_book,
+            )
+            csv_path, xlsx_path = paired_output_paths(
+                args.output or args.output_dir / "full_abebooks_market_observations.csv"
+            )
+            print(f"Wrote {count} full-library AbeBooks observation rows to {csv_path} and {xlsx_path}")
             return 0
         if args.command == "collect-expanded-abebooks-observations":
             count = collect_expanded_abebooks_observations(
