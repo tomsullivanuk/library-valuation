@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from statistics import median
 
 
-MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr3"
+MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr4"
 
 MARKET_EVIDENCE_SUMMARY_BASENAME = "market_evidence_summary"
 
@@ -161,7 +161,58 @@ def _summarize_group(rows: list[Mapping[str, str]], generated_at: str) -> dict[s
         "evidence_model_version": MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION,
         "evidence_notes": " ".join(notes),
     }
+    values["outlier_sensitivity"] = classify_outlier_sensitivity(values)
+    values["market_confidence"] = classify_market_confidence(values)
     return {field: values.get(field, "") for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
+
+
+def classify_outlier_sensitivity(summary_row: Mapping[str, str]) -> str:
+    """Classify sensitivity to sample size and observed asking-price spread."""
+    listing_count = _integer(_first(summary_row, "listing_count"))
+    if listing_count == 0:
+        return "not_applicable"
+    low = _decimal(_first(summary_row, "min_asking_price"))
+    high = _decimal(_first(summary_row, "max_asking_price"))
+    if low is None or high is None:
+        return "unknown_outlier_sensitivity"
+    if listing_count < 3 or low == 0 < high:
+        return "high_outlier_sensitivity"
+    if low == 0:
+        return "low_outlier_sensitivity"
+    spread_ratio = high / low
+    if spread_ratio >= Decimal("5"):
+        return "high_outlier_sensitivity"
+    if spread_ratio >= Decimal("3"):
+        return "moderate_outlier_sensitivity"
+    return "low_outlier_sensitivity"
+
+
+def classify_market_confidence(summary_row: Mapping[str, str]) -> str:
+    """Classify evidence usability without asserting or estimating book value."""
+    evidence_status = _first(summary_row, "evidence_status")
+    listing_count = _integer(_first(summary_row, "listing_count"))
+    if evidence_status == "source_unavailable":
+        return "source_unavailable"
+    if evidence_status == "no_query":
+        return "no_query"
+    if listing_count == 0:
+        return "no_market_evidence"
+    if "mixed currencies" in _first(summary_row, "evidence_notes").casefold():
+        return "mixed_currency_evidence"
+    if _decimal(_first(summary_row, "median_asking_price")) is None:
+        return "price_unavailable_evidence"
+    best_match = _first(summary_row, "best_match_confidence").casefold()
+    if best_match not in {"high", "medium"}:
+        return "ambiguous_edition_match"
+    if listing_count < 3:
+        return "thin_market_evidence"
+    outlier_sensitivity = _first(summary_row, "outlier_sensitivity")
+    high_confidence_count = _integer(_first(summary_row, "high_confidence_listing_count"))
+    if listing_count >= 5 and high_confidence_count >= 3 and outlier_sensitivity != "high_outlier_sensitivity":
+        return "high_confidence_market_evidence"
+    if outlier_sensitivity != "high_outlier_sensitivity":
+        return "moderate_confidence_market_evidence"
+    return "unknown_market_confidence"
 
 
 def _evidence_status(listings: list[Mapping[str, str]], status_rows: list[Mapping[str, str]]) -> str:
@@ -193,6 +244,13 @@ def _decimal(value: str) -> Decimal | None:
     except (InvalidOperation, AttributeError):
         return None
     return number if number.is_finite() and number >= 0 else None
+
+
+def _integer(value: str) -> int:
+    try:
+        return max(int(value), 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _format_decimal(value: Decimal) -> str:

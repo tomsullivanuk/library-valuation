@@ -271,8 +271,8 @@ are conservative reference ranges based on seller asking prices and must remain
 visibly separate from completed-sale evidence, Research Assessment scoring, and
 collector decisions.
 
-The schema and aggregation version for this generated artifact is `0.5.0-pr3`. The source of
-truth for column order in code is
+The schema, aggregation, and classification version for this generated artifact
+is `0.5.0-pr4`. The source of truth for column order in code is
 `valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
 
 | Field | Meaning |
@@ -299,9 +299,9 @@ truth for column order in code is
 | `max_asking_price` | Highest observed asking price among eligible listing evidence. |
 | `trimmed_low_asking_price` | Lower asking-price reference after documented outlier handling. Reserved for later range logic. |
 | `trimmed_high_asking_price` | Upper asking-price reference after documented outlier handling. Reserved for later range logic. |
-| `evidence_status` | Evidence availability or usability status. Reserved for later classification logic. |
-| `outlier_sensitivity` | Indicator of whether asking-price evidence is materially affected by outliers. Reserved for later classification logic. |
-| `market_confidence` | Evidence-quality classification based on coverage, match quality, usable listing count, and ambiguity. Reserved for later confidence rules. |
+| `evidence_status` | Evidence availability status: listings observed, no evidence, source unavailable, or no usable query. It does not classify evidence quality. |
+| `outlier_sensitivity` | Initial deterministic sensitivity category based on listing count and observed asking-price spread. |
+| `market_confidence` | Evidence-quality and usability category based on availability, currency consistency, usable prices, match quality, coverage, and outlier sensitivity. It does not classify book value. |
 | `likely_low` | Conservative low end of an asking-price-derived market range. Reserved for later range logic. |
 | `likely_mid` | Conservative midpoint or reference point of an asking-price-derived market range. Reserved for later range logic. |
 | `likely_high` | Conservative high end of an asking-price-derived market range. Reserved for later range logic. |
@@ -334,6 +334,37 @@ logic may introduce documented trimming. Interpretation, market confidence,
 likely range, and review fields remain reserved and blank. These outputs remain
 generated, non-durable artifacts and do not change Research Assessment records
 or monthly import behavior.
+
+### Market confidence classification
+
+`evidence_status` answers only whether listing evidence was observed or why a
+lookup could not provide it. It remains separate from `market_confidence`, which
+classifies how usable the observed asking-price evidence is. Neither field is an
+appraisal or an assertion of book value.
+
+PR4 applies this precedence:
+
+1. Preserve `source_unavailable`, `no_query`, and `no_market_evidence` outcomes.
+2. Classify mixed currencies as `mixed_currency_evidence` and listings without
+   usable prices as `price_unavailable_evidence`.
+3. Classify low or unknown best matches as `ambiguous_edition_match`, regardless
+   of listing volume.
+4. Classify one or two otherwise usable listings as `thin_market_evidence`.
+5. Use `high_confidence_market_evidence` for at least five listings, including
+   at least three high-confidence matches, when outlier sensitivity is not high.
+6. Use `moderate_confidence_market_evidence` for at least three usable,
+   high- or medium-match listings when outlier sensitivity is not high.
+7. Use `unknown_market_confidence` when usable evidence does not satisfy those
+   rules, including a larger sample with high outlier sensitivity.
+
+The initial outlier-sensitivity heuristic is `not_applicable` when there are no
+listings, `unknown_outlier_sensitivity` when prices cannot be compared, and
+`high_outlier_sensitivity` for fewer than three listings. With at least three
+usable prices, a maximum-to-minimum ratio of at least 5 is high, a ratio of at
+least 3 is `moderate_outlier_sensitivity`, and a smaller ratio is
+`low_outlier_sensitivity`. A positive maximum with a zero minimum is high.
+These are deterministic starting heuristics, not statistically calibrated
+thresholds. PR5 range fields and PR6 recommendation fields remain blank.
 
 ## Future Generated Artifacts
 
