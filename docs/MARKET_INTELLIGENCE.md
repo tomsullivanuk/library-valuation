@@ -271,8 +271,8 @@ are conservative reference ranges based on seller asking prices and must remain
 visibly separate from completed-sale evidence, Research Assessment scoring, and
 collector decisions.
 
-The schema, aggregation, and classification version for this generated artifact
-is `0.5.0-pr4`. The source of truth for column order in code is
+The schema, aggregation, classification, and range prototype version for this
+generated artifact is `0.5.0-pr5`. The source of truth for column order in code is
 `valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
 
 | Field | Meaning |
@@ -302,10 +302,10 @@ is `0.5.0-pr4`. The source of truth for column order in code is
 | `evidence_status` | Evidence availability status: listings observed, no evidence, source unavailable, or no usable query. It does not classify evidence quality. |
 | `outlier_sensitivity` | Initial deterministic sensitivity category based on listing count and observed asking-price spread. |
 | `market_confidence` | Evidence-quality and usability category based on availability, currency consistency, usable prices, match quality, coverage, and outlier sensitivity. It does not classify book value. |
-| `likely_low` | Conservative low end of an asking-price-derived market range. Reserved for later range logic. |
-| `likely_mid` | Conservative midpoint or reference point of an asking-price-derived market range. Reserved for later range logic. |
-| `likely_high` | Conservative high end of an asking-price-derived market range. Reserved for later range logic. |
-| `market_range_basis` | Short method or reason text explaining the range basis. Reserved for later range logic. |
+| `likely_low` | Cautious low reference in the asking-price-derived market range prototype, when supported. |
+| `likely_mid` | Median-based reference in the asking-price-derived market range prototype, when supported. |
+| `likely_high` | Cautious high reference in the asking-price-derived market range prototype, omitted for ambiguous or highly sensitive evidence. |
+| `market_range_basis` | Stable method or unavailability reason explaining how the prototype range was handled. |
 | `review_recommendation` | Review disposition such as accept, verify, investigate, or fallback research. Reserved for later recommendation logic. |
 | `review_reason` | Explainable reason codes or short reason text supporting the review recommendation. Reserved for later recommendation logic. |
 | `fallback_research_priority` | Priority to use when market evidence is missing, thin, ambiguous, or low-confidence. Reserved for later bridge logic. |
@@ -329,11 +329,10 @@ Listing and source-status rows both contribute to coverage counts, while only
 listing rows with parseable prices and currencies contribute to asking-price
 statistics. When multiple currencies occur for a book, currency and all price
 summary fields remain blank rather than silently combining currencies. The
-trimmed reference fields equal observed minimum and maximum in PR3; later range
-logic may introduce documented trimming. Interpretation, market confidence,
-likely range, and review fields remain reserved and blank. These outputs remain
-generated, non-durable artifacts and do not change Research Assessment records
-or monthly import behavior.
+trimmed reference fields equal observed minimum and maximum in PR3; later work
+may introduce documented trimming. These outputs remain generated, non-durable
+artifacts and do not change Research Assessment records or monthly import
+behavior.
 
 ### Market confidence classification
 
@@ -364,7 +363,34 @@ usable prices, a maximum-to-minimum ratio of at least 5 is high, a ratio of at
 least 3 is `moderate_outlier_sensitivity`, and a smaller ratio is
 `low_outlier_sensitivity`. A positive maximum with a zero minimum is high.
 These are deterministic starting heuristics, not statistically calibrated
-thresholds. PR5 range fields and PR6 recommendation fields remain blank.
+thresholds.
+
+### Conservative market range prototype
+
+PR5 derives cautious numeric references from observed seller asking prices. The
+prototype does not estimate actual sale proceeds and is not an appraisal, fair
+market value, or definitive valuation. It performs no currency conversion and
+does not use Research Score as a price input.
+
+High-confidence evidence uses trimmed low, median, and trimmed high asking-price
+references. Moderate-confidence evidence uses the same fields with min/max as
+documented fallbacks. Thin evidence provides low and median references, but its
+high outlier sensitivity suppresses the high reference. Ambiguous edition
+matches also provide only low and median references, never a likely high.
+
+No numeric range is produced for unavailable sources, missing queries, no market
+evidence, mixed currencies, unavailable prices, or unknown confidence. In those
+cases `market_range_basis` contains a stable `range_not_available_*` reason.
+Supported basis values are:
+
+- `high_confidence_observed_asking_prices`
+- `moderate_confidence_observed_asking_prices`
+- `thin_evidence_observed_asking_prices`
+- `thin_evidence_high_outlier_sensitivity_observed_asking_prices`
+- `ambiguous_match_observed_asking_prices`
+- `ambiguous_match_high_outlier_sensitivity_observed_asking_prices`
+
+PR6 recommendation, reason, and fallback-priority fields remain blank.
 
 ## Future Generated Artifacts
 

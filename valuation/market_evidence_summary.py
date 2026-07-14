@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from statistics import median
 
 
-MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr4"
+MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr5"
 
 MARKET_EVIDENCE_SUMMARY_BASENAME = "market_evidence_summary"
 
@@ -163,6 +163,7 @@ def _summarize_group(rows: list[Mapping[str, str]], generated_at: str) -> dict[s
     }
     values["outlier_sensitivity"] = classify_outlier_sensitivity(values)
     values["market_confidence"] = classify_market_confidence(values)
+    values.update(build_conservative_market_range(values))
     return {field: values.get(field, "") for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
 
 
@@ -213,6 +214,72 @@ def classify_market_confidence(summary_row: Mapping[str, str]) -> str:
     if outlier_sensitivity != "high_outlier_sensitivity":
         return "moderate_confidence_market_evidence"
     return "unknown_market_confidence"
+
+
+RANGE_UNAVAILABLE_BASIS = {
+    "source_unavailable": "range_not_available_source_unavailable",
+    "no_query": "range_not_available_no_query",
+    "no_market_evidence": "range_not_available_no_market_evidence",
+    "mixed_currency_evidence": "range_not_available_mixed_currency",
+    "price_unavailable_evidence": "range_not_available_price_unavailable",
+    "unknown_market_confidence": "range_not_available_unknown_confidence",
+}
+
+
+def build_conservative_market_range(summary_row: Mapping[str, str]) -> dict[str, str]:
+    """Build a cautious asking-price-derived range without estimating sale value."""
+    confidence = _first(summary_row, "market_confidence")
+    if confidence in RANGE_UNAVAILABLE_BASIS:
+        return _range_values(basis=RANGE_UNAVAILABLE_BASIS[confidence])
+
+    low = _first(summary_row, "min_asking_price")
+    mid = _first(summary_row, "median_asking_price")
+    high = _first(summary_row, "max_asking_price")
+    trimmed_low = _first(summary_row, "trimmed_low_asking_price") or low
+    trimmed_high = _first(summary_row, "trimmed_high_asking_price") or high
+    if not low or not mid:
+        return _range_values(basis="range_not_available_price_unavailable")
+
+    sensitivity = _first(summary_row, "outlier_sensitivity")
+    if confidence == "ambiguous_edition_match":
+        basis = "ambiguous_match_observed_asking_prices"
+        if sensitivity == "high_outlier_sensitivity":
+            basis = "ambiguous_match_high_outlier_sensitivity_observed_asking_prices"
+        return _range_values(low=low, mid=mid, basis=basis)
+    if confidence == "thin_market_evidence":
+        if sensitivity == "high_outlier_sensitivity":
+            return _range_values(
+                low=low,
+                mid=mid,
+                basis="thin_evidence_high_outlier_sensitivity_observed_asking_prices",
+            )
+        return _range_values(low=low, mid=mid, high=high, basis="thin_evidence_observed_asking_prices")
+    if confidence == "moderate_confidence_market_evidence":
+        return _range_values(
+            low=trimmed_low,
+            mid=mid,
+            high=trimmed_high,
+            basis="moderate_confidence_observed_asking_prices",
+        )
+    if confidence == "high_confidence_market_evidence":
+        if not trimmed_low or not trimmed_high:
+            return _range_values(basis="range_not_available_price_unavailable")
+        return _range_values(
+            low=trimmed_low,
+            mid=mid,
+            high=trimmed_high,
+            basis="high_confidence_observed_asking_prices",
+        )
+    return _range_values(basis="range_not_available_unknown_confidence")
+
+
+def _range_values(*, low: str = "", mid: str = "", high: str = "", basis: str) -> dict[str, str]:
+    return {
+        "likely_low": low,
+        "likely_mid": mid,
+        "likely_high": high,
+        "market_range_basis": basis,
+    }
 
 
 def _evidence_status(listings: list[Mapping[str, str]], status_rows: list[Mapping[str, str]]) -> str:

@@ -7,6 +7,7 @@ from valuation.market_evidence_summary import (
     MARKET_EVIDENCE_SUMMARY_FIELDNAMES,
     MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION,
     aggregate_market_evidence,
+    build_conservative_market_range,
     market_evidence_summary_fieldnames,
 )
 
@@ -19,8 +20,8 @@ def test_market_evidence_summary_fieldnames_returns_copy():
     assert "mutated" not in market_evidence_summary_fieldnames()
 
 
-def test_market_evidence_summary_schema_matches_pr4_contract():
-    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr4"
+def test_market_evidence_summary_schema_matches_pr5_contract():
+    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr5"
     assert MARKET_EVIDENCE_SUMMARY_BASENAME == "market_evidence_summary"
     assert MARKET_EVIDENCE_SUMMARY_FIELDNAMES == [
         "catalog_item_id",
@@ -130,7 +131,7 @@ def test_multiple_listings_aggregate_counts_prices_and_context():
     assert summary["trimmed_high_asking_price"] == "30.00"
     assert summary["research_score"] == "7"
     assert summary["research_band"] == "high"
-    assert summary["evidence_model_version"] == "0.5.0-pr4"
+    assert summary["evidence_model_version"] == "0.5.0-pr5"
 
 
 def test_status_rows_count_as_coverage_but_not_prices():
@@ -154,6 +155,10 @@ def test_status_rows_count_as_coverage_but_not_prices():
     assert summary["evidence_status"] == "observed_listings"
     assert summary["market_confidence"] == "thin_market_evidence"
     assert summary["outlier_sensitivity"] == "high_outlier_sensitivity"
+    assert summary["likely_low"] == "12.50"
+    assert summary["likely_mid"] == "12.50"
+    assert summary["likely_high"] == ""
+    assert summary["market_range_basis"] == "thin_evidence_high_outlier_sensitivity_observed_asking_prices"
     assert "excluded from asking-price calculations" in summary["evidence_notes"]
 
 
@@ -195,6 +200,8 @@ def test_mixed_currencies_are_not_combined():
     assert "Mixed currencies" in summary["evidence_notes"]
     assert summary["market_confidence"] == "mixed_currency_evidence"
     assert summary["outlier_sensitivity"] == "unknown_outlier_sensitivity"
+    assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
+    assert summary["market_range_basis"] == "range_not_available_mixed_currency"
 
 
 def test_status_only_row_leaves_reserved_fields_blank():
@@ -207,15 +214,9 @@ def test_status_only_row_leaves_reserved_fields_blank():
     assert summary["market_confidence"] == "source_unavailable"
     assert summary["outlier_sensitivity"] == "not_applicable"
     assert summary["best_match_confidence"] == ""
-    for field in (
-        "likely_low",
-        "likely_mid",
-        "likely_high",
-        "market_range_basis",
-        "review_recommendation",
-        "review_reason",
-        "fallback_research_priority",
-    ):
+    assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
+    assert summary["market_range_basis"] == "range_not_available_source_unavailable"
+    for field in ("review_recommendation", "review_reason", "fallback_research_priority"):
         assert summary[field] == ""
 
 
@@ -238,6 +239,31 @@ def test_high_confidence_market_evidence_has_low_outlier_sensitivity():
 
     assert summary["market_confidence"] == "high_confidence_market_evidence"
     assert summary["outlier_sensitivity"] == "low_outlier_sensitivity"
+    assert summary["likely_low"] == "10.00"
+    assert summary["likely_mid"] == "12.00"
+    assert summary["likely_high"] == "14.00"
+    assert summary["market_range_basis"] == "high_confidence_observed_asking_prices"
+
+
+def test_high_confidence_range_uses_distinct_trimmed_bounds():
+    result = build_conservative_market_range(
+        {
+            "market_confidence": "high_confidence_market_evidence",
+            "outlier_sensitivity": "moderate_outlier_sensitivity",
+            "min_asking_price": "5.00",
+            "median_asking_price": "20.00",
+            "max_asking_price": "100.00",
+            "trimmed_low_asking_price": "10.00",
+            "trimmed_high_asking_price": "40.00",
+        }
+    )
+
+    assert result == {
+        "likely_low": "10.00",
+        "likely_mid": "20.00",
+        "likely_high": "40.00",
+        "market_range_basis": "high_confidence_observed_asking_prices",
+    }
 
 
 def test_moderate_confidence_market_evidence():
@@ -247,6 +273,10 @@ def test_moderate_confidence_market_evidence():
 
     assert summary["market_confidence"] == "moderate_confidence_market_evidence"
     assert summary["outlier_sensitivity"] == "low_outlier_sensitivity"
+    assert summary["likely_low"] == "10.00"
+    assert summary["likely_mid"] == "15.00"
+    assert summary["likely_high"] == "20.00"
+    assert summary["market_range_basis"] == "moderate_confidence_observed_asking_prices"
 
 
 def test_ambiguous_edition_match_outranks_listing_volume():
@@ -255,6 +285,10 @@ def test_ambiguous_edition_match_outranks_listing_volume():
     )[0]
 
     assert summary["market_confidence"] == "ambiguous_edition_match"
+    assert summary["likely_low"] == "10.00"
+    assert summary["likely_mid"] == "12.00"
+    assert summary["likely_high"] == ""
+    assert summary["market_range_basis"] == "ambiguous_match_observed_asking_prices"
 
 
 def test_price_unavailable_evidence():
@@ -264,6 +298,8 @@ def test_price_unavailable_evidence():
 
     assert summary["market_confidence"] == "price_unavailable_evidence"
     assert summary["outlier_sensitivity"] == "unknown_outlier_sensitivity"
+    assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
+    assert summary["market_range_basis"] == "range_not_available_price_unavailable"
 
 
 def test_no_market_evidence_and_no_query_categories():
@@ -278,8 +314,10 @@ def test_no_market_evidence_and_no_query_categories():
 
     assert no_evidence["market_confidence"] == "no_market_evidence"
     assert no_evidence["outlier_sensitivity"] == "not_applicable"
+    assert no_evidence["market_range_basis"] == "range_not_available_no_market_evidence"
     assert no_query["market_confidence"] == "no_query"
     assert no_query["outlier_sensitivity"] == "not_applicable"
+    assert no_query["market_range_basis"] == "range_not_available_no_query"
 
 
 def test_outlier_sensitivity_moderate_and_high_spread():
@@ -293,6 +331,8 @@ def test_outlier_sensitivity_moderate_and_high_spread():
     assert moderate["outlier_sensitivity"] == "moderate_outlier_sensitivity"
     assert high["outlier_sensitivity"] == "high_outlier_sensitivity"
     assert high["market_confidence"] == "unknown_market_confidence"
+    assert high["likely_high"] == ""
+    assert high["market_range_basis"] == "range_not_available_unknown_confidence"
 
 
 def test_pipeline_entry_point_writes_csv_and_xlsx(tmp_path):
