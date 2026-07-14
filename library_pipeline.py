@@ -60,6 +60,10 @@ from valuation.market_observation_coverage import (
     MARKET_OBSERVATION_COVERAGE_FIELDNAMES,
     build_market_observation_coverage_rows,
 )
+from valuation.market_evidence_summary import (
+    MARKET_EVIDENCE_SUMMARY_FIELDNAMES,
+    aggregate_market_evidence,
+)
 from valuation.research_assessments import (
     RESEARCH_MODEL_VERSION,
     acquisition_snapshot_hash,
@@ -1258,6 +1262,13 @@ def report_market_observation_coverage(output_dir: Path) -> int:
     return len(report_rows)
 
 
+def summarize_market_evidence(observations: Path, output_csv: Path, output_xlsx: Path) -> int:
+    summary_rows = aggregate_market_evidence(read_csv_rows(observations))
+    write_csv(output_csv, MARKET_EVIDENCE_SUMMARY_FIELDNAMES, summary_rows)
+    write_xlsx(output_xlsx, MARKET_EVIDENCE_SUMMARY_FIELDNAMES, summary_rows, "Market Evidence Summary")
+    return len(summary_rows)
+
+
 def analyze_market_validation(output_dir: Path) -> int:
     sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
     observation_rows = read_csv_rows(output_dir / "market_observations.csv")
@@ -2146,6 +2157,11 @@ def build_parser() -> argparse.ArgumentParser:
     coverage_parser = subparsers.add_parser("report-market-observation-coverage")
     coverage_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
+    evidence_summary_parser = subparsers.add_parser("summarize-market-evidence")
+    evidence_summary_parser.add_argument("--observations", type=Path, default=Path("output/market_observations.csv"))
+    evidence_summary_parser.add_argument("--output-csv", type=Path, default=Path("output/market_evidence_summary.csv"))
+    evidence_summary_parser.add_argument("--output-xlsx", type=Path, default=Path("output/market_evidence_summary.xlsx"))
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2263,6 +2279,10 @@ def main(argv: list[str] | None = None) -> int:
             count = report_market_observation_coverage(args.output_dir)
             csv_path, xlsx_path = paired_output_paths(args.output_dir / "market_observation_coverage_report.csv")
             print(f"Wrote {count} market observation coverage rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "summarize-market-evidence":
+            count = summarize_market_evidence(args.observations, args.output_csv, args.output_xlsx)
+            print(f"Wrote {count} market evidence summary rows to {args.output_csv} and {args.output_xlsx}")
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

@@ -1,9 +1,12 @@
 import csv
 
+from library_pipeline import summarize_market_evidence
+
 from valuation.market_evidence_summary import (
     MARKET_EVIDENCE_SUMMARY_BASENAME,
     MARKET_EVIDENCE_SUMMARY_FIELDNAMES,
     MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION,
+    aggregate_market_evidence,
     market_evidence_summary_fieldnames,
 )
 
@@ -16,8 +19,8 @@ def test_market_evidence_summary_fieldnames_returns_copy():
     assert "mutated" not in market_evidence_summary_fieldnames()
 
 
-def test_market_evidence_summary_schema_matches_pr2_contract():
-    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr2"
+def test_market_evidence_summary_schema_matches_pr3_contract():
+    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr3"
     assert MARKET_EVIDENCE_SUMMARY_BASENAME == "market_evidence_summary"
     assert MARKET_EVIDENCE_SUMMARY_FIELDNAMES == [
         "catalog_item_id",
@@ -78,3 +81,154 @@ def test_market_evidence_summary_csv_header_matches_schema(tmp_path):
         writer.writeheader()
 
     assert path.read_text(encoding="utf-8").splitlines()[0] == ",".join(MARKET_EVIDENCE_SUMMARY_FIELDNAMES)
+
+
+def observation(**overrides):
+    row = {
+        "observation_id": "OBS1",
+        "catalog_id": "BK000001",
+        "isbn13": "9780000000001",
+        "isbn10": "0000000001",
+        "title": "Example Book",
+        "author": "Example Author",
+        "research_score": "7",
+        "score_band": "high",
+        "source": "abebooks",
+        "lookup_status": "observed",
+        "lookup_strategy": "isbn13",
+        "asking_price": "10.00",
+        "currency": "USD",
+        "match_confidence": "high",
+    }
+    row.update(overrides)
+    return row
+
+
+def test_multiple_listings_aggregate_counts_prices_and_context():
+    rows = [
+        observation(asking_price="10.00", match_confidence="medium"),
+        observation(observation_id="OBS2", asking_price="20.00", lookup_strategy="title_author"),
+        observation(observation_id="OBS3", asking_price="30.00", match_confidence="low"),
+    ]
+
+    summary = aggregate_market_evidence(rows, generated_at="2026-07-14T00:00:00Z")[0]
+
+    assert list(summary) == MARKET_EVIDENCE_SUMMARY_FIELDNAMES
+    assert summary["catalog_item_id"] == "BK000001"
+    assert summary["isbn_13"] == "9780000000001"
+    assert summary["observation_count"] == "3"
+    assert summary["listing_count"] == "3"
+    assert summary["status_row_count"] == "0"
+    assert summary["source_count"] == "1"
+    assert summary["observed_source_names"] == "abebooks"
+    assert summary["lookup_strategy"] == "isbn13 | title_author"
+    assert summary["currency"] == "USD"
+    assert summary["min_asking_price"] == "10.00"
+    assert summary["median_asking_price"] == "20.00"
+    assert summary["max_asking_price"] == "30.00"
+    assert summary["trimmed_low_asking_price"] == "10.00"
+    assert summary["trimmed_high_asking_price"] == "30.00"
+    assert summary["research_score"] == "7"
+    assert summary["research_band"] == "high"
+    assert summary["evidence_model_version"] == "0.5.0-pr3"
+
+
+def test_status_rows_count_as_coverage_but_not_prices():
+    rows = [
+        observation(asking_price="12.50"),
+        observation(
+            observation_id="STATUS1",
+            lookup_status="no_results",
+            asking_price="999.00",
+            currency="USD",
+            match_confidence="unknown",
+        ),
+    ]
+
+    summary = aggregate_market_evidence(rows, generated_at="2026-07-14T00:00:00Z")[0]
+
+    assert summary["observation_count"] == "2"
+    assert summary["listing_count"] == "1"
+    assert summary["status_row_count"] == "1"
+    assert summary["median_asking_price"] == "12.50"
+    assert summary["evidence_status"] == "observed_listings"
+    assert "excluded from asking-price calculations" in summary["evidence_notes"]
+
+
+def test_match_confidence_counts_and_best_are_deterministic():
+    rows = [
+        observation(match_confidence="unknown"),
+        observation(observation_id="OBS2", match_confidence="low"),
+        observation(observation_id="OBS3", match_confidence="medium"),
+        observation(observation_id="OBS4", match_confidence="high"),
+        observation(observation_id="OBS5", match_confidence="unexpected"),
+    ]
+
+    summary = aggregate_market_evidence(reversed(rows), generated_at="2026-07-14T00:00:00Z")[0]
+
+    assert summary["best_match_confidence"] == "high"
+    assert summary["high_confidence_listing_count"] == "1"
+    assert summary["medium_confidence_listing_count"] == "1"
+    assert summary["low_confidence_listing_count"] == "1"
+    assert summary["unknown_confidence_listing_count"] == "2"
+
+
+def test_mixed_currencies_are_not_combined():
+    rows = [
+        observation(asking_price="10.00", currency="USD"),
+        observation(observation_id="OBS2", asking_price="15.00", currency="GBP"),
+    ]
+
+    summary = aggregate_market_evidence(rows, generated_at="2026-07-14T00:00:00Z")[0]
+
+    for field in (
+        "currency",
+        "min_asking_price",
+        "median_asking_price",
+        "max_asking_price",
+        "trimmed_low_asking_price",
+        "trimmed_high_asking_price",
+    ):
+        assert summary[field] == ""
+    assert "Mixed currencies" in summary["evidence_notes"]
+
+
+def test_status_only_row_leaves_reserved_fields_blank():
+    summary = aggregate_market_evidence(
+        [observation(lookup_status="source_unavailable", asking_price="", currency="")],
+        generated_at="2026-07-14T00:00:00Z",
+    )[0]
+
+    assert summary["evidence_status"] == "source_unavailable"
+    assert summary["best_match_confidence"] == ""
+    for field in (
+        "outlier_sensitivity",
+        "market_confidence",
+        "likely_low",
+        "likely_mid",
+        "likely_high",
+        "market_range_basis",
+        "review_recommendation",
+        "review_reason",
+        "fallback_research_priority",
+    ):
+        assert summary[field] == ""
+
+
+def test_pipeline_entry_point_writes_csv_and_xlsx(tmp_path):
+    observations = tmp_path / "market_observations.csv"
+    output_csv = tmp_path / "market_evidence_summary.csv"
+    output_xlsx = tmp_path / "market_evidence_summary.xlsx"
+    with observations.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(observation()))
+        writer.writeheader()
+        writer.writerow(observation())
+
+    count = summarize_market_evidence(observations, output_csv, output_xlsx)
+
+    assert count == 1
+    assert output_xlsx.exists()
+    with output_csv.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames == MARKET_EVIDENCE_SUMMARY_FIELDNAMES
+        assert list(reader)[0]["catalog_item_id"] == "BK000001"

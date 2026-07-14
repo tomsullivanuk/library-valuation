@@ -271,7 +271,7 @@ are conservative reference ranges based on seller asking prices and must remain
 visibly separate from completed-sale evidence, Research Assessment scoring, and
 collector decisions.
 
-The schema version for this generated artifact is `0.5.0-pr2`. The source of
+The schema and aggregation version for this generated artifact is `0.5.0-pr3`. The source of
 truth for column order in code is
 `valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
 
@@ -316,11 +316,24 @@ truth for column order in code is
 | `evidence_model_version` | Version of the summary, confidence, or range method used to generate populated evidence fields. |
 | `evidence_notes` | Short limitations, warnings, or provenance notes for human review. |
 
-PR2 defines the schema only. Later PRs may populate reserved interpretation,
-range, confidence, and recommendation fields from source-specific market
-observations. This PR does not aggregate `output/market_observations.csv` into
-the summary artifact and does not change Research Assessment scores, bands,
-signals, persisted assessment records, or monthly import behavior.
+PR3 aggregates source-neutral observation rows with:
+
+```bash
+python library_pipeline.py summarize-market-evidence \
+  --observations output/market_observations.csv \
+  --output-csv output/market_evidence_summary.csv \
+  --output-xlsx output/market_evidence_summary.xlsx
+```
+
+Listing and source-status rows both contribute to coverage counts, while only
+listing rows with parseable prices and currencies contribute to asking-price
+statistics. When multiple currencies occur for a book, currency and all price
+summary fields remain blank rather than silently combining currencies. The
+trimmed reference fields equal observed minimum and maximum in PR3; later range
+logic may introduce documented trimming. Interpretation, market confidence,
+likely range, and review fields remain reserved and blank. These outputs remain
+generated, non-durable artifacts and do not change Research Assessment records
+or monthly import behavior.
 
 ## Future Generated Artifacts
 
