@@ -271,8 +271,8 @@ are conservative reference ranges based on seller asking prices and must remain
 visibly separate from completed-sale evidence, Research Assessment scoring, and
 collector decisions.
 
-The schema, aggregation, classification, and range prototype version for this
-generated artifact is `0.5.0-pr5`. The source of truth for column order in code is
+The schema, aggregation, classification, range, and review version for this
+generated artifact is `0.5.0-pr6`. The source of truth for column order in code is
 `valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
 
 | Field | Meaning |
@@ -306,9 +306,9 @@ generated artifact is `0.5.0-pr5`. The source of truth for column order in code 
 | `likely_mid` | Median-based reference in the asking-price-derived market range prototype, when supported. |
 | `likely_high` | Cautious high reference in the asking-price-derived market range prototype, omitted for ambiguous or highly sensitive evidence. |
 | `market_range_basis` | Stable method or unavailability reason explaining how the prototype range was handled. |
-| `review_recommendation` | Review disposition such as accept, verify, investigate, or fallback research. Reserved for later recommendation logic. |
-| `review_reason` | Explainable reason codes or short reason text supporting the review recommendation. Reserved for later recommendation logic. |
-| `fallback_research_priority` | Priority to use when market evidence is missing, thin, ambiguous, or low-confidence. Reserved for later bridge logic. |
+| `review_recommendation` | Stable next-action category derived primarily from market evidence quality and range support. |
+| `review_reason` | Machine-readable reason or reasons supporting the next-action category. |
+| `fallback_research_priority` | Existing Research Assessment priority exposed only when market evidence is missing or unavailable. It is not a price input. |
 | `research_score` | Existing Research Assessment score copied for review context only. It is not a hidden price input. |
 | `research_band` | Existing Research Assessment band copied for review context only. |
 | `triggered_signals` | Existing Research Signal codes copied for review context and fallback prioritization. |
@@ -390,7 +390,29 @@ Supported basis values are:
 - `ambiguous_match_observed_asking_prices`
 - `ambiguous_match_high_outlier_sensitivity_observed_asking_prices`
 
-PR6 recommendation, reason, and fallback-priority fields remain blank.
+### Review recommendation and fallback priority
+
+PR6 makes the market-evidence-first flow actionable in the generated Market
+Evidence Summary. It does not change durable Research Assessments, Collector
+Reviews, the monthly import, or the existing Collector Workbook generator.
+
+High- and moderate-confidence evidence is recommended for
+`review_for_possible_sale` when `likely_mid` is at least 50 or `likely_high` is
+at least 75. These are initial review-routing heuristics over asking prices, not
+value claims or statistically calibrated sale thresholds. Usable evidence below
+those thresholds is `market_evidence_sufficient`.
+
+Ambiguous matches route to `review_edition_or_condition`. Thin, mixed-currency,
+price-unavailable, and unknown-confidence evidence routes to
+`manual_market_research_needed`; the reason also identifies fragile evidence
+when outlier sensitivity is high. A missing usable query or insufficient core
+metadata routes to `metadata_cleanup_needed` before fallback research.
+
+When market evidence is missing or unavailable, existing Research Assessment
+bands are exposed as `fallback_research_priority`. High and medium priorities
+route to the recommendation of the same name. Low or absent priority routes to
+`no_action_needed`. Research Score and band never alter an available asking-price
+range or trigger a sale recommendation.
 
 ## Future Generated Artifacts
 

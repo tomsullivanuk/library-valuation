@@ -8,6 +8,7 @@ from valuation.market_evidence_summary import (
     MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION,
     aggregate_market_evidence,
     build_conservative_market_range,
+    build_review_recommendation,
     market_evidence_summary_fieldnames,
 )
 
@@ -20,8 +21,8 @@ def test_market_evidence_summary_fieldnames_returns_copy():
     assert "mutated" not in market_evidence_summary_fieldnames()
 
 
-def test_market_evidence_summary_schema_matches_pr5_contract():
-    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr5"
+def test_market_evidence_summary_schema_matches_pr6_contract():
+    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr6"
     assert MARKET_EVIDENCE_SUMMARY_BASENAME == "market_evidence_summary"
     assert MARKET_EVIDENCE_SUMMARY_FIELDNAMES == [
         "catalog_item_id",
@@ -131,7 +132,7 @@ def test_multiple_listings_aggregate_counts_prices_and_context():
     assert summary["trimmed_high_asking_price"] == "30.00"
     assert summary["research_score"] == "7"
     assert summary["research_band"] == "high"
-    assert summary["evidence_model_version"] == "0.5.0-pr5"
+    assert summary["evidence_model_version"] == "0.5.0-pr6"
 
 
 def test_status_rows_count_as_coverage_but_not_prices():
@@ -159,6 +160,9 @@ def test_status_rows_count_as_coverage_but_not_prices():
     assert summary["likely_mid"] == "12.50"
     assert summary["likely_high"] == ""
     assert summary["market_range_basis"] == "thin_evidence_high_outlier_sensitivity_observed_asking_prices"
+    assert summary["review_recommendation"] == "manual_market_research_needed"
+    assert "fragile_asking_price_evidence" in summary["review_reason"]
+    assert summary["fallback_research_priority"] == ""
     assert "excluded from asking-price calculations" in summary["evidence_notes"]
 
 
@@ -202,6 +206,8 @@ def test_mixed_currencies_are_not_combined():
     assert summary["outlier_sensitivity"] == "unknown_outlier_sensitivity"
     assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
     assert summary["market_range_basis"] == "range_not_available_mixed_currency"
+    assert summary["review_recommendation"] == "manual_market_research_needed"
+    assert summary["review_reason"] == "mixed_currency_evidence_requires_manual_research"
 
 
 def test_status_only_row_leaves_reserved_fields_blank():
@@ -216,8 +222,9 @@ def test_status_only_row_leaves_reserved_fields_blank():
     assert summary["best_match_confidence"] == ""
     assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
     assert summary["market_range_basis"] == "range_not_available_source_unavailable"
-    for field in ("review_recommendation", "review_reason", "fallback_research_priority"):
-        assert summary[field] == ""
+    assert summary["review_recommendation"] == "fallback_research_priority"
+    assert summary["review_reason"] == "market_evidence_unavailable_high_research_priority"
+    assert summary["fallback_research_priority"] == "high"
 
 
 def listing_rows(prices, *, match_confidence="high", currency="USD"):
@@ -243,6 +250,8 @@ def test_high_confidence_market_evidence_has_low_outlier_sensitivity():
     assert summary["likely_mid"] == "12.00"
     assert summary["likely_high"] == "14.00"
     assert summary["market_range_basis"] == "high_confidence_observed_asking_prices"
+    assert summary["review_recommendation"] == "market_evidence_sufficient"
+    assert summary["review_reason"] == "usable_market_evidence_below_sale_review_threshold"
 
 
 def test_high_confidence_range_uses_distinct_trimmed_bounds():
@@ -277,6 +286,7 @@ def test_moderate_confidence_market_evidence():
     assert summary["likely_mid"] == "15.00"
     assert summary["likely_high"] == "20.00"
     assert summary["market_range_basis"] == "moderate_confidence_observed_asking_prices"
+    assert summary["review_recommendation"] == "market_evidence_sufficient"
 
 
 def test_ambiguous_edition_match_outranks_listing_volume():
@@ -289,6 +299,8 @@ def test_ambiguous_edition_match_outranks_listing_volume():
     assert summary["likely_mid"] == "12.00"
     assert summary["likely_high"] == ""
     assert summary["market_range_basis"] == "ambiguous_match_observed_asking_prices"
+    assert summary["review_recommendation"] == "review_edition_or_condition"
+    assert summary["review_reason"] == "ambiguous_edition_or_condition_match"
 
 
 def test_price_unavailable_evidence():
@@ -300,6 +312,8 @@ def test_price_unavailable_evidence():
     assert summary["outlier_sensitivity"] == "unknown_outlier_sensitivity"
     assert summary["likely_low"] == summary["likely_mid"] == summary["likely_high"] == ""
     assert summary["market_range_basis"] == "range_not_available_price_unavailable"
+    assert summary["review_recommendation"] == "manual_market_research_needed"
+    assert summary["review_reason"] == "asking_price_unavailable_requires_manual_research"
 
 
 def test_no_market_evidence_and_no_query_categories():
@@ -315,9 +329,14 @@ def test_no_market_evidence_and_no_query_categories():
     assert no_evidence["market_confidence"] == "no_market_evidence"
     assert no_evidence["outlier_sensitivity"] == "not_applicable"
     assert no_evidence["market_range_basis"] == "range_not_available_no_market_evidence"
+    assert no_evidence["review_recommendation"] == "fallback_research_priority"
+    assert no_evidence["fallback_research_priority"] == "high"
     assert no_query["market_confidence"] == "no_query"
     assert no_query["outlier_sensitivity"] == "not_applicable"
     assert no_query["market_range_basis"] == "range_not_available_no_query"
+    assert no_query["review_recommendation"] == "metadata_cleanup_needed"
+    assert no_query["review_reason"] == "insufficient_metadata_for_market_lookup"
+    assert no_query["fallback_research_priority"] == "high"
 
 
 def test_outlier_sensitivity_moderate_and_high_spread():
@@ -333,6 +352,56 @@ def test_outlier_sensitivity_moderate_and_high_spread():
     assert high["market_confidence"] == "unknown_market_confidence"
     assert high["likely_high"] == ""
     assert high["market_range_basis"] == "range_not_available_unknown_confidence"
+    assert high["review_recommendation"] == "manual_market_research_needed"
+    assert "fragile_asking_price_evidence" in high["review_reason"]
+
+
+def test_meaningful_asking_price_range_recommends_possible_sale_review():
+    summary = aggregate_market_evidence(
+        listing_rows([50, 55, 60, 65, 70]), generated_at="2026-07-14T00:00:00Z"
+    )[0]
+
+    assert summary["market_confidence"] == "high_confidence_market_evidence"
+    assert summary["likely_mid"] == "60.00"
+    assert summary["review_recommendation"] == "review_for_possible_sale"
+    assert summary["review_reason"] == "asking_price_range_meets_initial_sale_review_threshold"
+    assert summary["fallback_research_priority"] == ""
+
+
+def test_high_side_threshold_can_trigger_possible_sale_review():
+    result = build_review_recommendation(
+        {
+            "market_confidence": "moderate_confidence_market_evidence",
+            "likely_mid": "45.00",
+            "likely_high": "75.00",
+            "research_band": "high",
+        }
+    )
+
+    assert result == {
+        "review_recommendation": "review_for_possible_sale",
+        "review_reason": "asking_price_range_meets_initial_sale_review_threshold",
+        "fallback_research_priority": "",
+    }
+
+
+def test_low_research_priority_without_market_evidence_needs_no_action():
+    summary = aggregate_market_evidence(
+        [
+            observation(
+                lookup_status="no_results",
+                asking_price="",
+                currency="",
+                research_score="4",
+                score_band="low",
+            )
+        ],
+        generated_at="2026-07-14T00:00:00Z",
+    )[0]
+
+    assert summary["review_recommendation"] == "no_action_needed"
+    assert summary["review_reason"] == "market_evidence_unavailable_low_research_priority"
+    assert summary["fallback_research_priority"] == "low"
 
 
 def test_pipeline_entry_point_writes_csv_and_xlsx(tmp_path):

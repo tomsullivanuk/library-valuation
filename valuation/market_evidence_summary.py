@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from statistics import median
 
 
-MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr5"
+MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr6"
 
 MARKET_EVIDENCE_SUMMARY_BASENAME = "market_evidence_summary"
 
@@ -61,6 +61,8 @@ def market_evidence_summary_fieldnames() -> list[str]:
 
 
 CONFIDENCE_STRENGTH = {"unknown": 0, "low": 1, "medium": 2, "high": 3}
+SALE_REVIEW_MID_THRESHOLD = Decimal("50")
+SALE_REVIEW_HIGH_THRESHOLD = Decimal("75")
 
 
 def aggregate_market_evidence(
@@ -164,6 +166,7 @@ def _summarize_group(rows: list[Mapping[str, str]], generated_at: str) -> dict[s
     values["outlier_sensitivity"] = classify_outlier_sensitivity(values)
     values["market_confidence"] = classify_market_confidence(values)
     values.update(build_conservative_market_range(values))
+    values.update(build_review_recommendation(values))
     return {field: values.get(field, "") for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
 
 
@@ -279,6 +282,105 @@ def _range_values(*, low: str = "", mid: str = "", high: str = "", basis: str) -
         "likely_mid": mid,
         "likely_high": high,
         "market_range_basis": basis,
+    }
+
+
+def build_review_recommendation(summary_row: Mapping[str, str]) -> dict[str, str]:
+    """Recommend human review from market evidence, with Research Signals as fallback only."""
+    confidence = _first(summary_row, "market_confidence")
+    fallback_priority = _fallback_research_priority(summary_row)
+
+    if _needs_metadata_cleanup(summary_row):
+        return _review_values(
+            "metadata_cleanup_needed",
+            "insufficient_metadata_for_market_lookup",
+            fallback_priority,
+        )
+    if confidence == "ambiguous_edition_match":
+        return _review_values(
+            "review_edition_or_condition",
+            "ambiguous_edition_or_condition_match",
+            fallback_priority,
+        )
+    if confidence in {
+        "thin_market_evidence",
+        "price_unavailable_evidence",
+        "mixed_currency_evidence",
+        "unknown_market_confidence",
+    }:
+        reason = {
+            "thin_market_evidence": "thin_market_evidence_requires_manual_research",
+            "price_unavailable_evidence": "asking_price_unavailable_requires_manual_research",
+            "mixed_currency_evidence": "mixed_currency_evidence_requires_manual_research",
+            "unknown_market_confidence": "uncertain_market_evidence_requires_manual_research",
+        }[confidence]
+        if _first(summary_row, "outlier_sensitivity") == "high_outlier_sensitivity":
+            reason += ";fragile_asking_price_evidence"
+        return _review_values("manual_market_research_needed", reason, fallback_priority)
+    if confidence in {"high_confidence_market_evidence", "moderate_confidence_market_evidence"}:
+        mid = _decimal(_first(summary_row, "likely_mid"))
+        high = _decimal(_first(summary_row, "likely_high"))
+        if (mid is not None and mid >= SALE_REVIEW_MID_THRESHOLD) or (
+            high is not None and high >= SALE_REVIEW_HIGH_THRESHOLD
+        ):
+            return _review_values(
+                "review_for_possible_sale",
+                "asking_price_range_meets_initial_sale_review_threshold",
+                "",
+            )
+        return _review_values(
+            "market_evidence_sufficient",
+            "usable_market_evidence_below_sale_review_threshold",
+            "",
+        )
+    if confidence in {"no_market_evidence", "source_unavailable", "no_query"}:
+        if fallback_priority in {"high", "medium"}:
+            return _review_values(
+                "fallback_research_priority",
+                f"market_evidence_unavailable_{fallback_priority}_research_priority",
+                fallback_priority,
+            )
+        return _review_values(
+            "no_action_needed",
+            "market_evidence_unavailable_low_research_priority",
+            fallback_priority,
+        )
+    return _review_values("no_action_needed", "no_review_rule_triggered", fallback_priority)
+
+
+def _fallback_research_priority(summary_row: Mapping[str, str]) -> str:
+    confidence = _first(summary_row, "market_confidence")
+    if confidence not in {"no_market_evidence", "source_unavailable", "no_query"}:
+        return ""
+    band = _first(summary_row, "research_band").casefold()
+    if band in {"high", "medium", "low", "none"}:
+        return band
+    score = _integer(_first(summary_row, "research_score"))
+    if score >= 30:
+        return "high"
+    if score >= 15:
+        return "medium"
+    if score >= 1:
+        return "low"
+    return "none"
+
+
+def _needs_metadata_cleanup(summary_row: Mapping[str, str]) -> bool:
+    if _first(summary_row, "market_confidence") == "no_query":
+        return True
+    missing_title_or_author = not _first(summary_row, "title") or not _first(summary_row, "author")
+    return missing_title_or_author and _first(summary_row, "market_confidence") in {
+        "ambiguous_edition_match",
+        "no_market_evidence",
+        "source_unavailable",
+    }
+
+
+def _review_values(recommendation: str, reason: str, fallback_priority: str) -> dict[str, str]:
+    return {
+        "review_recommendation": recommendation,
+        "review_reason": reason,
+        "fallback_research_priority": fallback_priority,
     }
 
 
