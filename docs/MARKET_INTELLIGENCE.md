@@ -255,6 +255,73 @@ score. The comparison should help determine whether the Research Assessment
 model is useful for identifying books that are materially more likely to possess
 meaningful market value.
 
+## Market Evidence Summary Schema
+
+`output/market_evidence_summary.csv` and
+`output/market_evidence_summary.xlsx` are the v0.5.0 generated per-book Market
+Evidence Summary artifacts. They are source-neutral outputs derived from market
+observations and catalog context. They are not durable repository records, and
+the monthly Amazon import workflow must not read them back as source-of-truth
+data.
+
+The summary is designed to make observed asking-price evidence reviewable
+without describing the output as an appraisal, fair market value, realized sale
+price, pricing guarantee, or definitive valuation. Asking-price-derived ranges
+are conservative reference ranges based on seller asking prices and must remain
+visibly separate from completed-sale evidence, Research Assessment scoring, and
+collector decisions.
+
+The schema version for this generated artifact is `0.5.0-pr2`. The source of
+truth for column order in code is
+`valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
+
+| Field | Meaning |
+| --- | --- |
+| `catalog_item_id` | Stable catalog item identifier for the summarized book. |
+| `isbn_13` | Catalog ISBN-13 used for identity and review context, when available. |
+| `isbn_10` | Catalog ISBN-10 used for identity and review context, when available. |
+| `title` | Catalog title shown for human review. |
+| `author` | Catalog author or contributor text shown for human review. |
+| `observation_count` | Total source observation rows considered for the catalog item, including listing and status rows. |
+| `listing_count` | Count of observation rows that represent parsed asking-price listings. |
+| `status_row_count` | Count of lookup-status or diagnostic rows that do not represent listings. |
+| `source_count` | Count of distinct market sources represented in the observations. |
+| `observed_source_names` | Stable, delimited source names represented in the summary. |
+| `lookup_strategy` | Stable, delimited lookup strategies used across the observations. |
+| `best_match_confidence` | Highest listing match-confidence level available for the catalog item. |
+| `high_confidence_listing_count` | Listing count with high match confidence. |
+| `medium_confidence_listing_count` | Listing count with medium match confidence. |
+| `low_confidence_listing_count` | Listing count with low match confidence. |
+| `unknown_confidence_listing_count` | Listing count with missing or unknown match confidence. |
+| `currency` | Currency for the asking-price evidence, when a single currency can be stated safely. |
+| `min_asking_price` | Lowest observed asking price among eligible listing evidence. |
+| `median_asking_price` | Median observed asking price among eligible listing evidence. |
+| `max_asking_price` | Highest observed asking price among eligible listing evidence. |
+| `trimmed_low_asking_price` | Lower asking-price reference after documented outlier handling. Reserved for later range logic. |
+| `trimmed_high_asking_price` | Upper asking-price reference after documented outlier handling. Reserved for later range logic. |
+| `evidence_status` | Evidence availability or usability status. Reserved for later classification logic. |
+| `outlier_sensitivity` | Indicator of whether asking-price evidence is materially affected by outliers. Reserved for later classification logic. |
+| `market_confidence` | Evidence-quality classification based on coverage, match quality, usable listing count, and ambiguity. Reserved for later confidence rules. |
+| `likely_low` | Conservative low end of an asking-price-derived market range. Reserved for later range logic. |
+| `likely_mid` | Conservative midpoint or reference point of an asking-price-derived market range. Reserved for later range logic. |
+| `likely_high` | Conservative high end of an asking-price-derived market range. Reserved for later range logic. |
+| `market_range_basis` | Short method or reason text explaining the range basis. Reserved for later range logic. |
+| `review_recommendation` | Review disposition such as accept, verify, investigate, or fallback research. Reserved for later recommendation logic. |
+| `review_reason` | Explainable reason codes or short reason text supporting the review recommendation. Reserved for later recommendation logic. |
+| `fallback_research_priority` | Priority to use when market evidence is missing, thin, ambiguous, or low-confidence. Reserved for later bridge logic. |
+| `research_score` | Existing Research Assessment score copied for review context only. It is not a hidden price input. |
+| `research_band` | Existing Research Assessment band copied for review context only. |
+| `triggered_signals` | Existing Research Signal codes copied for review context and fallback prioritization. |
+| `evidence_generated_at` | Timestamp when the generated summary artifact was produced. |
+| `evidence_model_version` | Version of the summary, confidence, or range method used to generate populated evidence fields. |
+| `evidence_notes` | Short limitations, warnings, or provenance notes for human review. |
+
+PR2 defines the schema only. Later PRs may populate reserved interpretation,
+range, confidence, and recommendation fields from source-specific market
+observations. This PR does not aggregate `output/market_observations.csv` into
+the summary artifact and does not change Research Assessment scores, bands,
+signals, persisted assessment records, or monthly import behavior.
+
 ## Future Generated Artifacts
 
 Likely future generated outputs include:
@@ -274,6 +341,8 @@ Likely future generated outputs include:
 - `calibration_simulation.csv`
 - `calibration_simulation_summary.csv`
 - `calibration_simulation_candidate_movements.csv`
+- `market_evidence_summary.csv`
+- `market_evidence_summary.xlsx`
 - `market_values.csv`
 - `market_validation_report.md`
 
