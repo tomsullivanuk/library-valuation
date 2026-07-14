@@ -204,12 +204,21 @@ durable truth by the monthly workflow.
 
 ## 9. Proposed PR Sequence
 
+Implementation status: PR1 through PR6 are complete. PR7 aligns release-facing
+documentation and records final acceptance evidence. The implemented summary
+model version is `0.5.0-pr6`; no durable schema or monthly-import change was
+introduced.
+
 ### PR1 — Market-Evidence-First Design Brief
+
+Status: complete.
 
 Create this release plan and establish terminology, scope, boundaries, risks,
 and sequencing. No application behavior or durable schema changes.
 
 ### PR2 — Market Evidence Summary Schema
+
+Status: complete.
 
 Define the source-neutral contracts for evidence summaries, provenance,
 exclusions, ambiguity, confidence inputs, currencies, and method versions.
@@ -219,17 +228,23 @@ accident.
 
 ### PR3 — Market Evidence Aggregation
 
+Status: complete.
+
 Aggregate source-specific observations into deterministic per-book summaries.
 Preserve raw evidence references, reject or flag incompatible observations, and
 isolate AbeBooks-specific behavior behind the source boundary.
 
 ### PR4 — Market Confidence Classification
 
+Status: complete.
+
 Introduce explainable confidence levels and reason codes based on match quality,
 usable listing count, source coverage, and known ambiguity. Confidence should be
 testable independently from price calculations.
 
 ### PR5 — Conservative Market Range Prototype
+
+Status: complete.
 
 Produce a cautious, versioned asking-price-derived range for evidence that meets
 explicit eligibility rules. Show exclusions, currency assumptions, sample size,
@@ -238,11 +253,16 @@ review instead of manufacturing precision.
 
 ### PR6 — Research Candidate / Collector Workbook Refresh
 
+Status: complete in the generated Market Evidence Summary. The existing monthly
+Collector Workbook generator remains unchanged.
+
 Update generated collector outputs so market range, market confidence, and
 review recommendation are distinct. Use Research Signals as fallback and review
 context rather than a substitute price when usable market evidence exists.
 
 ### PR7 — Documentation, Release Notes, and Acceptance Test Refresh
+
+Status: in release-readiness review.
 
 Align architecture, roadmap, backlog, README, release notes, and release
 checklist with the implemented behavior, then complete acceptance testing. PR7

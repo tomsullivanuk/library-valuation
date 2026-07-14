@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.5.0 - 2026-07-14
+
+Release focus: Market Evidence First.
+
+Added:
+
+- Generated source-neutral Market Evidence Summary CSV and XLSX artifacts.
+- Deterministic aggregation of listing and status observations by catalog item.
+- Market confidence and outlier-sensitivity classifications.
+- A conservative asking-price-derived market range prototype.
+- Review recommendations and fallback Research Assessment priority context.
+- Versioned evidence notes, method provenance, and stable reason codes.
+
+Changed:
+
+- Market observations are now the primary evidence where usable.
+- Research Signals are positioned as fallback, uncertainty, metadata-cleanup,
+  and review-prioritization inputs rather than price evidence.
+- Release documentation now distinguishes raw observations, evidence quality,
+  descriptive ranges, and recommended human review.
+
+Unchanged:
+
+- Production Research Assessment scoring, signals, weights, and bands.
+- Durable catalog, acquisition, assessment, and Collector Review records.
+- Monthly `update-library` behavior and AbeBooks collection behavior.
+
+Known limitations:
+
+- Current price evidence consists of seller asking prices, not completed sales.
+- Currency conversion is not performed; mixed currencies suppress range output.
+- Edition and condition matching remain lightweight and may require review.
+- Range and sale-review thresholds are initial deterministic heuristics, not
+  statistically calibrated estimates of realizable proceeds.
+
 ## v0.4.0 - 2026-07-13
 
 Release focus: Market Validation and Market Intelligence research infrastructure.

@@ -164,6 +164,10 @@ Current generated outputs include:
 - `collector_workbook.xlsx`: generated multi-sheet collector workbook over
   current durable state and generated Research Candidate rows. Its Summary
   sheet is a collector dashboard, and workbook edits are not imported.
+- `market_observations.csv` / `.xlsx`: source-specific generated listing and
+  lookup-status observations.
+- `market_evidence_summary.csv` / `.xlsx`: source-neutral generated per-book
+  evidence coverage, confidence, asking-price-derived range, and review guidance.
 
 ### Identity And Matching
 
@@ -248,6 +252,31 @@ not represent completed sales or complete market truth.
 The v0.4.0 decision preserves the current single Research Score. Future model
 design may separate market likelihood from research effort, but no new score or
 schema is introduced in this release.
+
+## v0.5.0 Market-Evidence-First Architecture
+
+Version 0.5.0 adds an opt-in generated transformation after market collection:
+
+```text
+Source-specific market observations
+        |
+        v
+Source-neutral Market Evidence Summary
+        |
+        +--> availability and coverage
+        +--> market confidence and outlier sensitivity
+        +--> cautious asking-price-derived range
+        +--> review recommendation or fallback research priority
+```
+
+The summary is regenerated under `output/`; it is not a repository and is not
+an input to `update-library`. Research Assessment score and band are copied only
+as fallback review context when market evidence is unavailable. They do not
+change asking-price statistics, confidence, or range calculations.
+
+Source adapters remain separate from aggregation and interpretation. AbeBooks
+collection stays in `valuation/abebooks.py`; source-neutral summary behavior
+stays in `valuation/market_evidence_summary.py`.
 
 ## Source-of-Truth Principle
 

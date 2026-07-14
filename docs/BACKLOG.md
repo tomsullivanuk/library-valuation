@@ -5,6 +5,20 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ---
 
+## v0.5.0 Market-Evidence-First Work
+
+- [x] Define the generated Market Evidence Summary schema and version.
+- [x] Aggregate source-specific market observations per catalog item.
+- [x] Classify market confidence and outlier sensitivity deterministically.
+- [x] Produce a cautious asking-price-derived range prototype.
+- [x] Generate review recommendations and fallback research priority.
+- [x] Document the generated/non-durable boundary and non-appraisal terminology.
+- [ ] Add another independent market source or completed-sale evidence.
+- [ ] Calibrate range and review thresholds against broader evidence.
+- [ ] Decide whether a future durable observation repository is justified.
+
+---
+
 ## v0.4.0 Validation Work
 
 ### Valuation
@@ -28,11 +42,11 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   production scoring changes
 - [x] Complete the v0.4.0 release-readiness review with production Research
   Assessment scoring unchanged
-- [ ] Create a temporary valuation workbook for sampled books
+- [x] Create a generated per-book market evidence summary for observed books
 - [ ] Review false-positive and false-negative candidates from PR8
 - [ ] Persistent valuation repository
-- [ ] First external valuation source (AbeBooks or eBay)
-- [ ] "Books Worth Investigating" report
+- [x] First experimental external asking-price source (AbeBooks)
+- [x] Generated review recommendation and fallback-priority fields
 - [ ] Incremental valuation (only value new books)
 
 ### Workflow

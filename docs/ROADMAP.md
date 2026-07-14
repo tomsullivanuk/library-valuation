@@ -318,6 +318,29 @@ Exit condition:
   information about market value, and follow-on valuation work is grounded in
   that evidence.
 
+## v0.5.0: Market Evidence First
+
+Version 0.5.0 implements the generated, source-neutral evidence layer proposed
+after the v0.4.0 experiment.
+
+Completed outcomes:
+
+- Defined the versioned Market Evidence Summary schema.
+- Aggregated source-specific observation and status rows per catalog item.
+- Classified evidence availability, market confidence, and outlier sensitivity.
+- Produced a cautious asking-price-derived range only where supported.
+- Added review recommendations that account for evidence usability, ambiguity,
+  fragility, and initial economic-interest thresholds.
+- Repositioned Research Signals as fallback and review-prioritization context
+  when market evidence is missing or unavailable.
+- Preserved production Research Assessment scoring and monthly import behavior.
+- Kept all market summary artifacts generated and non-durable.
+
+Exit condition:
+
+- A user can transform market observations into an explainable per-book summary
+  without confusing asking prices with completed sales or formal appraisals.
+
 ## Later: Top-25 Market Research Workflow
 
 After the Market Validation Spike, the project may create a focused workflow

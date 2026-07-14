@@ -118,8 +118,10 @@ Examples:
 - `appraise`
 - `insure`
 
-Recommendations are future work. Market Intelligence should provide evidence for
-recommendations, not produce recommendations itself.
+Formal collector decisions such as appraise or insure remain future work. The
+v0.5.0 Market Evidence Summary produces narrower review-routing recommendations,
+such as manual research or edition review, while leaving durable collector
+decisions to the user-owned review workflow.
 
 ## Lookup Strategy
 
@@ -414,9 +416,9 @@ route to the recommendation of the same name. Low or absent priority routes to
 `no_action_needed`. Research Score and band never alter an available asking-price
 range or trigger a sale recommendation.
 
-## Future Generated Artifacts
+## Generated And Future Artifacts
 
-Likely future generated outputs include:
+Implemented generated outputs and possible future outputs include:
 
 - `market_validation_sample.csv`
 - `market_validation_sample_metadata.csv`

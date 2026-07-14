@@ -1,5 +1,50 @@
 # Release Checklist
 
+## v0.5.0
+
+Pre-release checks:
+
+- [x] Run `.venv/bin/python -m pytest`.
+- [x] Run `python3 -m compileall valuation library_pipeline.py tests`.
+- [x] Run `git diff --check`.
+- [x] Confirm `summarize-market-evidence --help` matches documented options.
+- [x] Confirm focused Market Evidence Summary tests cover aggregation,
+  confidence, outlier sensitivity, range, and review recommendations.
+- [x] Confirm production Research Assessment scoring, signals, weights, and
+  bands are unchanged.
+- [x] Confirm monthly `update-library` and durable data behavior are unchanged.
+- [x] Confirm Market Evidence Summary artifacts remain generated and untracked.
+- [x] Confirm mixed currencies are not converted or combined.
+- [x] Confirm asking-price-derived ranges use non-appraisal terminology.
+- [x] Confirm internal Markdown links resolve.
+
+Release hygiene:
+
+- [x] Confirm `CHANGELOG.md` includes v0.5.0.
+- [x] Confirm `docs/RELEASE_NOTES_v0.5.0.md` is ready for the GitHub Release.
+- [x] Confirm `docs/RELEASE_READINESS_v0.5.0.md` records final scope,
+  acceptance evidence, and limitations.
+- [x] Confirm README, architecture, data model, roadmap, backlog, Market
+  Intelligence, and release plan describe the same generated workflow.
+- [ ] Confirm the working tree is clean after the PR7 commit.
+- [ ] Create the annotated tag with `git tag -a v0.5.0 -m "Release v0.5.0"`.
+- [ ] Push the commit and tag.
+- [ ] Create the GitHub Release using `docs/RELEASE_NOTES_v0.5.0.md`.
+
+Post-release smoke checks:
+
+- [ ] Confirm `library_pipeline.py --help` lists `summarize-market-evidence`.
+- [ ] Run the summary command against preserved generated observations.
+- [ ] Inspect the CSV/XLSX field order and a mixed-currency caution row.
+- [ ] Confirm the GitHub Release links to the correct tag and release notes.
+
+Known post-release follow-up:
+
+- Add independent sources and completed-sale evidence.
+- Calibrate initial range and sale-review thresholds beyond the v0.4.0 sample.
+- Improve edition and condition matching.
+- Decide whether market observation history should become durable.
+
 ## v0.4.0
 
 Pre-release checks:

@@ -394,6 +394,24 @@ Data classification:
 - Regenerated: automated market collection may regenerate new observations, but
   past observations should not be overwritten.
 
+### Generated Market Evidence Summary
+
+`output/market_evidence_summary.csv` and `.xlsx` contain one generated row per
+catalog item represented in the observation input. They summarize observation
+coverage, match quality, usable single-currency asking prices, market
+confidence, outlier sensitivity, a cautious asking-price-derived range, and
+review guidance.
+
+The summary is source neutral and versioned. It is not durable market history,
+does not replace raw observation provenance, and must not be read by the monthly
+import as canonical data. Mixed currencies are not converted or combined.
+Research Assessment fields are copied only for fallback review priority when
+market evidence is missing or unavailable; they are not price inputs.
+
+The `likely_low`, `likely_mid`, and `likely_high` fields are descriptive
+asking-price-derived references. They are not appraisals, fair market value,
+realized sale prices, definitive valuations, or guaranteed proceeds.
+
 ### Valuation Estimate
 
 A `Valuation Estimate` converts market observations and heuristics into an

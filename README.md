@@ -55,8 +55,8 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
-- `docs/MARKET_INTELLIGENCE.md`: v0.4.0 architecture for external market
-  observations and future valuation evidence.
+- `docs/MARKET_INTELLIGENCE.md`: v0.5.0 market-evidence-first architecture,
+  generated summary schema, confidence, range, and review rules.
 - `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether
   Research Score predicts market value.
 - `docs/MARKET_VALIDATION_FINDINGS_v0.4.0.md`: provisional findings and
@@ -68,6 +68,9 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/RELEASE_READINESS_v0.4.0.md`: verified v0.4.0 release scope, commands,
   generated artifacts, limitations, and remaining release steps.
 - `docs/RELEASE_NOTES_v0.4.0.md`: concise user-facing v0.4.0 release summary.
+- `docs/RELEASE_NOTES_v0.5.0.md`: concise user-facing v0.5.0 release summary.
+- `docs/RELEASE_READINESS_v0.5.0.md`: v0.5.0 scope, acceptance evidence, and
+  remaining release steps.
 - `docs/RELEASE_CHECKLIST.md`: release-readiness checklist.
 
 ## Developer Setup
@@ -336,6 +339,32 @@ The resulting [Calibration Scenario Review](docs/CALIBRATION_SCENARIO_REVIEW_v0.
 records the decision not to change production scoring in v0.4.0. A future model
 may separate market likelihood from research effort, but that redesign is not
 part of this release.
+
+### v0.5.0 Market-Evidence-First Workflow
+
+Version 0.5.0 turns generated market observations into a source-neutral,
+per-book Market Evidence Summary. Market observations are primary evidence when
+usable. Existing Research Signals remain fallback, uncertainty,
+metadata-cleanup, and review-prioritization context; they are not price inputs.
+
+After collecting `output/market_observations.csv`, run:
+
+```bash
+python3 library_pipeline.py summarize-market-evidence \
+  --observations output/market_observations.csv \
+  --output-csv output/market_evidence_summary.csv \
+  --output-xlsx output/market_evidence_summary.xlsx
+```
+
+The input contains source-specific listing and status rows. The generated
+summary contains one row per catalog item with coverage, match quality, asking-
+price statistics, market confidence, outlier sensitivity, a cautious range,
+and review guidance. Both artifacts are generated output and are not read back
+as durable truth by the monthly import.
+
+The range is derived from observed seller asking prices. It is not an
+appraisal, fair market value, realized sale price, definitive valuation, or
+guarantee of sale proceeds. Mixed currencies are not converted or combined.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
