@@ -278,6 +278,13 @@ Source adapters remain separate from aggregation and interpretation. AbeBooks
 collection stays in `valuation/abebooks.py`; source-neutral summary behavior
 stays in `valuation/market_evidence_summary.py`.
 
+The optional `build-abebooks-review-workbook` transformation reads the complete
+Market Evidence Summary and joins `data/acquisitions.csv` by stable
+`catalog_item_id`. It exposes a narrower review queue while retaining every
+canonical summary field on an Evidence Detail tab. Possession confidence is
+date-derived review context only and never changes market evidence or review
+recommendation semantics.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

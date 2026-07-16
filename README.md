@@ -406,6 +406,11 @@ preserve the test artifact if it matters.
   --observations output/full_abebooks_market_observations.csv \
   --output-csv output/full_abebooks_market_evidence_summary.csv \
   --output-xlsx output/full_abebooks_market_evidence_summary.xlsx
+
+.venv/bin/python library_pipeline.py build-abebooks-review-workbook \
+  --summary output/full_abebooks_market_evidence_summary.csv \
+  --output-xlsx output/full_abebooks_review_workbook.xlsx \
+  --data-dir data
 ```
 
 The collector writes `full_abebooks_market_observations.csv/.xlsx` by default;
@@ -417,6 +422,12 @@ The summary workbook supports filtering and pivoting by
 `review_recommendation`, `market_confidence`, `outlier_sensitivity`, and
 `evidence_status`. The baseline is observed AbeBooks asking-price evidence and
 review guidance, not an appraisal, fair market value, or realized sale estimate.
+
+The generated review workbook adds a prioritized human review queue, focused
+sale/research/edition tabs, acquisition-date possession context, full evidence
+detail, run counts, and field definitions. Books whose latest acquisition is
+before 2021 are flagged for physical verification. The workbook does not alter
+the canonical evidence summary or durable catalog and acquisition data.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

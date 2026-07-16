@@ -327,7 +327,21 @@ def wrapped_text_fields(fieldnames: list[str]) -> set[str]:
     return {
         field
         for field in fieldnames
-        if field in {"Research Rationale", "review_notes", "missing_fields", "note"}
+        if field
+        in {
+            "Research Rationale",
+            "review_notes",
+            "missing_fields",
+            "note",
+            "possession_note",
+            "review_reason",
+            "meaning",
+            "interpretation",
+            "what_it_means",
+            "source_or_derivation",
+            "example_values",
+            "reviewer_guidance",
+        }
     }
 
 
