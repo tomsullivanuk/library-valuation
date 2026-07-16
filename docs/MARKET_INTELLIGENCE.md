@@ -494,7 +494,8 @@ an appraisal, fair market value, or realized price. The latest acquisition year
 is shown with a verification prompt for pre-2021 or unknown acquisitions; this
 presentation never suppresses market evidence. Detailed market confidence,
 outlier sensitivity, and possession-confidence fields remain in the workbook
-and evidence artifacts. eBay and multi-source evidence remain later work.
+and evidence artifacts. eBay active listings are the proposed v0.7.0 theme;
+multi-source evidence is not part of v0.6.0.
 
 ## Non-Goals
 

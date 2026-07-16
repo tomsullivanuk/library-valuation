@@ -19,8 +19,10 @@ source-neutral Market Evidence Summary. Review of 205 rows generated from
 `output/expanded_market_observations.csv` showed coherent summary behavior but
 also showed that all observations came from AbeBooks.
 
-Version 0.6.0 should add source breadth before range, confidence, or review
-thresholds are tuned. The desired architecture is:
+The spike originally proposed adding source breadth before range, confidence,
+or review thresholds were tuned. Release review instead chose to establish the
+full AbeBooks baseline in v0.6.0 and defer live source breadth to v0.7.0. The
+desired future architecture remains:
 
 ```text
 MarketSourceAdapter
@@ -441,3 +443,11 @@ remain bounded:
 PR3 should not add eBay credentials, change the core AbeBooks parser, change
 durable data, or teach the summary layer to compare evidence types. Those remain
 later, reviewable changes.
+
+## 14. Release Closeout
+
+Version 0.6.0 completed the full-library AbeBooks baseline, review workbook, and
+static review report without adding a second live source. The spike's eBay
+findings remain the recommended next direction, now positioned as
+**v0.7.0 — eBay Active Listings Integration**. v0.6.0 makes no multi-source or
+completed-sale claim.

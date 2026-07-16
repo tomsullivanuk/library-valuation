@@ -2,20 +2,18 @@
 
 ## 1. Release Title and Theme
 
-**v0.6.0 — Multi-Source Market Evidence**
+**v0.6.0 — Full AbeBooks Baseline & Review Artifacts**
 
-Version 0.6.0 expands the market-evidence-first foundation beyond AbeBooks. It
-does not produce formal appraisals, claim fair market value, or assume that all
-external signals are interchangeable.
+Version 0.6.0 turns the AbeBooks market-evidence work into a full-library,
+reviewer-facing workflow. It does not produce formal appraisals, claim fair
+market value, realized sale prices, or expected sale proceeds.
 
 ### Release Objective
 
-Expand the market-evidence-first foundation beyond AbeBooks by evaluating
-low-friction market sources, integrating the easiest useful additional source
-through a source-adapter pattern, and updating generated Market Evidence
-Summaries to distinguish single-source evidence, source diversity, and
-cross-source agreement or conflict without changing durable catalog,
-acquisition, or Research Assessment records.
+Collect a conservatively paced full-library AbeBooks baseline, summarize it
+through the existing Market Evidence Summary, and produce reviewer-facing Excel
+and static HTML artifacts without changing durable catalog, acquisition,
+Research Assessment, monthly import, or evidence-model semantics.
 
 ## 2. Background From v0.5.0
 
@@ -54,7 +52,8 @@ review-prioritization context. It also preserved important boundaries:
 
 That foundation can already count distinct sources, but the implemented
 confidence and range rules have only been exercised with AbeBooks evidence.
-Version 0.6.0 should add source diversity before those rules are tuned further.
+Version 0.6.0 therefore measures the full-library AbeBooks baseline before any
+second-source rules are introduced.
 
 ## 3. Empirical Finding From the Expanded Summary Review
 
@@ -78,13 +77,12 @@ create false confidence. In particular, one marketplace cannot answer whether
 other active listings, sold/completed evidence, retail/list-price signals, or
 availability signals confirm or challenge its results.
 
-## 4. Strategic Decision: Expand Beyond AbeBooks
+## 4. Strategic Decision: Baseline Before Second Source
 
-Version 0.6.0 will use **easiest reliable integration first** as its source
-selection principle. The release will begin with a bounded empirical spike,
-select one useful low-friction source, and integrate that source behind an
-adapter boundary. It will not select a source solely because it is theoretically
-ideal, nor attempt several production integrations at once.
+The source spike found no second source that should be rushed into this release.
+Version 0.6.0 instead establishes the full AbeBooks baseline and makes its
+review queues usable through generated workbook and HTML artifacts. eBay active
+listings become the recommended v0.7.0 theme and remain outside this release.
 
 The primary product question is:
 
@@ -96,28 +94,22 @@ asking-price range. A retail/list-price signal is not a used-market asking price
 Sold/completed evidence may better reflect market-clearing behavior, but it is
 still not a formal appraisal and may have access or matching limitations.
 
-If the easiest reliable source is metadata-only, v0.6.0 may integrate it as
-metadata/availability support while continuing the search for a second price
-source. The release must not claim multi-source price agreement merely because
-two different kinds of evidence exist.
+This release makes no multi-source agreement claim. Future integration must
+preserve evidence-type distinctions and source provenance.
 
 ## 5. Goals
 
-- Evaluate candidate sources empirically for access practicality, reliability,
-  evidence value, and schema fit.
-- Select and integrate the easiest useful additional source through a
-  source-specific adapter.
-- Normalize source output into a source-neutral observation contract without
-  erasing source provenance or evidence type.
-- Distinguish single-source evidence from genuine source diversity.
-- Summarize cross-source agreement, conflict, and non-comparability with
-  explainable reasons.
-- Distinguish asking-price, sold/completed, retail/list-price,
-  metadata/availability, and other signals before aggregation.
-- Update market confidence so source diversity can add information without
-  automatically or mechanically increasing confidence.
-- Preserve cautious range behavior and prevent incompatible evidence types or
-  currencies from being averaged blindly.
+- Evaluate candidate sources and document access, reliability, evidence value,
+  and schema-fit constraints.
+- Collect AbeBooks observations across the full assessed catalog with
+  conservative pacing, bounded-run support, and distinct output names.
+- Reuse the source-neutral Market Evidence Summary without changing its
+  aggregation, confidence, range, or recommendation semantics.
+- Produce a reviewer-facing Excel workbook with focused queues and full
+  evidence detail.
+- Produce a static, self-contained HTML report suitable for sharing with
+  non-technical reviewers.
+- Add latest-acquisition possession context without suppressing evidence.
 - Keep generated artifacts reproducible, versioned, auditable, and separate
   from durable project data.
 - Continue incremental, reviewable PRs with fixture-driven tests.
@@ -388,49 +380,30 @@ validation-sample outputs are not overwritten. Use the baseline to quantify
 evidence coverage, review recommendations, confidence, outlier sensitivity,
 and the practical manual-review queue before adding another live source.
 
-### PR4 — Baseline Summary Report / Review Queue Analysis
+### PR4 — AbeBooks Baseline Review Workbook
 
-Analyze the full-library baseline by evidence status, market confidence,
-outlier sensitivity, and review recommendation. Produce a compact generated
-report or documented review workflow that identifies the highest-priority books
-and where second-source evidence is most needed. This work may be folded into
-PR3 if it remains small.
+Generate a reviewer-facing workbook with focused possible-sale, manual-research,
+and edition/condition queues, complete evidence detail, run counts, field
+definitions, and latest-acquisition possession context.
 
 ### PR5 — Static AbeBooks Review Report
 
 Create a generated, self-contained HTML report from the full-library AbeBooks
 Market Evidence Summary. Include executive counts, prominent non-appraisal
 caveats, tabbed recommendation queues, acquisition-year possession prompts, a
-single human-readable AbeBooks range, friendly review reasons, usage guidance,
+single human-readable AbeBooks range, queue-specific guidance, usage guidance,
 and a field guide while exposing only essential reviewer fields. Keep detailed
 confidence and outlier fields in the workbook/evidence artifacts. Reuse PR4
 possession rules and do not change evidence aggregation or recommendations.
 
-### PR6 — eBay Active Listings Access / Credential Spike
-
-Confirm developer enrollment, production access, credential handling, quotas,
-marketplace configuration, and a bounded ISBN/keyword query before committing
-to the live adapter. Do not add secrets to the repository.
-
-### PR7 — eBay Active Listing Adapter
-
-Implement eBay active listings behind an isolated adapter with bounded queries,
-rate-limit handling, failure diagnostics, captured fixtures, and observed
-asking-price semantics. Keep it opt-in and independent of monthly import.
-
-### PR8 — Multi-Source Agreement / Conflict Summary
-
-Extend the generated Market Evidence Summary to report source diversity,
-evidence-type composition, comparable groups, agreement, conflict, and
-non-comparability. Keep each source's contribution auditable. Prefer explicit
-conflict over a misleading averaged range.
-
-### PR9 — Documentation, Release Notes, and Acceptance Test Refresh
+### PR6 — Documentation, Release Notes, and Release Readiness
 
 Align README, architecture, data model, Market Intelligence, roadmap, backlog,
 release notes, readiness evidence, and checklist with implemented behavior. Run
-acceptance tests across single-source, multi-source agreement, multi-source
-conflict, non-comparable evidence, source failure, and compatibility cases.
+the implemented full-library AbeBooks workflow and reviewer artifacts.
+
+eBay access, an eBay adapter, and multi-source agreement/conflict behavior are
+deferred to v0.7.0 and later work.
 
 Each PR should preserve generated/durable boundaries, remain independently
 reviewable, and include tests proportional to behavior.
@@ -439,31 +412,13 @@ reviewable, and include tests proportional to behavior.
 
 Version 0.6.0 is ready when:
 
-- The source spike records a reproducible candidate comparison and a justified
-  easiest-useful-source decision.
-- At least one additional useful source or explicit manual/exported source path
-  is integrated through an isolated adapter. If it is metadata-only, all docs
-  and outputs state that limitation and do not claim price corroboration.
-- AbeBooks and the added source can produce source-neutral observation rows
-  without source-specific logic leaking into aggregation.
-- Every observation preserves source, evidence type, lookup and collection
-  provenance, match context, and applicable price/status semantics.
-- Generated summaries distinguish single-source evidence, multiple comparable
-  sources, multiple non-comparable sources, and absent usable evidence.
-- Comparable cross-source evidence receives an explainable agreement or
-  conflict status with stable reasons and a method version.
-- Incompatible evidence types, mixed currencies, and materially ambiguous
-  matches are not silently combined.
-- Market confidence remains separate from price, exposes reasons, and does not
-  increase merely because a second source exists.
-- Conservative ranges use only documented eligible evidence and retain clear
-  asking-price, sold/completed, and retail/list-price distinctions.
-- Conflicting evidence produces visible review guidance rather than false
-  precision.
-- Source unavailability, rate limits, authentication failures, no results, and
-  parse failures are visible and do not corrupt other source results.
-- Deterministic tests do not require live network access and cover source
-  agreement, conflict, duplication, non-comparability, and source failure.
+- The source spike documents candidate-source constraints and defers eBay.
+- The full assessed catalog can produce distinct AbeBooks observation and
+  Market Evidence Summary artifacts with conservative pacing and bounded runs.
+- The generated review workbook exposes focused queues, complete evidence
+  detail, run summary, field definitions, and acquisition context.
+- The static HTML report exposes concise tabbed queues, usage guidance,
+  acquisition-year prompts, sort-order guidance, metadata, and caveats.
 - The standard monthly Amazon import behaves as it did in v0.5.0.
 - Durable catalog, acquisition, Research Assessment, and Collector Review data
   remain unchanged.
@@ -472,8 +427,9 @@ Version 0.6.0 is ready when:
 - Generated market artifacts remain separate from durable data.
 - Documentation uses non-appraisal terminology consistently and agrees with
   actual implementation.
-- Source access, rate limits, terms, licensing, and retention constraints are
-  documented and respected.
+- AbeBooks asking prices are not presented as appraisals, fair market value,
+  realized sale prices, or expected proceeds.
+- eBay and other market sources are clearly deferred to v0.7.0/future work.
 
 ## 13. Architectural Risks and Mitigations
 
@@ -502,8 +458,8 @@ Version 0.6.0 is ready when:
   environment, and which require credentials or approval?
 - What minimum result quality and operational reliability must a source meet to
   be selected by PR2?
-- If the easiest source is Google Books or another metadata-oriented API, is
-  metadata/availability support sufficient for v0.6.0, or should the release
+- If the easiest future source is Google Books or another metadata-oriented
+  API, is metadata/availability support sufficient, or should a later release
   also require a manual/exported price-evidence path?
 - Can eBay active or sold/completed evidence be accessed reliably at the scale
   and cadence this project needs?
@@ -528,7 +484,7 @@ Version 0.6.0 is ready when:
   confidence, review recommendations, or only contextual fields?
 - How should cross-source duplicates and repeated collection runs be detected?
 - Should existing v0.5.0 summary columns remain stable with additive fields, or
-  should v0.6.0 introduce an explicitly versioned replacement schema?
+  should a future multi-source release introduce a versioned replacement?
 - What source response data may be retained in fixtures or generated artifacts
   under applicable terms and licensing constraints?
 - When, if ever, should observations become durable historical evidence rather

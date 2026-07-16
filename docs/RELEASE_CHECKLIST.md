@@ -1,5 +1,54 @@
 # Release Checklist
 
+## v0.6.0
+
+Pre-release checks:
+
+- [x] Run `.venv/bin/python -m pytest`.
+- [x] Run `python3 -m compileall valuation library_pipeline.py tests`.
+- [x] Run `git diff --check`.
+- [x] Confirm CLI help for full-library collection, the review workbook, and
+  the static review report matches documented options.
+- [x] Confirm the full AbeBooks baseline and Market Evidence Summary can be
+  generated.
+- [x] Confirm the review workbook and static HTML report can be generated.
+- [x] Confirm the static HTML report was visually inspected during PR5.
+- [x] Confirm Market Evidence Summary and Research Assessment semantics are
+  unchanged.
+- [x] Confirm monthly import and durable data behavior are unchanged.
+- [x] Confirm generated artifacts remain ignored/untracked.
+- [x] Confirm non-appraisal caveats cover asking prices, condition, edition,
+  seller credibility, and physical possession.
+
+Release hygiene:
+
+- [x] Confirm `CHANGELOG.md` includes v0.6.0.
+- [x] Confirm `docs/RELEASE_NOTES_v0.6.0.md` is ready for the GitHub Release.
+- [x] Confirm `docs/RELEASE_READINESS_v0.6.0.md` records final scope,
+  acceptance evidence, and limitations.
+- [x] Confirm README, architecture, roadmap, backlog, Market Intelligence, and
+  release plan describe Full AbeBooks Baseline & Review Artifacts.
+- [x] Confirm eBay active listings are deferred to v0.7.0.
+- [ ] Confirm the working tree is clean after the documentation PR commit.
+- [ ] Create the annotated tag with `git tag -a v0.6.0 -m "Release v0.6.0"`.
+- [ ] Push the commit and tag.
+- [ ] Create the GitHub Release using `docs/RELEASE_NOTES_v0.6.0.md`.
+
+Post-release smoke checks:
+
+- [ ] Confirm `library_pipeline.py --help` lists all v0.6.0 commands.
+- [ ] Generate the workbook and HTML report from preserved full-baseline
+  summary output.
+- [ ] Open the generated HTML in a browser and inspect all review tabs.
+- [ ] Confirm the GitHub Release links to the correct tag and release notes.
+
+Known post-release follow-up:
+
+- Begin v0.7.0 eBay credential/access validation and isolated adapter design.
+- Add cross-source comparison only after provenance and evidence types remain
+  auditable.
+- Continue improving edition, condition, and physical-possession review.
+
 ## v0.5.0
 
 Pre-release checks:

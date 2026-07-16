@@ -17,15 +17,21 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Calibrate range and review thresholds against broader evidence.
 - [ ] Decide whether a future durable observation repository is justified.
 
-## v0.6.0 Multi-Source Market Evidence
+## v0.6.0 Full AbeBooks Baseline & Review Artifacts
 
 - [x] Define the multi-source release plan.
 - [x] Complete the source integration spike.
-- [ ] Run a bounded test and full-library AbeBooks baseline.
-- [ ] Analyze baseline review recommendations, confidence, evidence status, and
+- [x] Run a bounded test and full-library AbeBooks baseline.
+- [x] Analyze baseline review recommendations, confidence, evidence status, and
   outlier sensitivity.
+- [x] Add the AbeBooks baseline review workbook.
+- [x] Add the static, shareable AbeBooks review report.
+
+## v0.7.0 eBay Active Listings Integration
+
 - [ ] Confirm eBay active-listing credentials and production access.
-- [ ] Add an isolated eBay active-listing adapter.
+- [ ] Add an isolated, opt-in eBay active-listing adapter.
+- [ ] Preserve source provenance and asking-price semantics.
 - [ ] Summarize cross-source agreement, conflict, and non-comparability.
 
 ---
@@ -59,7 +65,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] First experimental external asking-price source (AbeBooks)
 - [x] Generated review recommendation and fallback-priority fields
 - [x] Static, shareable AbeBooks review report with acquisition/possession context
-- [ ] eBay access spike and isolated integration
+- [ ] eBay access spike and isolated integration (v0.7.0)
 - [ ] Incremental valuation (only value new books)
 
 ### Workflow

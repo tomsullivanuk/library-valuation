@@ -366,7 +366,7 @@ The range is derived from observed seller asking prices. It is not an
 appraisal, fair market value, realized sale price, definitive valuation, or
 guarantee of sale proceeds. Mixed currencies are not converted or combined.
 
-### v0.6.0 Full-Library AbeBooks Baseline
+### v0.6.0 Full AbeBooks Baseline & Review Artifacts
 
 Before adding another live marketplace, v0.6.0 establishes an AbeBooks-only
 directional baseline for the full assessed catalog. First refresh the catalog
@@ -435,11 +435,18 @@ before 2021 are flagged for physical verification. The workbook does not alter
 the canonical evidence summary or durable catalog and acquisition data.
 
 The generated static HTML report is a simpler, self-contained sharing view. It
-uses tabbed review queues, a compact queue summary, a single human-readable
-AbeBooks range, acquisition-year possession prompts, friendly review reasons,
-and a short field guide. Detailed evidence-quality fields remain in the review
+uses tabbed review queues, queue-specific guidance, a single human-readable
+AbeBooks range, acquisition-year possession prompts, and a field guide with the
+report sort order. Detailed evidence-quality fields remain in the review
 workbook rather than the public-facing tables. Re-running the command replaces
 the requested HTML output; the report is generated, ignored data.
+
+All files produced under `output/` by this workflow are generated artifacts and
+remain ignored/untracked. AbeBooks asking prices are not appraisals, fair market
+value, realized sale prices, or expected sale proceeds. Edition, condition,
+dust jacket, signature, seller credibility, and physical possession may
+materially affect value. eBay and other market sources are not included in
+v0.6.0; eBay active-listing integration is planned for v0.7.0.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

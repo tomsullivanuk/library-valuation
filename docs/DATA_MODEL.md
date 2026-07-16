@@ -618,6 +618,9 @@ Provider-specific caches:
 Generated outputs:
 
 - Generated CSV, XLSX, reports, and workbooks live under `output/`.
+- The v0.6.0 AbeBooks review workbook and static HTML report are projections of
+  the generated Market Evidence Summary plus acquisition context; neither is a
+  repository or an input to monthly updates.
 - Nothing in `output/` is source data.
 - Everything in `output/` must be reproducible from `input/`, `data/`,
   `cache/`, `config/`, and code.

@@ -294,6 +294,10 @@ needed. Detailed confidence and outlier fields remain available in the workbook
 and evidence artifacts. The report does not change or persist Market Evidence
 Summary, catalog, or acquisition records.
 
+Together, the full-library collector and these two review transformations are
+the v0.6.0 Full AbeBooks Baseline & Review Artifacts workflow. A second-source
+adapter and cross-source interpretation are deferred to v0.7.0 or later.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

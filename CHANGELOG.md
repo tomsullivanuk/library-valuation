@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.6.0 - 2026-07-16
+
+Release focus: Full AbeBooks Baseline & Review Artifacts.
+
+Added:
+
+- Source-integration spike documenting candidate-source constraints and a
+  staged path beyond AbeBooks.
+- Conservatively paced full-library AbeBooks observation collection with
+  bounded-run and output-path controls.
+- Reviewer-facing AbeBooks Excel workbook with focused queues, complete
+  evidence detail, run summary, field definitions, and acquisition context.
+- Static, self-contained HTML report with tabbed review queues, acquisition-year
+  prompts, combined AbeBooks ranges, queue guidance, sort-order documentation,
+  report metadata, and caveats.
+
+Changed:
+
+- The AbeBooks experiment can now be run across the full assessed catalog and
+  transformed into shareable review artifacts.
+- Latest acquisition dates provide possession-verification context without
+  suppressing market evidence or changing review recommendations.
+- eBay active-listing integration is deferred to the v0.7.0 release theme.
+
+Unchanged:
+
+- Market Evidence Summary aggregation, confidence, range, and recommendation
+  semantics.
+- Research Assessment scoring, signals, weights, bands, and persisted records.
+- Monthly Amazon import behavior and durable catalog/acquisition schemas.
+
+Known limitations:
+
+- AbeBooks seller asking prices are not appraisals, fair market value, realized
+  sale prices, or expected sale proceeds.
+- Edition, condition, dust jacket, signature, seller credibility, and physical
+  possession may materially affect value.
+- eBay and other independent market sources are not included in v0.6.0.
+
 ## v0.5.0 - 2026-07-14
 
 Release focus: Market Evidence First.

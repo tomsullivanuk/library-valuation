@@ -341,27 +341,32 @@ Exit condition:
 - A user can transform market observations into an explainable per-book summary
   without confusing asking prices with completed sales or formal appraisals.
 
-## v0.6.0: Multi-Source Market Evidence
+## v0.6.0: Full AbeBooks Baseline & Review Artifacts
 
-Before adding eBay active listings, establish a conservatively throttled
-AbeBooks-only baseline across the full assessed catalog.
+Version 0.6.0 turns the AbeBooks market-evidence work into a conservatively
+throttled full-library workflow with reviewer-facing Excel and static HTML
+artifacts.
 
 Sequence:
 
 - PR1: Multi-Source Market Evidence Design Brief.
 - PR2: Source Integration Spike.
 - PR3: Full-Library AbeBooks Baseline Workflow.
-- PR4: Baseline Summary Report / Review Queue Analysis, if not folded into PR3.
+- PR4: AbeBooks Baseline Review Workbook.
 - PR5: Static AbeBooks Review Report.
-- PR6: eBay Active Listings Access / Credential Spike.
-- PR7: eBay Active Listing Adapter.
-- PR8: Multi-Source Agreement / Conflict Summary.
-- PR9: Documentation, Release Notes, and Acceptance Test Refresh.
+- PR6: Documentation, Release Notes, and Release Readiness.
 
 The baseline should quantify evidence coverage, confidence, outlier sensitivity,
 review recommendations, and the practical manual-review queue. It remains
 observed asking-price evidence rather than an appraisal or realized-sale
 estimate.
+
+## v0.7.0: eBay Active Listings Integration
+
+Evaluate credentials and production access, then add an isolated, opt-in eBay
+active-listing adapter. Extend generated summaries to distinguish source
+agreement, conflict, and non-comparability without treating active asking prices
+as completed sales or appraisals. This work is explicitly outside v0.6.0.
 
 ## Later: Top-25 Market Research Workflow
 
