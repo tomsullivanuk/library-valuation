@@ -462,6 +462,8 @@ Implemented generated outputs and possible future outputs include:
 - `calibration_simulation_candidate_movements.csv`
 - `market_evidence_summary.csv`
 - `market_evidence_summary.xlsx`
+- `full_abebooks_review_workbook.xlsx`
+- `full_abebooks_review_report.html`
 - `market_values.csv`
 - `market_validation_report.md`
 
@@ -483,6 +485,16 @@ artifacts and are likewise non-canonical.
 These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by
 accident.
+
+The static AbeBooks review report is a reviewer-facing projection of the full
+Market Evidence Summary. It separates recommendation queues with CSS-only tabs
+and includes only essential identity, asking-price, research, and acquisition
+context. Its one displayed range remains an observed asking-price reference—not
+an appraisal, fair market value, or realized price. The latest acquisition year
+is shown with a verification prompt for pre-2021 or unknown acquisitions; this
+presentation never suppresses market evidence. Detailed market confidence,
+outlier sensitivity, and possession-confidence fields remain in the workbook
+and evidence artifacts. eBay and multi-source evidence remain later work.
 
 ## Non-Goals
 

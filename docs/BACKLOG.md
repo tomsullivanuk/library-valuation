@@ -58,6 +58,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Persistent valuation repository
 - [x] First experimental external asking-price source (AbeBooks)
 - [x] Generated review recommendation and fallback-priority fields
+- [x] Static, shareable AbeBooks review report with acquisition/possession context
+- [ ] eBay access spike and isolated integration
 - [ ] Incremental valuation (only value new books)
 
 ### Workflow

@@ -396,26 +396,36 @@ report or documented review workflow that identifies the highest-priority books
 and where second-source evidence is most needed. This work may be folded into
 PR3 if it remains small.
 
-### PR5 — eBay Active Listings Access / Credential Spike
+### PR5 — Static AbeBooks Review Report
+
+Create a generated, self-contained HTML report from the full-library AbeBooks
+Market Evidence Summary. Include executive counts, prominent non-appraisal
+caveats, tabbed recommendation queues, acquisition-year possession prompts, a
+single human-readable AbeBooks range, friendly review reasons, usage guidance,
+and a field guide while exposing only essential reviewer fields. Keep detailed
+confidence and outlier fields in the workbook/evidence artifacts. Reuse PR4
+possession rules and do not change evidence aggregation or recommendations.
+
+### PR6 — eBay Active Listings Access / Credential Spike
 
 Confirm developer enrollment, production access, credential handling, quotas,
 marketplace configuration, and a bounded ISBN/keyword query before committing
 to the live adapter. Do not add secrets to the repository.
 
-### PR6 — eBay Active Listing Adapter
+### PR7 — eBay Active Listing Adapter
 
 Implement eBay active listings behind an isolated adapter with bounded queries,
 rate-limit handling, failure diagnostics, captured fixtures, and observed
 asking-price semantics. Keep it opt-in and independent of monthly import.
 
-### PR7 — Multi-Source Agreement / Conflict Summary
+### PR8 — Multi-Source Agreement / Conflict Summary
 
 Extend the generated Market Evidence Summary to report source diversity,
 evidence-type composition, comparable groups, agreement, conflict, and
 non-comparability. Keep each source's contribution auditable. Prefer explicit
 conflict over a misleading averaged range.
 
-### PR8 — Documentation, Release Notes, and Acceptance Test Refresh
+### PR9 — Documentation, Release Notes, and Acceptance Test Refresh
 
 Align README, architecture, data model, Market Intelligence, roadmap, backlog,
 release notes, readiness evidence, and checklist with implemented behavior. Run

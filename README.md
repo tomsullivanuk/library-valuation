@@ -411,6 +411,11 @@ preserve the test artifact if it matters.
   --summary output/full_abebooks_market_evidence_summary.csv \
   --output-xlsx output/full_abebooks_review_workbook.xlsx \
   --data-dir data
+
+.venv/bin/python library_pipeline.py build-abebooks-review-report \
+  --summary output/full_abebooks_market_evidence_summary.csv \
+  --output-html output/full_abebooks_review_report.html \
+  --data-dir data
 ```
 
 The collector writes `full_abebooks_market_observations.csv/.xlsx` by default;
@@ -428,6 +433,13 @@ sale/research/edition tabs, acquisition-date possession context, full evidence
 detail, run counts, and field definitions. Books whose latest acquisition is
 before 2021 are flagged for physical verification. The workbook does not alter
 the canonical evidence summary or durable catalog and acquisition data.
+
+The generated static HTML report is a simpler, self-contained sharing view. It
+uses tabbed review queues, a compact queue summary, a single human-readable
+AbeBooks range, acquisition-year possession prompts, friendly review reasons,
+and a short field guide. Detailed evidence-quality fields remain in the review
+workbook rather than the public-facing tables. Re-running the command replaces
+the requested HTML output; the report is generated, ignored data.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

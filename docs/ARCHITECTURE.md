@@ -285,6 +285,15 @@ canonical summary field on an Evidence Detail tab. Possession confidence is
 date-derived review context only and never changes market evidence or review
 recommendation semantics.
 
+The downstream `build-abebooks-review-report` transformation reuses that same
+acquisition-context join and produces a portable, static HTML sharing view. It
+projects only essential reviewer fields into tabbed, action-specific tables,
+combines conservative references into one displayed AbeBooks range, and shows
+only the latest acquisition year with a possession-verification prompt when
+needed. Detailed confidence and outlier fields remain available in the workbook
+and evidence artifacts. The report does not change or persist Market Evidence
+Summary, catalog, or acquisition records.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

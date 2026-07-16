@@ -352,10 +352,11 @@ Sequence:
 - PR2: Source Integration Spike.
 - PR3: Full-Library AbeBooks Baseline Workflow.
 - PR4: Baseline Summary Report / Review Queue Analysis, if not folded into PR3.
-- PR5: eBay Active Listings Access / Credential Spike.
-- PR6: eBay Active Listing Adapter.
-- PR7: Multi-Source Agreement / Conflict Summary.
-- PR8: Documentation, Release Notes, and Acceptance Test Refresh.
+- PR5: Static AbeBooks Review Report.
+- PR6: eBay Active Listings Access / Credential Spike.
+- PR7: eBay Active Listing Adapter.
+- PR8: Multi-Source Agreement / Conflict Summary.
+- PR9: Documentation, Release Notes, and Acceptance Test Refresh.
 
 The baseline should quantify evidence coverage, confidence, outlier sensitivity,
 review recommendations, and the practical manual-review queue. It remains

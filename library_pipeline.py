@@ -31,6 +31,7 @@ from valuation.abebooks import (
     fetch_url,
 )
 from valuation.abebooks_review_workbook import write_abebooks_review_workbook
+from valuation.abebooks_review_report import write_abebooks_review_report
 from valuation.calibration_simulation import (
     CALIBRATION_SIMULATION_FIELDNAMES,
     CALIBRATION_SIMULATION_MOVEMENT_FIELDNAMES,
@@ -1341,6 +1342,18 @@ def build_abebooks_review_workbook(summary: Path, output_xlsx: Path, data_dir: P
     return len(summary_rows)
 
 
+def build_abebooks_review_report(summary: Path, output_html: Path, data_dir: Path) -> int:
+    summary_rows = read_csv_rows(summary)
+    acquisitions = read_optional_csv_rows(data_dir / "acquisitions.csv")
+    write_abebooks_review_report(
+        output_html,
+        summary_rows=summary_rows,
+        acquisitions=acquisitions,
+        summary_filename=summary.name,
+    )
+    return len(summary_rows)
+
+
 def analyze_market_validation(output_dir: Path) -> int:
     sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
     observation_rows = read_csv_rows(output_dir / "market_observations.csv")
@@ -2251,6 +2264,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     review_workbook_parser.add_argument("--data-dir", type=Path, default=Path("data"))
 
+    review_report_parser = subparsers.add_parser(
+        "build-abebooks-review-report", help="Build a static reviewer-facing HTML report"
+    )
+    review_report_parser.add_argument(
+        "--summary", type=Path, default=Path("output/full_abebooks_market_evidence_summary.csv")
+    )
+    review_report_parser.add_argument(
+        "--output-html", type=Path, default=Path("output/full_abebooks_review_report.html")
+    )
+    review_report_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2390,6 +2414,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "build-abebooks-review-workbook":
             count = build_abebooks_review_workbook(args.summary, args.output_xlsx, args.data_dir)
             print(f"Wrote {count} AbeBooks review rows to {args.output_xlsx}")
+            return 0
+        if args.command == "build-abebooks-review-report":
+            count = build_abebooks_review_report(args.summary, args.output_html, args.data_dir)
+            print(f"Wrote {count} AbeBooks review rows to {args.output_html}")
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

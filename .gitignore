@@ -23,6 +23,7 @@ imports/
 
 # Generated Reports
 output/reports/
+output/full_abebooks_review_report.html
 
 # Local Acceptance Runs
 acceptance_test/
