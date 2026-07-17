@@ -298,6 +298,28 @@ Together, the full-library collector and these two review transformations are
 the v0.6.0 Full AbeBooks Baseline & Review Artifacts workflow. A second-source
 adapter and cross-source interpretation are deferred to v0.7.0 or later.
 
+### Planned v0.7.0 eBay source boundary
+
+The v0.7.0 plan adds eBay behind a source-specific client and adapter before it
+touches source-neutral aggregation:
+
+```text
+Environment/local ignored credentials
+  -> eBay Browse API client
+  -> source-specific eBay observation/status rows
+  -> targeted generated collection artifacts
+  -> reviewed multi-source summary transformation
+  -> reviewer workbook and static HTML projections
+```
+
+The client owns OAuth application-token acquisition, environment/marketplace
+selection, pacing, bounded pagination, and sanitized failures. The adapter owns
+field normalization and matching while preserving source provenance, item price,
+shipping, currency, buying option, and active-listing status. Aggregation must
+not branch on eBay response shapes or naively pool eBay and AbeBooks prices.
+Credentials, tokens, eBay outputs, and combined outputs never become durable
+catalog state or monthly-import inputs.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

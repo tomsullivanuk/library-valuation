@@ -363,10 +363,23 @@ estimate.
 
 ## v0.7.0: eBay Active Listings Integration
 
-Evaluate credentials and production access, then add an isolated, opt-in eBay
-active-listing adapter. Extend generated summaries to distinguish source
-agreement, conflict, and non-comparability without treating active asking prices
-as completed sales or appraisals. This work is explicitly outside v0.6.0.
+Add eBay incrementally as active-listing asking-price evidence:
+
+- PR1: v0.7.0 Release Plan.
+- PR2: eBay Access / Credential Spike.
+- PR3: eBay Active Listings Client.
+- PR4: eBay Observation Adapter.
+- PR5: Targeted eBay Collection Workflow.
+- PR6: Multi-Source Market Evidence Summary.
+- PR7: Workbook / HTML Report Updates.
+- PR8: Documentation and Release Readiness.
+
+Begin with a 5–10 book smoke test, then a bounded possible-sale plus stratified
+manual/edition-review cohort. Do not make the initial eBay run full-library.
+Extend generated summaries to distinguish source agreement, conflict, and
+non-comparability without treating active asking prices as completed sales,
+appraisals, fair market value, or expected proceeds. Sold/completed evidence and
+automatic full-library collection remain deferred decisions.
 
 ## Later: Top-25 Market Research Workflow
 

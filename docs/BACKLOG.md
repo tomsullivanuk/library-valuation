@@ -29,10 +29,23 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ## v0.7.0 eBay Active Listings Integration
 
-- [ ] Confirm eBay active-listing credentials and production access.
-- [ ] Add an isolated, opt-in eBay active-listing adapter.
-- [ ] Preserve source provenance and asking-price semantics.
-- [ ] Summarize cross-source agreement, conflict, and non-comparability.
+- [x] Define the v0.7.0 release plan and staged architecture.
+- [ ] Confirm developer keysets, OAuth scope, token flow, sandbox behavior,
+  production access, marketplace selection, and call limits.
+- [ ] Add an isolated Browse API client with redaction, pacing, bounded
+  pagination, and fixture-backed failure handling.
+- [ ] Normalize active listings into source-specific eBay observation/status
+  rows while preserving item price, shipping, currency, buying option, match,
+  and source provenance.
+- [ ] Run a 5–10 book smoke test and a bounded reviewer-priority cohort before
+  deciding whether broader collection is justified.
+- [ ] Add source-specific summary measures and explicit agreement, conflict, or
+  non-comparability without naively pooling prices.
+- [ ] Update workbook and HTML review artifacts with concise source context and
+  active-listing caveats.
+- [ ] Complete v0.7.0 documentation and release readiness.
+- [ ] Keep sold/completed eBay evidence and automatic full-library collection
+  deferred unless separate access and product decisions are approved.
 
 ---
 

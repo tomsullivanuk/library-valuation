@@ -448,6 +448,20 @@ dust jacket, signature, seller credibility, and physical possession may
 materially affect value. eBay and other market sources are not included in
 v0.6.0; eBay active-listing integration is planned for v0.7.0.
 
+### v0.7.0 eBay Active Listings Integration (Planned)
+
+The v0.7.0 plan introduces eBay incrementally as a second source of active-
+listing asking-price evidence. It starts with credential and production-access
+validation, then an isolated Browse API client, normalized eBay observations, a
+small smoke test, and a targeted reviewer-priority cohort before any broader
+collection or multi-source summary changes.
+
+Active eBay listings are not sold prices, fair market value, appraisals,
+realized sale prices, or expected proceeds. Credentials and tokens must remain
+in environment variables or local ignored configuration, and all eBay outputs
+remain generated under `output/`. See
+[`docs/RELEASE_PLAN_v0.7.0.md`](docs/RELEASE_PLAN_v0.7.0.md).
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 
