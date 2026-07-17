@@ -513,6 +513,32 @@ asking-price evidence only and must never be labeled sold/completed evidence,
 fair market value, an appraisal, a realized price, or expected proceeds. See
 [v0.7.0 Release Plan](RELEASE_PLAN_v0.7.0.md).
 
+### PR2 access-check boundary
+
+The `ebay-access-check` command validates the application-token and one-search
+path using explicit `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`,
+`EBAY_MARKETPLACE_ID`, and `EBAY_ENVIRONMENT` variables. It accepts one query,
+caps results at three, writes no output, and redacts credentials and tokens from
+failures. Its safe console snippets are connectivity diagnostics, not market
+observations and not inputs to aggregation. Sold/completed listings, observation
+normalization, multi-source summaries, and review-artifact changes remain later
+PRs.
+
+Sandbox and production status must be reported separately. PR2 uses the sandbox
+keyset only. Production was not tested and its keyset remains disabled pending
+Marketplace Account Deletion/Closure notification compliance through either
+notification subscription or an approved exemption. Sandbox connectivity must
+not be interpreted as production entitlement or representative market coverage.
+
+On 2026-07-17, PR2 used sandbox and `EBAY_US`. The initial local TLS failure was
+resolved by setting `SSL_CERT_FILE` to the installed certifi CA bundle; verified
+HTTPS remained enabled. After correcting an incorrect local secret value, OAuth
+application-token acquisition succeeded and one Browse API item-summary request
+completed. The query `Springer Handbook of Spacetime` returned zero sandbox
+results. That validates sandbox access and request construction, not production
+coverage, search quality, or market evidence. No observation or response
+artifact was written.
+
 ## Non-Goals
 
 This document does not define or implement:

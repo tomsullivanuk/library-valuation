@@ -15,6 +15,11 @@ venv/
 # Local Caches
 .cache/
 
+# Local credentials
+.env
+.env.*
+!.env.example
+
 # Local Imports
 imports/
 

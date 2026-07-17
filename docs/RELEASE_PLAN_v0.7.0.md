@@ -272,6 +272,57 @@ marketplace headers, terms, quotas, response fields, filters, and a tiny lawful
 search. Capture only sanitized fixtures and write an explicit proceed/defer
 decision. No integration with summary/report workflows.
 
+Implemented access-check shape:
+
+- explicit `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `EBAY_MARKETPLACE_ID`, and
+  `EBAY_ENVIRONMENT` environment variables;
+- no `.env` loader, credential cache, or output file;
+- OAuth application-token request using the client-credentials grant and
+  application scope;
+- exactly one item-summary keyword search with a limit of 1–3;
+- safe environment, marketplace, result count, and title/price/currency console
+  output; and
+- fixture-only tests for requests, responses, invalid data, missing variables,
+  and credential/token redaction.
+
+This proves the code path and provides the bounded live smoke command. PR2 now
+records successful sandbox token/search access; production entitlement, actual
+quota, and representative marketplace result quality remain gates for later
+production-facing work.
+
+PR2 environment status:
+
+- **Sandbox:** validated with an application token and one bounded Browse API
+  item-summary search using `EBAY_US`.
+- **Production:** intentionally not tested. The production keyset is currently
+  disabled pending eBay Marketplace Account Deletion/Closure notification
+  compliance, either by subscribing to notifications or obtaining an
+  exemption. Production validation is deferred until eBay enables the keyset.
+
+No sandbox result may be used to claim production access, production search
+quality, or completed-sale capability.
+
+Sandbox smoke record (2026-07-17):
+
+- environment: `sandbox`;
+- marketplace: `EBAY_US`;
+- TLS trust diagnosis: the Python 3.14 virtual environment had no active default
+  CA file; `SSL_CERT_FILE` pointed to the installed certifi bundle and preserved
+  certificate verification;
+- application-token acquisition: **succeeded** after correcting an incorrect
+  local secret value;
+- Browse item-summary search: **succeeded** for
+  `Springer Handbook of Spacetime` with limit 3;
+- safe result count: **0** (no listing snippets); and
+- sensitive output/artifacts: none written.
+
+The local CA trust issue is resolved for the bounded command through an
+environment override and is documented only as troubleshooting, not required
+project behavior. The successful zero-result sandbox response validates access
+and request execution but is not representative of production search quality.
+Production remains disabled and unverified pending Marketplace Account
+Deletion/Closure notification compliance.
+
 ### PR3 — eBay Active Listings Client
 
 Implement token acquisition, endpoint/environment selection, request building,

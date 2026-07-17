@@ -320,6 +320,30 @@ not branch on eBay response shapes or naively pool eBay and AbeBooks prices.
 Credentials, tokens, eBay outputs, and combined outputs never become durable
 catalog state or monthly-import inputs.
 
+PR2 implements only the first client-boundary probe in
+`valuation/ebay_access.py`. `ebay-access-check` reads four explicit environment
+variables, obtains an application token, and performs one item-summary search
+limited to at most three results. It writes no artifact and projects only safe
+title/price/currency snippets. HTTP failures are converted to redacted
+user-facing errors. The module is not an observation adapter and has no path to
+Market Evidence Summary, workbook, report, or monthly-import code.
+
+PR2 intentionally validates sandbox access first. Production access is
+unverified because the production keyset is disabled pending eBay Marketplace
+Account Deletion/Closure notification compliance. This is an operational access
+gate, not a reason to hard-code sandbox behavior or remove production endpoint
+support from the isolated client.
+
+The first bounded sandbox run exposed a local Python trust-store gap: the
+virtual environment reported no active default CA file. A local troubleshooting
+retry set `SSL_CERT_FILE` to the installed certifi bundle, preserving certificate
+validation and successfully reaching the token endpoint. After correcting an
+incorrect local secret value, the sandbox client acquired an application token
+and completed one item-summary search. The zero-result response validates the
+request path but not production coverage or match quality. The CA override is
+local environment troubleshooting, not a source-client requirement or reason
+to weaken TLS verification.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

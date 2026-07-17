@@ -39,6 +39,7 @@ from valuation.calibration_simulation import (
     build_calibration_simulation,
 )
 from valuation.collector_workbook import write_collector_workbook
+from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials
 from valuation.expanded_market_validation_analysis import (
     EXPANDED_MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
     EXPANDED_RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
@@ -2275,6 +2276,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     review_report_parser.add_argument("--data-dir", type=Path, default=Path("data"))
 
+    ebay_access_parser = subparsers.add_parser(
+        "ebay-access-check", help="Verify eBay credentials and one bounded active-listing search"
+    )
+    ebay_access_parser.add_argument("--query", required=True, help="Book query for the one smoke-test search")
+    ebay_access_parser.add_argument("--limit", type=int, default=3, choices=range(1, 4))
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2418,6 +2425,22 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "build-abebooks-review-report":
             count = build_abebooks_review_report(args.summary, args.output_html, args.data_dir)
             print(f"Wrote {count} AbeBooks review rows to {args.output_html}")
+            return 0
+        if args.command == "ebay-access-check":
+            try:
+                result = EbayAccessClient(EbayCredentials.from_environment()).check_access(
+                    args.query, args.limit
+                )
+            except EbayAccessError as error:
+                raise UserFacingError(str(error)) from None
+            print(f"Environment: {result.environment}")
+            print(f"Marketplace: {result.marketplace_id}")
+            print(f"Token acquired: {'yes' if result.token_acquired else 'no'}")
+            print(f"Request succeeded: {'yes' if result.request_succeeded else 'no'}")
+            print(f"Result count: {result.result_count}")
+            for listing in result.listings:
+                amount = " ".join(value for value in (listing.price, listing.currency) if value) or "price unavailable"
+                print(f"- {listing.title} — {amount}")
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

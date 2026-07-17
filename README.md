@@ -462,6 +462,42 @@ in environment variables or local ignored configuration, and all eBay outputs
 remain generated under `output/`. See
 [`docs/RELEASE_PLAN_v0.7.0.md`](docs/RELEASE_PLAN_v0.7.0.md).
 
+The PR2 developer access check requires an explicit environment and performs
+only one bounded active-listing search without writing an output file:
+
+```bash
+export EBAY_CLIENT_ID="..."
+export EBAY_CLIENT_SECRET="..."
+export EBAY_MARKETPLACE_ID="EBAY_US"
+export EBAY_ENVIRONMENT="production"  # or sandbox
+
+.venv/bin/python library_pipeline.py ebay-access-check \
+  --query "Springer Handbook of Spacetime" \
+  --limit 3
+```
+
+Do not commit credentials, tokens, `.env` files, or authorization headers. The
+command obtains an OAuth application token through the client-credentials flow,
+runs one Browse API item-summary search, and prints only environment,
+marketplace, success/count fields, and up to three title/price/currency snippets.
+It does not create eBay observations, update market evidence, collect the full
+library, or provide sold/completed evidence.
+
+PR2 validation is sandbox-only. Production has not been tested: the production
+keyset is currently disabled pending eBay Marketplace Account Deletion/Closure
+notification compliance (subscription or exemption). Do not infer production
+access from sandbox behavior. Run the smoke command only after exporting the
+sandbox variables into the process that launches the command.
+
+The local Python 3.14 environment had no active default CA file. Pointing
+`SSL_CERT_FILE` to the installed certifi bundle restored verified HTTPS without
+disabling validation. With the corrected local sandbox keyset, the 2026-07-17
+bounded check acquired an application token and completed one Browse API search
+for `Springer Handbook of Spacetime`. Sandbox returned zero results, which is
+acceptable for access validation and says nothing about production result
+quality. The CA override is local troubleshooting, not required project runtime
+behavior.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 
