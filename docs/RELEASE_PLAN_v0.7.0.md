@@ -212,7 +212,7 @@ The eBay adapter should attempt to capture:
 - lookup strategy, normalized query, result rank, and pagination context;
 - eBay item ID and permitted item URL/reference;
 - listing title and subtitle/short description when useful;
-- seller username or permitted seller metadata;
+- no seller username or other seller identity (not needed for valuation review);
 - item price amount and currency;
 - shipping/delivery cost amount and currency when returned;
 - buying option and auction/fixed-price distinction;
@@ -338,8 +338,8 @@ Implemented client boundary:
 - one direct query and a bounded limit produce immutable, provisional
   source-specific in-memory results;
 - normalized fields include item ID, title, item price/currency, item URL,
-  condition, safely available seller username, buying options, item-location
-  country, source label, query, and marketplace;
+  condition, buying options, item-location country, source label, query, and
+  marketplace; seller username is intentionally omitted;
 - zero results return an empty tuple, while missing optional fields remain safe
   blanks and non-USD currency remains unchanged;
 - raw payloads are not stored or printed; and

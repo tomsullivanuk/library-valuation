@@ -48,7 +48,6 @@ def listing(query: str):
         price_currency="EUR",
         item_web_url="https://example.test/item/123",
         condition="Good",
-        seller_username="bookseller",
         buying_options=("FIXED_PRICE",),
         item_location_country="DE",
         raw_source="ebay_active_listing",
@@ -137,6 +136,7 @@ def test_collection_maps_observed_and_zero_result_rows_and_passes_limit():
     assert sleeps == [0.25]
     assert rows[0]["asking_price"] == "42.00"
     assert rows[0]["currency"] == "EUR"
+    assert rows[0]["seller"] == ""
     assert list(rows[0]) == MARKET_OBSERVATION_FIELDNAMES
 
 

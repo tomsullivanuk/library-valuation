@@ -106,7 +106,7 @@ def ebay_listing_observation_row(
             "asking_price": listing.price_value,
             "currency": listing.price_currency,
             "condition": listing.condition,
-            "seller": listing.seller_username,
+            "seller": "",
             "listing_title": listing.title,
             "listing_author": "",
             "listing_url": listing.item_web_url,

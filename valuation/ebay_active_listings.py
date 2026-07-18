@@ -23,7 +23,6 @@ class EbayActiveListing:
     price_currency: str
     item_web_url: str
     condition: str
-    seller_username: str
     buying_options: tuple[str, ...]
     item_location_country: str
     raw_source: str
@@ -79,9 +78,6 @@ def normalize_active_listing(
     price = item.get("price")
     if not isinstance(price, Mapping):
         price = {}
-    seller = item.get("seller")
-    if not isinstance(seller, Mapping):
-        seller = {}
     location = item.get("itemLocation")
     if not isinstance(location, Mapping):
         location = {}
@@ -95,7 +91,6 @@ def normalize_active_listing(
         price_currency=safe_text(price.get("currency")),
         item_web_url=safe_text(item.get("itemWebUrl")),
         condition=safe_text(item.get("condition")),
-        seller_username=safe_text(seller.get("username")),
         buying_options=tuple(safe_text(option) for option in raw_options if safe_text(option)),
         item_location_country=safe_text(location.get("country")),
         raw_source=RAW_SOURCE,

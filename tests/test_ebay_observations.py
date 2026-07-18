@@ -30,7 +30,6 @@ def listing(**overrides):
         "price_currency": "EUR",
         "item_web_url": "https://www.ebay.com/itm/123",
         "condition": "Very Good",
-        "seller_username": "example-books",
         "buying_options": ("FIXED_PRICE", "BEST_OFFER"),
         "item_location_country": "DE",
         "raw_source": "ebay_active_listing",
@@ -71,14 +70,14 @@ def test_observed_listing_maps_to_existing_observation_shape():
     assert row["observation_id"].startswith("MOB-")
 
 
-def test_price_currency_condition_seller_and_url_are_preserved_without_shipping():
+def test_price_currency_condition_and_url_are_preserved_without_seller_or_shipping():
     row = adapt_ebay_search_result(
         catalog_row(), search_result(listing()), observation_date=OBSERVED_AT
     )[0]
     assert row["asking_price"] == "89.50"
     assert row["currency"] == "EUR"
     assert row["condition"] == "Very Good"
-    assert row["seller"] == "example-books"
+    assert row["seller"] == ""
     assert row["listing_title"] == "Springer Handbook of Spacetime"
     assert row["listing_author"] == ""
     assert row["listing_url"] == "https://www.ebay.com/itm/123"
@@ -94,6 +93,7 @@ def test_source_specific_values_are_limited_to_notes_and_raw_reference():
     assert "buying_options=FIXED_PRICE,BEST_OFFER" in row["match_notes"]
     assert "marketplace_id=EBAY_US" in row["match_notes"]
     assert "item_location_country=DE" in row["match_notes"]
+    assert "seller" not in row["match_notes"].casefold()
     assert all(field in MARKET_OBSERVATION_FIELDNAMES for field in row)
 
 

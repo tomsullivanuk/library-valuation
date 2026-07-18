@@ -550,8 +550,8 @@ artifact was written.
 PR3 adds a reusable active-listings client for one caller-supplied query. It
 normalizes mocked Browse item summaries into provisional source-specific,
 in-memory results containing item ID, title, item price and currency, item URL,
-condition, seller username when available, buying options, item-location
-country, query, marketplace, and source label. It preserves non-USD currencies
+condition, buying options, item-location country, query, marketplace, and source
+label. Seller username is intentionally omitted. It preserves non-USD currencies
 and missing fields without converting, estimating, or rejecting them.
 
 At the PR3 boundary these objects are not Market Observations and do not affect

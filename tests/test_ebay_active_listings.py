@@ -54,7 +54,8 @@ def test_successful_search_maps_source_specific_normalized_results():
     assert listing.price_currency == "EUR"
     assert listing.item_web_url == "https://www.ebay.com/itm/123"
     assert listing.condition == "Very Good"
-    assert listing.seller_username == "bookseller"
+    assert not hasattr(listing, "seller_username")
+    assert "bookseller" not in repr(listing)
     assert listing.buying_options == ("FIXED_PRICE", "BEST_OFFER")
     assert listing.item_location_country == "DE"
     assert listing.raw_source == RAW_SOURCE
@@ -80,7 +81,6 @@ def test_missing_price_and_optional_fields_are_safe_blanks():
     assert listing.price_currency == ""
     assert listing.item_web_url == ""
     assert listing.condition == ""
-    assert listing.seller_username == ""
     assert listing.buying_options == ()
     assert listing.item_location_country == ""
 

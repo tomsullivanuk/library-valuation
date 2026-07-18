@@ -351,10 +351,11 @@ PR3 adds `valuation/ebay_active_listings.py` as a source-specific normalization
 layer over the PR2 access client. It accepts one direct query, obtains an
 application token through the existing boundary, performs one bounded search,
 and returns immutable in-memory result objects. The provisional fields retain
-item identity, title, item price/currency, URL, condition, seller username,
-buying options, item-location country, query, marketplace, and an
+item identity, title, item price/currency, URL, condition, buying options,
+item-location country, query, marketplace, and an
 `ebay_active_listing` source label. Missing optional fields remain blank and raw
-responses are not retained. This layer still has no repository, CSV/XLSX,
+responses are not retained. Seller username is intentionally not normalized or
+retained. This layer still has no repository, CSV/XLSX,
 Market Evidence Summary, workbook, report, or monthly-import integration.
 
 PR4 adds `valuation/ebay_observations.py`, a pure adapter from those immutable
