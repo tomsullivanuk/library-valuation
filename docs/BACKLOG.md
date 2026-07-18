@@ -41,7 +41,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   generated CSV/XLSX outputs and conservative pacing.
 - [ ] Run a 5–10 book smoke test and a bounded reviewer-priority cohort before
   deciding whether broader collection is justified.
-- [ ] Add source-specific summary measures and explicit agreement, conflict, or
+- [x] Add source-specific summary measures and explicit agreement, conflict, or
   non-comparability without naively pooling prices.
 - [ ] Update workbook and HTML review artifacts with concise source context and
   active-listing caveats.

@@ -412,6 +412,20 @@ The `likely_low`, `likely_mid`, and `likely_high` fields are descriptive
 asking-price-derived references. They are not appraisals, fair market value,
 realized sale prices, definitive valuations, or guaranteed proceeds.
 
+Version `0.7.0-pr6` adds a source-aware projection without changing the input
+observation schema. `evidence_source_mix`, `market_range_source`, and
+`source_price_comparability` describe composition and whether source currencies
+can be compared. AbeBooks and eBay each receive listing/status counts, currency,
+and minimum/median/maximum asking-price fields.
+
+When AbeBooks rows exist, the legacy core counts, price statistics, confidence,
+range, and recommendation use AbeBooks as their primary calculation set; all-
+source composition remains visible in the new fields and existing source-name
+fields. With eBay-only rows, the core fields use eBay under the existing cautious
+rules. Prices are never pooled across sources, shipping remains excluded, and
+currency conversion is not performed. These additions remain generated and do
+not alter durable data or the current workbook/report projections.
+
 #### eBay active-listing observation adapter (v0.7.0 PR4)
 
 The eBay adapter projects in-memory active-listing results into the existing

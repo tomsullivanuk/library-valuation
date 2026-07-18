@@ -22,7 +22,7 @@ def test_market_evidence_summary_fieldnames_returns_copy():
 
 
 def test_market_evidence_summary_schema_matches_pr6_contract():
-    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.5.0-pr6"
+    assert MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION == "0.7.0-pr6"
     assert MARKET_EVIDENCE_SUMMARY_BASENAME == "market_evidence_summary"
     assert MARKET_EVIDENCE_SUMMARY_FIELDNAMES == [
         "catalog_item_id",
@@ -35,6 +35,21 @@ def test_market_evidence_summary_schema_matches_pr6_contract():
         "status_row_count",
         "source_count",
         "observed_source_names",
+        "evidence_source_mix",
+        "market_range_source",
+        "source_price_comparability",
+        "abebooks_listing_count",
+        "abebooks_status_count",
+        "abebooks_currency",
+        "abebooks_min_asking_price",
+        "abebooks_median_asking_price",
+        "abebooks_max_asking_price",
+        "ebay_active_listing_count",
+        "ebay_status_count",
+        "ebay_active_currency",
+        "ebay_active_min_asking_price",
+        "ebay_active_median_asking_price",
+        "ebay_active_max_asking_price",
         "lookup_strategy",
         "best_match_confidence",
         "high_confidence_listing_count",
@@ -132,7 +147,7 @@ def test_multiple_listings_aggregate_counts_prices_and_context():
     assert summary["trimmed_high_asking_price"] == "30.00"
     assert summary["research_score"] == "7"
     assert summary["research_band"] == "high"
-    assert summary["evidence_model_version"] == "0.5.0-pr6"
+    assert summary["evidence_model_version"] == "0.7.0-pr6"
 
 
 def test_status_rows_count_as_coverage_but_not_prices():

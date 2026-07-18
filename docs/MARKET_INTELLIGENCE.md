@@ -299,7 +299,7 @@ visibly separate from completed-sale evidence, Research Assessment scoring, and
 collector decisions.
 
 The schema, aggregation, classification, range, and review version for this
-generated artifact is `0.5.0-pr6`. The source of truth for column order in code is
+generated artifact is `0.7.0-pr6`. The source of truth for column order in code is
 `valuation.market_evidence_summary.MARKET_EVIDENCE_SUMMARY_FIELDNAMES`.
 
 | Field | Meaning |
@@ -309,11 +309,18 @@ generated artifact is `0.5.0-pr6`. The source of truth for column order in code 
 | `isbn_10` | Catalog ISBN-10 used for identity and review context, when available. |
 | `title` | Catalog title shown for human review. |
 | `author` | Catalog author or contributor text shown for human review. |
-| `observation_count` | Total source observation rows considered for the catalog item, including listing and status rows. |
-| `listing_count` | Count of observation rows that represent parsed asking-price listings. |
-| `status_row_count` | Count of lookup-status or diagnostic rows that do not represent listings. |
+| `observation_count` | Observation rows in the primary calculation set: AbeBooks when present, otherwise the available source rows. |
+| `listing_count` | Parsed asking-price listings in the primary calculation set. |
+| `status_row_count` | Lookup-status or diagnostic rows in the primary calculation set. |
 | `source_count` | Count of distinct market sources represented in the observations. |
 | `observed_source_names` | Stable, delimited source names represented in the summary. |
+| `evidence_source_mix` | Stable source-composition label such as AbeBooks-only, eBay-only, or both. |
+| `market_range_source` | Source used for the core confidence/range/recommendation calculations. |
+| `source_price_comparability` | Whether source price summaries use one currency, matching currencies, or non-comparable currencies. |
+| `abebooks_listing_count` / `abebooks_status_count` | AbeBooks listing and status rows represented. |
+| `abebooks_currency` / `abebooks_min_asking_price` / `abebooks_median_asking_price` / `abebooks_max_asking_price` | Separate AbeBooks asking-price summary; blank numeric fields when its currency is mixed. |
+| `ebay_active_listing_count` / `ebay_status_count` | eBay active-listing and status rows represented. |
+| `ebay_active_currency` / `ebay_active_min_asking_price` / `ebay_active_median_asking_price` / `ebay_active_max_asking_price` | Separate eBay item asking-price summary; excludes shipping and blanks numeric fields when its currency is mixed. |
 | `lookup_strategy` | Stable, delimited lookup strategies used across the observations. |
 | `best_match_confidence` | Highest listing match-confidence level available for the catalog item. |
 | `high_confidence_listing_count` | Listing count with high match confidence. |
@@ -326,7 +333,7 @@ generated artifact is `0.5.0-pr6`. The source of truth for column order in code 
 | `max_asking_price` | Highest observed asking price among eligible listing evidence. |
 | `trimmed_low_asking_price` | Lower asking-price reference after documented outlier handling. Reserved for later range logic. |
 | `trimmed_high_asking_price` | Upper asking-price reference after documented outlier handling. Reserved for later range logic. |
-| `evidence_status` | Evidence availability status: listings observed, no evidence, source unavailable, or no usable query. It does not classify evidence quality. |
+| `evidence_status` | Primary calculation-set availability status: listings observed, no evidence, source unavailable, or no usable query. Source-specific counts remain visible when supplemental evidence differs. |
 | `outlier_sensitivity` | Initial deterministic sensitivity category based on listing count and observed asking-price spread. |
 | `market_confidence` | Evidence-quality and usability category based on availability, currency consistency, usable prices, match quality, coverage, and outlier sensitivity. It does not classify book value. |
 | `likely_low` | Cautious low reference in the asking-price-derived market range prototype, when supported. |
@@ -596,9 +603,32 @@ inter-request delay.
 The paired `output/targeted_ebay_observations.csv/.xlsx` artifacts retain the
 existing observation field order. They contain item asking price only, preserve
 currency, exclude shipping, and leave match confidence unknown. They are not
-raw responses, durable market history, or inputs to the current Market Evidence
-Summary, workbook, or HTML report. Sandbox alone has been validated; production
-remains disabled and unverified, and sandbox results are not representative.
+raw responses or durable market history. They become summary inputs only when
+explicitly passed to the PR6 command; they remain absent from the current
+workbook and HTML report. Sandbox alone has been validated; production remains
+disabled and unverified, and sandbox results are not representative.
+
+The first PR5 live smoke used sandbox `EBAY_US`, verified TLS through certifi,
+two ISBN-13 queries, and a limit of three results per book. OAuth and both Browse
+requests completed, producing two `no_results` rows and ignored CSV/XLSX files.
+This validates the sandbox access, adapter, and artifact path only—not production
+coverage, listing availability, price quality, or match quality.
+
+### PR6 source-aware summary prototype
+
+`summarize-market-evidence` now accepts repeated `--observations` inputs. It
+still produces one generated row per catalog item, but adds separate AbeBooks
+and eBay listing/status counts, currencies, and price summaries plus source-mix,
+comparability, and range-source labels.
+
+When AbeBooks rows exist, the existing core price, confidence, range, and review
+fields remain calculated from AbeBooks only. eBay is supplemental: its active
+listing prices are not pooled, cannot independently raise core confidence, and
+its `no_results` does not mean global market absence. eBay-only items use the
+existing cautious rules and retain unknown match confidence. Mixed currencies
+within a source blank that source's numeric price summary; differing currencies
+across sources are labeled non-comparable. No conversion or shipping is added.
+Workbook and HTML report integration remains deferred.
 
 ## Non-Goals
 

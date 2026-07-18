@@ -9,7 +9,7 @@ from decimal import Decimal, InvalidOperation
 from statistics import median
 
 
-MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.5.0-pr6"
+MARKET_EVIDENCE_SUMMARY_SCHEMA_VERSION = "0.7.0-pr6"
 
 MARKET_EVIDENCE_SUMMARY_BASENAME = "market_evidence_summary"
 
@@ -24,6 +24,21 @@ MARKET_EVIDENCE_SUMMARY_FIELDNAMES = [
     "status_row_count",
     "source_count",
     "observed_source_names",
+    "evidence_source_mix",
+    "market_range_source",
+    "source_price_comparability",
+    "abebooks_listing_count",
+    "abebooks_status_count",
+    "abebooks_currency",
+    "abebooks_min_asking_price",
+    "abebooks_median_asking_price",
+    "abebooks_max_asking_price",
+    "ebay_active_listing_count",
+    "ebay_status_count",
+    "ebay_active_currency",
+    "ebay_active_min_asking_price",
+    "ebay_active_median_asking_price",
+    "ebay_active_max_asking_price",
     "lookup_strategy",
     "best_match_confidence",
     "high_confidence_listing_count",
@@ -98,6 +113,24 @@ def _identity_key(row: Mapping[str, str]) -> tuple[str, ...] | None:
 
 
 def _summarize_group(rows: list[Mapping[str, str]], generated_at: str) -> dict[str, str]:
+    abebooks_rows = [row for row in rows if _source_key(row) == "abebooks"]
+    primary_rows = abebooks_rows or rows
+    values = _summarize_primary_rows(primary_rows, generated_at)
+    sources = _stable_values(rows, "source_name", "source")
+    values["source_count"] = str(len(sources))
+    values["observed_source_names"] = " | ".join(sources)
+    values.update(_source_aware_values(rows, bool(abebooks_rows)))
+    if abebooks_rows and len(abebooks_rows) != len(rows):
+        supplemental_count = len(rows) - len(abebooks_rows)
+        note = (
+            f"{supplemental_count} supplemental non-AbeBooks row(s) were excluded from the "
+            "primary range, confidence, and recommendation calculations."
+        )
+        values["evidence_notes"] = " ".join(filter(None, (values["evidence_notes"], note)))
+    return {field: values.get(field, "") for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
+
+
+def _summarize_primary_rows(rows: list[Mapping[str, str]], generated_at: str) -> dict[str, str]:
     listings = [row for row in rows if _first(row, "lookup_status").casefold() == "observed"]
     status_rows = [row for row in rows if row not in listings]
     sources = _stable_values(rows, "source_name", "source")
@@ -167,7 +200,84 @@ def _summarize_group(rows: list[Mapping[str, str]], generated_at: str) -> dict[s
     values["market_confidence"] = classify_market_confidence(values)
     values.update(build_conservative_market_range(values))
     values.update(build_review_recommendation(values))
-    return {field: values.get(field, "") for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
+    return values
+
+
+def _source_aware_values(rows: list[Mapping[str, str]], has_abebooks: bool) -> dict[str, str]:
+    abebooks_rows = [row for row in rows if _source_key(row) == "abebooks"]
+    ebay_rows = [row for row in rows if _source_key(row) == "ebay_active_listings"]
+    abebooks = _source_summary(abebooks_rows)
+    ebay = _source_summary(ebay_rows)
+    source_keys = {_source_key(row) for row in rows if _source_key(row)}
+    if source_keys == {"abebooks"}:
+        source_mix = "abebooks_only"
+    elif source_keys == {"ebay_active_listings"}:
+        source_mix = "ebay_active_listings_only"
+    elif {"abebooks", "ebay_active_listings"}.issubset(source_keys):
+        source_mix = "abebooks_and_ebay_active_listings"
+    else:
+        source_mix = "other_or_mixed_sources"
+    return {
+        "evidence_source_mix": source_mix,
+        "market_range_source": "abebooks" if has_abebooks else ("ebay_active_listings" if ebay_rows else "other"),
+        "source_price_comparability": _source_price_comparability(abebooks, ebay),
+        "abebooks_listing_count": abebooks["listing_count"],
+        "abebooks_status_count": abebooks["status_count"],
+        "abebooks_currency": abebooks["currency"],
+        "abebooks_min_asking_price": abebooks["min"],
+        "abebooks_median_asking_price": abebooks["median"],
+        "abebooks_max_asking_price": abebooks["max"],
+        "ebay_active_listing_count": ebay["listing_count"],
+        "ebay_status_count": ebay["status_count"],
+        "ebay_active_currency": ebay["currency"],
+        "ebay_active_min_asking_price": ebay["min"],
+        "ebay_active_median_asking_price": ebay["median"],
+        "ebay_active_max_asking_price": ebay["max"],
+    }
+
+
+def _source_summary(rows: list[Mapping[str, str]]) -> dict[str, str]:
+    listings = [row for row in rows if _first(row, "lookup_status").casefold() == "observed"]
+    priced = []
+    for row in listings:
+        price = _decimal(_first(row, "asking_price", "price"))
+        currency = _first(row, "currency").upper()
+        if price is not None and currency:
+            priced.append((price, currency))
+    currencies = sorted({currency for _, currency in priced})
+    prices = sorted(price for price, _ in priced) if len(currencies) == 1 else []
+    return {
+        "listing_count": str(len(listings)),
+        "status_count": str(len(rows) - len(listings)),
+        "currency": currencies[0] if len(currencies) == 1 else ("mixed" if len(currencies) > 1 else ""),
+        "min": _format_decimal(prices[0]) if prices else "",
+        "median": _format_decimal(median(prices)) if prices else "",
+        "max": _format_decimal(prices[-1]) if prices else "",
+    }
+
+
+def _source_price_comparability(abebooks: Mapping[str, str], ebay: Mapping[str, str]) -> str:
+    currencies = [value for value in (abebooks["currency"], ebay["currency"]) if value]
+    if not currencies:
+        return "no_priced_listings"
+    if "mixed" in currencies:
+        return "mixed_currency_within_source"
+    if len(currencies) == 2 and currencies[0] != currencies[1]:
+        return "cross_source_currency_mismatch"
+    if len(currencies) == 2:
+        return "same_currency_separate_source_summaries"
+    return "single_source_currency"
+
+
+def _source_key(row: Mapping[str, str]) -> str:
+    source = _first(row, "source_name", "source").casefold()
+    aliases = {
+        "abebooks": "abebooks",
+        "ebay": "ebay_active_listings",
+        "ebay_active_listing": "ebay_active_listings",
+        "ebay_active_listings": "ebay_active_listings",
+    }
+    return aliases.get(source, source)
 
 
 def classify_outlier_sensitivity(summary_row: Mapping[str, str]) -> str:

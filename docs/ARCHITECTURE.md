@@ -381,8 +381,21 @@ one-second default delay between requests.
 The workflow writes only the existing 25-field observation schema as paired
 CSV/XLSX generated artifacts. It stops after the first safe client error to
 avoid repeated credential/token failures. It neither reads its own outputs nor
-connects them to Market Evidence Summary, workbooks, reports, monthly import, or
-durable state. Production remains gated and unverified.
+automatically connects them to downstream artifacts, monthly import, or durable
+state. Production remains gated and unverified.
+
+PR6 extends the existing summary command to accept repeated observation inputs.
+The aggregator still groups to one row per catalog item and adds a source-aware
+projection for AbeBooks and eBay counts, statuses, currencies, price summaries,
+source mix, comparability, and the source used for the core market range.
+
+For mixed items, AbeBooks remains the primary basis for the pre-existing core
+range, confidence, and recommendation fields. Supplemental eBay rows are not
+pooled into those calculations, so eBay listings cannot automatically upgrade
+confidence and eBay `no_results` cannot erase AbeBooks evidence. eBay-only rows
+use the existing cautious core rules. Source currencies remain separate;
+shipping and conversion are excluded. This generated prototype has no workbook,
+HTML report, monthly-import, or durable-state integration.
 
 ## Source-of-Truth Principle
 

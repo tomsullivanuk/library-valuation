@@ -523,9 +523,35 @@ authentication attempts.
 This collector is capped at 50 books and 10 results per book; both command
 defaults and examples are smaller. Item price and returned currency are
 preserved, shipping is excluded, and match confidence remains unknown. PR5 does
-not feed these rows into Market Evidence Summary, workbooks, or reports. Only
+not automatically feed these rows into downstream artifacts. Only
 sandbox access has been validated, sandbox result quality is not representative,
 and production remains disabled/unverified pending the existing compliance gate.
+
+PR6 extends `summarize-market-evidence` so `--observations` can be repeated for
+an explicit prototype combining AbeBooks and targeted eBay observation files:
+
+```bash
+.venv/bin/python library_pipeline.py summarize-market-evidence \
+  --observations output/full_abebooks_market_observations.csv \
+  --observations output/targeted_ebay_observations.csv \
+  --output-csv output/multisource_market_evidence_summary.csv \
+  --output-xlsx output/multisource_market_evidence_summary.xlsx
+```
+
+The result remains one row per catalog item. Source-specific counts, statuses,
+currencies, and minimum/median/maximum asking prices remain separate. When
+AbeBooks evidence exists, the established overall range, confidence, and review
+recommendation remain AbeBooks-based; eBay is supplemental and cannot upgrade
+or erase them. For eBay-only items the core fields cautiously summarize that
+source, with match confidence still unknown. Cross-source or within-source
+currency differences are labeled and never converted or pooled. Shipping is
+excluded. PR6 does not update the workbook or HTML report.
+
+The tiny post-PR5 sandbox smoke test used two ISBN-13 queries through verified
+TLS and completed OAuth plus both Browse requests. It produced two ignored
+`no_results` rows and paired CSV/XLSX output. This validates the sandbox request
+and artifact path only—not production access, listing coverage, prices, or match
+quality.
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

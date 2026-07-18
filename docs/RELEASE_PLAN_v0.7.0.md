@@ -388,10 +388,24 @@ of scope.
 
 ### PR6 — Multi-Source Market Evidence Summary
 
-Combine reviewed AbeBooks and eBay observation inputs, add source-specific
-measures and agreement/conflict/non-comparability semantics, and define any
-versioned schema changes. Preserve AbeBooks-only compatibility and prohibit
-naive pooling.
+Implemented by extending `summarize-market-evidence` with repeatable
+`--observations` inputs and schema version `0.7.0-pr6`:
+
+- preserves one row per catalog item and all AbeBooks-only calculation rules;
+- adds separate AbeBooks/eBay listing and status counts, currencies, and
+  minimum/median/maximum asking-price summaries;
+- labels source mix, core range source, and currency comparability;
+- uses AbeBooks as the unchanged core range/confidence/recommendation basis when
+  present, with eBay active listings visible only as supplemental evidence;
+- summarizes eBay-only rows cautiously with match confidence still unknown;
+- keeps eBay `no_results` source-specific rather than erasing AbeBooks evidence;
+  and
+- never pools cross-source prices, converts currency, or adds shipping.
+
+The PR5 sandbox smoke completed OAuth and two Browse requests through verified
+TLS, producing two eBay `no_results` rows. That validates the sandbox workflow,
+not production or listing quality. PR6 adds no workbook/report integration,
+production assumption, sold evidence, or durable data.
 
 ### PR7 — Workbook / HTML Report Updates
 
