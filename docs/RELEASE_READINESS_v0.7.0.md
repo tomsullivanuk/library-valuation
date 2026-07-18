@@ -2,7 +2,7 @@
 
 ## Status
 
-**Core workflow ready for final documentation and release review.**
+**Ready for release after this final documentation PR is reviewed and committed.**
 
 Production eBay access, representative listing evidence, reviewer-artifact
 integration, tagging, and release publication are not claimed by this review.
@@ -21,7 +21,7 @@ Ignored local credentials
 Active listings are seller asking-price evidence. They are not completed sales,
 appraisals, fair market value, realized prices, or expected proceeds.
 
-## PR Checklist Through PR6
+## PR Checklist Through PR8
 
 - [x] PR1 defines the staged eBay integration and production gate.
 - [x] PR2 validates sandbox OAuth and one Browse request with redacted failures.
@@ -29,6 +29,9 @@ appraisals, fair market value, realized prices, or expected proceeds.
 - [x] PR4 maps results and safe statuses to the existing 25-field observation schema.
 - [x] PR5 adds explicit bounded targeted collection and ignored CSV/XLSX output.
 - [x] PR6 adds repeated observation inputs and source-aware summary fields.
+- [x] PR7 verifies and documents the ignored end-to-end multi-source workflow.
+- [x] PR8 prepares the changelog, release notes, final roadmap/backlog state,
+  and release acceptance record.
 - [x] AbeBooks-only confidence, range, and recommendation behavior remains intact.
 - [x] Workbook and HTML report integration remains deferred.
 
@@ -124,8 +127,19 @@ Research Assessment, and Collector Review data remain unchanged.
 - [x] Automated tests and compile validation pass.
 - [x] CLI help matches the documented workflow.
 - [x] Non-appraisal and production-gate caveats are documented.
-- [ ] Final release documentation and notes are reviewed and committed.
+- [x] Final release documentation and notes are prepared for review.
 - [ ] Working tree is clean after the final documentation commit.
 - [ ] Annotated tag and GitHub Release are created explicitly.
+
+## Final Release Checklist
+
+1. Review and commit PR8 with documentation files only.
+2. Confirm the post-commit tracked working tree is clean and all generated
+   smoke artifacts remain ignored.
+3. Confirm the release head commit and that no `v0.7.0` tag exists.
+4. Create and push an annotated `v0.7.0` tag.
+5. Publish the GitHub Release titled **v0.7.0 — eBay Active Listings
+   Integration** using `docs/RELEASE_NOTES_v0.7.0.md`.
+6. Verify the release URL, latest-release status, and clean tracked state.
 
 This readiness review does not create a tag or publish a release.

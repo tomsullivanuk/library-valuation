@@ -424,10 +424,11 @@ instead of being introduced as release-hardening work.
 
 ### PR8 — Documentation and Release Readiness
 
-Align README, architecture, data model, Market Intelligence, roadmap, backlog,
-release notes, and acceptance evidence. Validate credentials, generated-output
-boundaries, single-source compatibility, source failure, and non-appraisal
-language.
+Finalize the changelog, release notes, README, Market Intelligence, roadmap,
+backlog, and readiness evidence. Preserve the production gate, generated-output
+boundary, AbeBooks-only compatibility, source-specific `no_results`, and
+non-appraisal language. Tagging and GitHub Release publication remain explicit
+post-commit operations.
 
 ## 12. Testing Strategy
 

@@ -30,8 +30,10 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 ## v0.7.0 eBay Active Listings Integration
 
 - [x] Define the v0.7.0 release plan and staged architecture.
-- [ ] Confirm developer keysets, OAuth scope, token flow, sandbox behavior,
-  production access, marketplace selection, and call limits.
+- [x] Confirm sandbox keyset, OAuth token flow, Browse request behavior, and
+  explicit marketplace selection.
+- [ ] Confirm production access, notification compliance, representative search
+  behavior, and effective call limits before any production rollout.
 - [x] Add an isolated Browse API client with redaction, bounded results, and
   fixture-backed failure handling.
 - [x] Normalize active listings into source-specific eBay observation/status
@@ -39,15 +41,19 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   provenance while excluding shipping.
 - [x] Add an explicit bounded reviewer-priority collection workflow with
   generated CSV/XLSX outputs and conservative pacing.
-- [ ] Run a 5–10 book smoke test and a bounded reviewer-priority cohort before
-  deciding whether broader collection is justified.
+- [x] Run a two-book sandbox workflow smoke test through generated observations
+  and multi-source summary output.
+- [ ] Run a representative bounded production cohort before deciding whether
+  broader collection is justified.
 - [x] Add source-specific summary measures and explicit agreement, conflict, or
   non-comparability without naively pooling prices.
 - [x] Verify the ignored local multi-source summary workflow using the full
   AbeBooks artifact and the two-row sandbox eBay smoke artifact.
 - [ ] Update workbook and HTML review artifacts with concise source context and
   active-listing caveats.
-- [ ] Complete v0.7.0 documentation and release readiness.
+- [x] Complete v0.7.0 documentation and release readiness.
+- [ ] Design reviewed eBay match-confidence rules and shipping/total-cost
+  treatment only after representative production evidence exists.
 - [ ] Keep sold/completed eBay evidence and automatic full-library collection
   deferred unless separate access and product decisions are approved.
 

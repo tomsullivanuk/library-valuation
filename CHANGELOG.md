@@ -1,5 +1,47 @@
 # Changelog
 
+## v0.7.0 - 2026-07-18
+
+Release focus: eBay Active Listings Integration.
+
+Added:
+
+- Isolated eBay credential, OAuth application-token, and Browse API access with
+  sandbox/production endpoint separation and safe error redaction.
+- Reusable in-memory active-listings client and pure adapter to the existing
+  25-field market-observation schema.
+- Explicit bounded `collect-targeted-ebay-observations` workflow with
+  reviewer-priority filtering, conservative query construction, pacing, and
+  ignored CSV/XLSX artifacts.
+- Source-aware Market Evidence Summary fields for separate AbeBooks and eBay
+  counts, statuses, currencies, price summaries, source mix, and comparability.
+
+Changed:
+
+- `summarize-market-evidence` accepts repeated `--observations` inputs.
+- Mixed-source summaries preserve AbeBooks as the core range, confidence, and
+  recommendation basis when AbeBooks evidence exists; eBay remains supplemental.
+- Release documentation records verified sandbox OAuth/Browse requests and the
+  3,014-row multi-source readiness check.
+
+Unchanged:
+
+- AbeBooks collection behavior and AbeBooks-only summary/recommendation rules.
+- Research Assessment logic, monthly Amazon imports, and durable catalog or
+  acquisition data.
+- Existing AbeBooks workbook and HTML report projections.
+
+Known limitations:
+
+- eBay evidence is active-listing asking-price evidence, not sold/completed
+  evidence, appraisal, fair market value, or expected proceeds.
+- Production eBay access remains gated and unverified; sandbox returned no
+  representative listing rows.
+- Shipping is excluded, currency conversion is not performed, and eBay match
+  confidence remains unknown.
+- Workbook/HTML integration, representative production collection,
+  sold/completed evidence, and any full-library eBay strategy remain deferred.
+
 ## v0.6.0 - 2026-07-16
 
 Release focus: Full AbeBooks Baseline & Review Artifacts.

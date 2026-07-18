@@ -501,17 +501,16 @@ an appraisal, fair market value, or realized price. The latest acquisition year
 is shown with a verification prompt for pre-2021 or unknown acquisitions; this
 presentation never suppresses market evidence. Detailed market confidence,
 outlier sensitivity, and possession-confidence fields remain in the workbook
-and evidence artifacts. eBay active listings are the proposed v0.7.0 theme;
+and evidence artifacts. eBay active listings are the v0.7.0 theme;
 multi-source evidence is not part of v0.6.0.
 
-## Planned v0.7.0 eBay Active-Listing Evidence
+## v0.7.0 eBay Active-Listing Evidence
 
-Version 0.7.0 plans an isolated eBay Buy Browse API path. It will validate
-credentials and production behavior first, then write source-specific eBay
-observation/status rows before changing Market Evidence Summary semantics. The
-first live work should be a tiny smoke test followed by a bounded cohort drawn
-from possible-sale and stratified manual/edition-review queues—not an automatic
-full-library run.
+Version 0.7.0 implements an isolated eBay Buy Browse API path through sandbox,
+source-specific eBay observation/status rows, bounded targeted collection, and
+source-aware Market Evidence Summary fields. Production behavior and
+representative listings remain unverified. Any future live work stays bounded
+to reviewer-priority cohorts—not an automatic full-library run.
 
 eBay item price, shipping, currency, buying option, condition, availability,
 match context, and source identifiers should remain separately auditable.

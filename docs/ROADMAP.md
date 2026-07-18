@@ -383,6 +383,12 @@ automatic full-library collection remain deferred decisions. Existing AbeBooks
 workbook and HTML projections remain unchanged until a later source-context
 design is explicitly approved.
 
+The v0.7.0 release boundary is the verified sandbox access path, bounded
+targeted observation workflow, source-aware generated summary, and documented
+readiness checks. Production access, representative eBay evidence, workbook and
+HTML integration, match-confidence rules, shipping treatment, sold/completed
+evidence, and any full-library strategy remain future work.
+
 ## Later: Top-25 Market Research Workflow
 
 After the Market Validation Spike, the project may create a focused workflow

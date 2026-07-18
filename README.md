@@ -448,13 +448,13 @@ dust jacket, signature, seller credibility, and physical possession may
 materially affect value. eBay and other market sources are not included in
 v0.6.0; eBay active-listing integration is planned for v0.7.0.
 
-### v0.7.0 eBay Active Listings Integration (Planned)
+### v0.7.0 eBay Active Listings Integration
 
-The v0.7.0 plan introduces eBay incrementally as a second source of active-
-listing asking-price evidence. It starts with credential and production-access
-validation, then an isolated Browse API client, normalized eBay observations, a
-small smoke test, and a targeted reviewer-priority cohort before any broader
-collection or multi-source summary changes.
+Version 0.7.0 introduces eBay incrementally as a second source of active-listing
+asking-price evidence. It includes isolated credential/access handling, a Browse
+API client, normalized eBay observations, bounded reviewer-priority collection,
+and repeated-input multi-source summaries. Production access and broader
+collection remain gated.
 
 Active eBay listings are not sold prices, fair market value, appraisals,
 realized sale prices, or expected proceeds. Credentials and tokens must remain
