@@ -330,6 +330,21 @@ timeouts, pacing, bounded pagination, retry/error handling, and credential
 redaction behind an isolated client. Use captured fixtures; live tests remain
 opt-in.
 
+Implemented client boundary:
+
+- `valuation/ebay_active_listings.py` composes the PR2 credential/token/HTTP
+  client rather than duplicating authentication or redaction;
+- one direct query and a bounded limit produce immutable, provisional
+  source-specific in-memory results;
+- normalized fields include item ID, title, item price/currency, item URL,
+  condition, safely available seller username, buying options, item-location
+  country, source label, query, and marketplace;
+- zero results return an empty tuple, while missing optional fields remain safe
+  blanks and non-USD currency remains unchanged;
+- raw payloads are not stored or printed; and
+- no command, output artifact, observation adapter, aggregation, workbook, or
+  report path is added.
+
 ### PR4 — eBay Observation Adapter
 
 Normalize item-summary responses and status/errors into versioned source-neutral

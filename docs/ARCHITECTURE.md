@@ -344,6 +344,16 @@ request path but not production coverage or match quality. The CA override is
 local environment troubleshooting, not a source-client requirement or reason
 to weaken TLS verification.
 
+PR3 adds `valuation/ebay_active_listings.py` as a source-specific normalization
+layer over the PR2 access client. It accepts one direct query, obtains an
+application token through the existing boundary, performs one bounded search,
+and returns immutable in-memory result objects. The provisional fields retain
+item identity, title, item price/currency, URL, condition, seller username,
+buying options, item-location country, query, marketplace, and an
+`ebay_active_listing` source label. Missing optional fields remain blank and raw
+responses are not retained. This layer still has no repository, CSV/XLSX,
+Market Evidence Summary, workbook, report, or monthly-import integration.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

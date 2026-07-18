@@ -539,6 +539,22 @@ results. That validates sandbox access and request construction, not production
 coverage, search quality, or market evidence. No observation or response
 artifact was written.
 
+### PR3 reusable client boundary
+
+PR3 adds a reusable active-listings client for one caller-supplied query. It
+normalizes mocked Browse item summaries into provisional source-specific,
+in-memory results containing item ID, title, item price and currency, item URL,
+condition, seller username when available, buying options, item-location
+country, query, marketplace, and source label. It preserves non-USD currencies
+and missing fields without converting, estimating, or rejecting them.
+
+These objects are not Market Observations and do not affect confidence, ranges,
+recommendations, workbooks, or reports. Query construction from catalog metadata,
+match-confidence rules, shipping normalization, status rows, and generated
+observation artifacts remain PR4/PR5 work. Active listings remain asking-price
+evidence only; PR2 sandbox quality is not representative and production remains
+gated.
+
 ## Non-Goals
 
 This document does not define or implement:
