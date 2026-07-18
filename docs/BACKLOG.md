@@ -32,11 +32,13 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] Define the v0.7.0 release plan and staged architecture.
 - [ ] Confirm developer keysets, OAuth scope, token flow, sandbox behavior,
   production access, marketplace selection, and call limits.
-- [ ] Add an isolated Browse API client with redaction, pacing, bounded
-  pagination, and fixture-backed failure handling.
-- [ ] Normalize active listings into source-specific eBay observation/status
-  rows while preserving item price, shipping, currency, buying option, match,
-  and source provenance.
+- [x] Add an isolated Browse API client with redaction, bounded results, and
+  fixture-backed failure handling.
+- [x] Normalize active listings into source-specific eBay observation/status
+  rows while preserving item price, currency, buying option, match, and source
+  provenance while excluding shipping.
+- [x] Add an explicit bounded reviewer-priority collection workflow with
+  generated CSV/XLSX outputs and conservative pacing.
 - [ ] Run a 5–10 book smoke test and a bounded reviewer-priority cohort before
   deciding whether broader collection is justified.
 - [ ] Add source-specific summary measures and explicit agreement, conflict, or

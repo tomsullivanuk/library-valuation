@@ -166,6 +166,9 @@ Current generated outputs include:
   sheet is a collector dashboard, and workbook edits are not imported.
 - `market_observations.csv` / `.xlsx`: source-specific generated listing and
   lookup-status observations.
+- `targeted_ebay_observations.csv` / `.xlsx`: explicitly generated, bounded
+  eBay active-listing and lookup-status observations for reviewer-priority
+  candidates.
 - `market_evidence_summary.csv` / `.xlsx`: source-neutral generated per-book
   evidence coverage, confidence, asking-price-derived range, and review guidance.
 
@@ -366,6 +369,20 @@ The adapter also produces one `no_results`, `no_query`, or sanitized
 outcome. It adds no collection command or generated artifact and has no path to
 Market Evidence Summary, workbook, report, monthly import, or durable catalog
 state. Production access remains gated and unverified.
+
+PR5 adds `valuation/ebay_targeted_collection.py` and the explicit
+`collect-targeted-ebay-observations` command. The command requires a generated
+Market Evidence Summary input, an output under `output/`, and a book limit. It
+defaults to the possible-sale queue, deterministically orders selected
+candidates, and constructs one query using ISBN-13, ISBN-10, title plus author,
+or usable title. Limits are capped at 50 books and 10 results per book, with a
+one-second default delay between requests.
+
+The workflow writes only the existing 25-field observation schema as paired
+CSV/XLSX generated artifacts. It stops after the first safe client error to
+avoid repeated credential/token failures. It neither reads its own outputs nor
+connects them to Market Evidence Summary, workbooks, reports, monthly import, or
+durable state. Production remains gated and unverified.
 
 ## Source-of-Truth Principle
 

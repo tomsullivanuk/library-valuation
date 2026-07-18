@@ -365,10 +365,26 @@ Catalog-derived query construction and targeted collection remain PR5 work.
 
 ### PR5 — Targeted eBay Collection Workflow
 
-Add smoke-test and reviewer-priority cohort selection, distinct output paths,
-limits, progress, overwrite/resume documentation, and coverage diagnostics.
-Begin with possible-sale plus stratified manual/edition-review candidates, not
-the full catalog.
+Implemented as `collect-targeted-ebay-observations` plus
+`valuation/ebay_targeted_collection.py`:
+
+- requires an explicit summary input, generated output path, and book limit;
+- defaults to possible-sale candidates and supports repeated filters for manual
+  research and edition/condition queues;
+- deterministically orders candidates and queries by ISBN-13, ISBN-10, title
+  plus author, then usable title;
+- caps runs at 50 books and 10 results per book, defaults to three results, and
+  applies a configurable one-second delay between requests;
+- writes paired `output/targeted_ebay_observations.csv/.xlsx` artifacts using
+  the unchanged 25-field schema; and
+- emits observed/no-query/no-results rows, or one sanitized source-unavailable
+  row before stopping after a client failure.
+
+Generated pairs are overwritten on intentional rerun; resume and coverage
+diagnostics remain future workflow improvements. No live PR5 run is part of the
+implementation validation. Full-library collection, summary aggregation,
+workbook/report changes, production assumptions, and sold listings remain out
+of scope.
 
 ### PR6 — Multi-Source Market Evidence Summary
 

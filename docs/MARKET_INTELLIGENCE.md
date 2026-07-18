@@ -576,6 +576,30 @@ Evidence Summary integration, workbook change, or HTML report change. Active
 listings remain asking-price evidence only. Production access remains disabled
 and unverified pending the existing compliance gate.
 
+### PR5 targeted collection boundary
+
+`collect-targeted-ebay-observations` turns the PR3 client and PR4 adapter into
+an explicit bounded workflow. It requires `--summary`, `--output`, and
+`--limit-books`; output must remain under `output/`. The default cohort is
+`review_for_possible_sale`. Repeated `--review-recommendation` options may also
+include `manual_market_research_needed` and `review_edition_or_condition`.
+Candidates are ordered deterministically by queue, asking-price review context,
+research score, title, and catalog ID.
+
+Query construction uses ISBN-13, ISBN-10, title plus author, then usable title
+alone. Missing queries produce `no_query`, empty searches produce `no_results`,
+and a safe client failure produces `source_unavailable` before the run stops to
+avoid repeated global authentication failures. The command caps collection at
+50 books and 10 results per book and defaults to three results and a one-second
+inter-request delay.
+
+The paired `output/targeted_ebay_observations.csv/.xlsx` artifacts retain the
+existing observation field order. They contain item asking price only, preserve
+currency, exclude shipping, and leave match confidence unknown. They are not
+raw responses, durable market history, or inputs to the current Market Evidence
+Summary, workbook, or HTML report. Sandbox alone has been validated; production
+remains disabled and unverified, and sandbox results are not representative.
+
 ## Non-Goals
 
 This document does not define or implement:

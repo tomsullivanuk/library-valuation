@@ -40,6 +40,14 @@ from valuation.calibration_simulation import (
 )
 from valuation.collector_workbook import write_collector_workbook
 from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials
+from valuation.ebay_active_listings import EbayActiveListingsClient
+from valuation.ebay_targeted_collection import (
+    DEFAULT_REVIEW_RECOMMENDATIONS,
+    MAX_RESULTS_PER_BOOK,
+    MAX_TARGETED_BOOKS,
+    SUPPORTED_REVIEW_RECOMMENDATIONS,
+    collect_targeted_ebay_observation_rows,
+)
 from valuation.expanded_market_validation_analysis import (
     EXPANDED_MARKET_VALIDATION_ANALYSIS_FIELDNAMES,
     EXPANDED_RESEARCH_SIGNAL_EFFECTIVENESS_FIELDNAMES,
@@ -1316,6 +1324,49 @@ def collect_expanded_abebooks_observations(
     return len(observation_rows)
 
 
+def collect_targeted_ebay_observations(
+    summary_path: Path,
+    output_path: Path,
+    *,
+    limit_books: int,
+    max_results_per_book: int = 3,
+    delay: float = 1.0,
+    review_recommendations: tuple[str, ...] = DEFAULT_REVIEW_RECOMMENDATIONS,
+    client: EbayActiveListingsClient | None = None,
+    observation_date: str | None = None,
+    sleep=time.sleep,
+    output_root: Path = Path("output"),
+) -> int:
+    """Write an explicit, bounded eBay active-listing observation artifact."""
+    ensure_generated_output_path(output_path, output_root)
+    try:
+        active_client = client or EbayActiveListingsClient(
+            EbayAccessClient(EbayCredentials.from_environment())
+        )
+        rows = collect_targeted_ebay_observation_rows(
+            read_csv_rows(summary_path),
+            active_client,
+            observation_date=observation_date or utc_timestamp(),
+            limit_books=limit_books,
+            max_results_per_book=max_results_per_book,
+            delay_seconds=delay,
+            review_recommendations=review_recommendations,
+            sleep=sleep,
+        )
+    except (EbayAccessError, ValueError) as error:
+        raise UserFacingError(str(error)) from None
+    write_table_outputs(output_path, MARKET_OBSERVATION_FIELDNAMES, rows, "Targeted eBay Observations")
+    return len(rows)
+
+
+def ensure_generated_output_path(output_path: Path, output_root: Path = Path("output")) -> None:
+    """Keep generated eBay artifacts within the ignored output boundary."""
+    resolved_root = output_root.resolve()
+    resolved_csv, resolved_xlsx = (path.resolve() for path in paired_output_paths(output_path))
+    if not all(path.is_relative_to(resolved_root) for path in (resolved_csv, resolved_xlsx)):
+        raise UserFacingError(f"eBay observation output must be under {output_root}")
+
+
 def report_market_observation_coverage(output_dir: Path) -> int:
     sample_rows = read_csv_rows(output_dir / "market_validation_sample.csv")
     observation_rows = read_csv_rows(output_dir / "market_observations.csv")
@@ -2282,6 +2333,26 @@ def build_parser() -> argparse.ArgumentParser:
     ebay_access_parser.add_argument("--query", required=True, help="Book query for the one smoke-test search")
     ebay_access_parser.add_argument("--limit", type=int, default=3, choices=range(1, 4))
 
+    targeted_ebay_parser = subparsers.add_parser(
+        "collect-targeted-ebay-observations",
+        help="Collect a bounded reviewer-priority cohort of eBay active-listing observations",
+    )
+    targeted_ebay_parser.add_argument("--summary", required=True, type=Path)
+    targeted_ebay_parser.add_argument("--output", required=True, type=Path)
+    targeted_ebay_parser.add_argument(
+        "--limit-books", required=True, type=int, metavar=f"1-{MAX_TARGETED_BOOKS}"
+    )
+    targeted_ebay_parser.add_argument(
+        "--max-results-per-book", type=int, default=3, metavar=f"1-{MAX_RESULTS_PER_BOOK}"
+    )
+    targeted_ebay_parser.add_argument("--delay", type=float, default=1.0)
+    targeted_ebay_parser.add_argument(
+        "--review-recommendation",
+        action="append",
+        choices=SUPPORTED_REVIEW_RECOMMENDATIONS,
+        help="Repeat to include multiple reviewer queues; defaults to review_for_possible_sale",
+    )
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2441,6 +2512,20 @@ def main(argv: list[str] | None = None) -> int:
             for listing in result.listings:
                 amount = " ".join(value for value in (listing.price, listing.currency) if value) or "price unavailable"
                 print(f"- {listing.title} — {amount}")
+            return 0
+        if args.command == "collect-targeted-ebay-observations":
+            count = collect_targeted_ebay_observations(
+                args.summary,
+                args.output,
+                limit_books=args.limit_books,
+                max_results_per_book=args.max_results_per_book,
+                delay=args.delay,
+                review_recommendations=tuple(
+                    args.review_recommendation or DEFAULT_REVIEW_RECOMMENDATIONS
+                ),
+            )
+            csv_path, xlsx_path = paired_output_paths(args.output)
+            print(f"Wrote {count} targeted eBay observation rows to {csv_path} and {xlsx_path}")
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

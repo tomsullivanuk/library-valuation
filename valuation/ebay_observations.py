@@ -11,7 +11,7 @@ from valuation.ebay_active_listings import EbayActiveListing, EbayActiveListingS
 
 
 SOURCE = "ebay_active_listings"
-SUPPORTED_LOOKUP_STRATEGIES = {"isbn13", "isbn10", "title_author", "direct_query"}
+SUPPORTED_LOOKUP_STRATEGIES = {"isbn13", "isbn10", "title_author", "title", "direct_query"}
 
 
 def adapt_ebay_search_result(

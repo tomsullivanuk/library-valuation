@@ -426,7 +426,14 @@ buying options are not interpreted. Item ID is retained as `raw_reference`;
 buying options, marketplace, and item-location country are safe provenance in
 `match_notes`. Match confidence remains `unknown`. The adapter retains no raw
 payload and writes no file; collection and summary/reviewer-artifact integration
-remain separate future steps.
+remain separate steps.
+
+PR5 writes the adapter rows only through the explicit, bounded
+`collect-targeted-ebay-observations` command. Its paired CSV/XLSX files under
+`output/` are regenerated projections, not canonical observations or durable
+catalog state. The command reads review recommendations only to select a small
+cohort; it does not alter recommendation logic or feed eBay rows into the
+current Market Evidence Summary, workbook, or report.
 
 ### Valuation Estimate
 

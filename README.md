@@ -498,6 +498,35 @@ acceptable for access validation and says nothing about production result
 quality. The CA override is local troubleshooting, not required project runtime
 behavior.
 
+PR5 adds an explicit targeted collector for generated eBay observation rows.
+The summary, output, and bounded book limit are required; the default queue is
+`review_for_possible_sale`, and additional supported queues can be included by
+repeating `--review-recommendation`:
+
+```bash
+.venv/bin/python library_pipeline.py collect-targeted-ebay-observations \
+  --summary output/full_abebooks_market_evidence_summary.csv \
+  --output output/targeted_ebay_observations.csv \
+  --limit-books 10 \
+  --max-results-per-book 3 \
+  --delay 1
+```
+
+The command requires the same four eBay environment variables as the access
+check. It writes paired CSV/XLSX files under the ignored `output/` boundary and
+overwrites that generated pair on an intentional rerun. Queries use ISBN-13,
+then ISBN-10, then title plus author, then a usable title alone. Books without a
+safe query receive `no_query`; zero results receive `no_results`; the first safe
+client failure receives `source_unavailable` and stops the run to avoid repeated
+authentication attempts.
+
+This collector is capped at 50 books and 10 results per book; both command
+defaults and examples are smaller. Item price and returned currency are
+preserved, shipping is excluded, and match confidence remains unknown. PR5 does
+not feed these rows into Market Evidence Summary, workbooks, or reports. Only
+sandbox access has been validated, sandbox result quality is not representative,
+and production remains disabled/unverified pending the existing compliance gate.
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 
