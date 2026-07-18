@@ -354,6 +354,19 @@ buying options, item-location country, query, marketplace, and an
 responses are not retained. This layer still has no repository, CSV/XLSX,
 Market Evidence Summary, workbook, report, or monthly-import integration.
 
+PR4 adds `valuation/ebay_observations.py`, a pure adapter from those immutable
+client results to the existing 25-field market-observation row shape. It is
+network-free and file-free. Observed rows use `ebay_active_listings` as the
+source, preserve item price and currency without shipping or conversion, and
+keep item ID, buying options, marketplace, and item-location country in
+`raw_reference` or `match_notes`. Match confidence remains `unknown`.
+
+The adapter also produces one `no_results`, `no_query`, or sanitized
+`source_unavailable` status row when the caller supplies the corresponding
+outcome. It adds no collection command or generated artifact and has no path to
+Market Evidence Summary, workbook, report, monthly import, or durable catalog
+state. Production access remains gated and unverified.
+
 ## Source-of-Truth Principle
 
 The durable state under `data/`, together with user source files under

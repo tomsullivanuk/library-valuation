@@ -412,6 +412,22 @@ The `likely_low`, `likely_mid`, and `likely_high` fields are descriptive
 asking-price-derived references. They are not appraisals, fair market value,
 realized sale prices, definitive valuations, or guaranteed proceeds.
 
+#### eBay active-listing observation adapter (v0.7.0 PR4)
+
+The eBay adapter projects in-memory active-listing results into the existing
+generated market-observation row shape; it does not add canonical fields or
+durable records. It maps catalog identity and research context into the shared
+fields, uses `ebay_active_listings` as `source`, and supports `observed`,
+`no_results`, `no_query`, and `source_unavailable` lookup statuses.
+
+For observed rows, `asking_price` is the eBay item price only and `currency` is
+preserved as returned. Shipping is excluded, currencies are not converted, and
+buying options are not interpreted. Item ID is retained as `raw_reference`;
+buying options, marketplace, and item-location country are safe provenance in
+`match_notes`. Match confidence remains `unknown`. The adapter retains no raw
+payload and writes no file; collection and summary/reviewer-artifact integration
+remain separate future steps.
+
 ### Valuation Estimate
 
 A `Valuation Estimate` converts market observations and heuristics into an

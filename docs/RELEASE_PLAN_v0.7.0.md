@@ -347,9 +347,21 @@ Implemented client boundary:
 
 ### PR4 — eBay Observation Adapter
 
-Normalize item-summary responses and status/errors into versioned source-neutral
-observation candidates. Add ISBN/title matching and confidence tests while
-preserving eBay-specific provenance and price components.
+Implemented as a pure adapter in `valuation/ebay_observations.py`:
+
+- converts immutable PR3 search results into the existing 25-field
+  market-observation row shape without network or file access;
+- emits `observed`, `no_results`, `no_query`, and sanitized
+  `source_unavailable` rows;
+- preserves item price and currency without shipping, conversion, landed-cost
+  inference, or buying-option interpretation;
+- retains item ID, buying options, marketplace, and item-location country in
+  notes/reference fields rather than expanding the canonical schema; and
+- leaves match confidence `unknown` until later edition/match review rules.
+
+PR4 adds no command, collection artifact, Market Evidence Summary integration,
+workbook/report change, sold-listing support, or production-access assumption.
+Catalog-derived query construction and targeted collection remain PR5 work.
 
 ### PR5 — Targeted eBay Collection Workflow
 

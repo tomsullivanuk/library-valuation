@@ -548,12 +548,33 @@ condition, seller username when available, buying options, item-location
 country, query, marketplace, and source label. It preserves non-USD currencies
 and missing fields without converting, estimating, or rejecting them.
 
-These objects are not Market Observations and do not affect confidence, ranges,
-recommendations, workbooks, or reports. Query construction from catalog metadata,
-match-confidence rules, shipping normalization, status rows, and generated
-observation artifacts remain PR4/PR5 work. Active listings remain asking-price
-evidence only; PR2 sandbox quality is not representative and production remains
-gated.
+At the PR3 boundary these objects are not Market Observations and do not affect
+confidence, ranges, recommendations, workbooks, or reports. Query construction
+from catalog metadata, reviewed match-confidence rules, shipping normalization,
+and generated observation artifacts remain later work. Active listings remain
+asking-price evidence only; PR2 sandbox quality is not representative and
+production remains gated.
+
+### PR4 observation adapter boundary
+
+PR4 adds `valuation/ebay_observations.py`, a pure, network-free, file-free
+adapter. It converts catalog context plus a PR3 search result into rows with the
+existing AbeBooks-compatible market-observation field order; it does not change
+that canonical row shape. Listing results become `observed` rows, while empty
+queries, zero results, and caller-reported safe failures become `no_query`,
+`no_results`, and `source_unavailable` status rows respectively.
+
+The adapter records eBay item price only. Currency is preserved without
+conversion, shipping is excluded, and buying options are retained as context
+without auction/fixed-price interpretation. Item ID, buying options,
+marketplace, and item-location country remain in `raw_reference` or
+`match_notes`; raw API payloads are neither accepted nor retained. Edition and
+match confidence remain `unknown` pending later reviewed rules.
+
+PR4 adds no command, collection workflow, generated observation file, Market
+Evidence Summary integration, workbook change, or HTML report change. Active
+listings remain asking-price evidence only. Production access remains disabled
+and unverified pending the existing compliance gate.
 
 ## Non-Goals
 
