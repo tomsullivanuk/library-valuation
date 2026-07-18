@@ -630,6 +630,25 @@ within a source blank that source's numeric price summary; differing currencies
 across sources are labeled non-comparable. No conversion or shipping is added.
 Workbook and HTML report integration remains deferred.
 
+### PR7 local workflow readiness
+
+The local readiness run combined
+`output/full_abebooks_market_observations.csv` and
+`output/smoke_ebay_observations.csv` through repeated `--observations`. It wrote
+ignored `smoke_multisource_market_evidence_summary.csv/.xlsx` files containing
+3,014 catalog rows. Source mix was 3,012 AbeBooks-only and 2 AbeBooks-plus-eBay.
+The run contained 2 eBay status rows, 0 eBay listings, 2,896 books with priced
+AbeBooks evidence, and 0 books with priced eBay evidence. Comparability was
+`single_source_currency` for 2,896 rows and `no_priced_listings` for 118 rows.
+
+This confirms the generated multi-source command path and source-specific
+`no_results` interpretation. It does not validate production eBay access,
+listing availability, prices, or match quality. Operational use still requires
+locally sourced ignored credentials, an explicit small targeted collection,
+and deliberate repeated-input summary generation. Outputs remain asking-price
+evidence, not appraisals or realized-sale estimates. Existing AbeBooks workbook
+and HTML projections do not consume the multi-source fields.
+
 ## Non-Goals
 
 This document does not define or implement:

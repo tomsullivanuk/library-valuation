@@ -13,11 +13,12 @@ sale price, or expected sale proceeds.
 
 Validate eBay developer access, build an isolated Browse API client and
 source-specific observation adapter, collect a bounded reviewer-priority cohort,
-and then extend generated summaries and review artifacts without changing
+and then extend generated summaries without changing
 durable catalog, acquisition, Research Assessment, or monthly import behavior.
 
 The release is successful only if source provenance and evidence limitations
-remain visible from API response through reviewer output.
+remain visible through the generated multi-source summary. Existing AbeBooks
+workbook and HTML artifacts remain unchanged pending a later product decision.
 
 ## 3. Starting Point
 
@@ -68,17 +69,17 @@ configured keyset.
 ### In scope
 
 - Credential and environment setup documentation.
-- Application-token acquisition and safe in-memory caching.
+- Application-token acquisition and safe redaction.
 - Sandbox and production endpoint separation.
 - Bounded active-listing item-summary searches.
 - ISBN/GTIN-first and title/author fallback query experiments.
-- Marketplace, category, buying-option, location, and delivery filters where
-  supported and empirically useful.
+- Explicit marketplace context and bounded direct queries.
 - An isolated source adapter that produces normalized eBay observation/status
   rows while preserving raw eBay provenance.
 - A targeted collection workflow for a reviewed cohort.
 - Source-specific eBay measures and multi-source review context.
-- Updated generated workbook and static HTML review artifacts.
+- Source-aware generated summary output; existing AbeBooks workbook and static
+  HTML artifacts remain unchanged.
 - Fixture-backed deterministic tests and redaction tests.
 
 ### Non-goals
@@ -407,11 +408,19 @@ TLS, producing two eBay `no_results` rows. That validates the sandbox workflow,
 not production or listing quality. PR6 adds no workbook/report integration,
 production assumption, sold evidence, or durable data.
 
-### PR7 — Workbook / HTML Report Updates
+### PR7 — v0.7.0 Multi-Source Workflow Readiness
 
-Expose concise source labels, source-specific evidence context, conflicts, and
-caveats without turning reviewer artifacts into technical dumps. Keep active-
-listing evidence separate from sold-price claims.
+Verify the existing generated workflow end to end without another live request:
+
+- combine the full AbeBooks observations and two-row sandbox eBay smoke artifact;
+- confirm 3,014 summary rows, including 3,012 AbeBooks-only and 2 mixed-source;
+- confirm the two eBay `no_results` rows remain source-specific status evidence;
+- confirm all smoke and multi-source outputs remain ignored/untracked; and
+- document local credentials, bounded collection, repeated-input summarization,
+  non-appraisal interpretation, production gating, and known limitations.
+
+No code or summary semantics changed. Workbook and HTML integration are deferred
+instead of being introduced as release-hardening work.
 
 ### PR8 — Documentation and Release Readiness
 
@@ -450,9 +459,11 @@ Proceed from each stage only when:
 - no credential appears in repository history, logs, errors, fixtures, or
   artifacts;
 - the client and adapter have deterministic fixture coverage;
-- targeted collection shows acceptable match quality and call cost;
+- the targeted collection path remains bounded; representative match quality
+  and call cost must be proven before any production or broader rollout;
 - cross-source rules expose rather than hide conflicts and non-comparability;
-- reviewer outputs retain asking-price and non-appraisal caveats;
+- existing AbeBooks reviewer outputs retain asking-price and non-appraisal
+  caveats and do not imply multi-source integration;
 - generated artifacts remain ignored/untracked; and
 - monthly import and durable data behavior remain unchanged.
 

@@ -553,6 +553,24 @@ TLS and completed OAuth plus both Browse requests. It produced two ignored
 and artifact path only—not production access, listing coverage, prices, or match
 quality.
 
+The v0.7.0 operational sequence is:
+
+1. Store sandbox credentials in ignored `.env` and source them into the current
+   shell; the application never commits or prints them.
+2. Optionally run `ebay-access-check` for one bounded connectivity check.
+3. Run `collect-targeted-ebay-observations` with an explicit small
+   `--limit-books`.
+4. Pass the AbeBooks and eBay observation CSVs as repeated `--observations`
+   inputs to `summarize-market-evidence`.
+5. Review eBay only as supplemental active-listing asking-price evidence.
+
+The PR7 local readiness run combined the full AbeBooks observations with the
+two-row sandbox smoke artifact and produced 3,014 summary rows: 3,012
+`abebooks_only` and 2 `abebooks_and_ebay_active_listings`. The two eBay rows were
+`no_results` statuses, not global market absence. Generated files remained
+ignored. The summary is not an appraisal, and workbook/HTML integration remains
+deferred. See [`docs/RELEASE_READINESS_v0.7.0.md`](docs/RELEASE_READINESS_v0.7.0.md).
+
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:
 

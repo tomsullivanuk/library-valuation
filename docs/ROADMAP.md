@@ -371,7 +371,7 @@ Add eBay incrementally as active-listing asking-price evidence:
 - PR4: eBay Observation Adapter.
 - PR5: Targeted eBay Collection Workflow.
 - PR6: Multi-Source Market Evidence Summary.
-- PR7: Workbook / HTML Report Updates.
+- PR7: Multi-Source Workflow Readiness.
 - PR8: Documentation and Release Readiness.
 
 Begin with a 5–10 book smoke test, then a bounded possible-sale plus stratified
@@ -379,7 +379,9 @@ manual/edition-review cohort. Do not make the initial eBay run full-library.
 Extend generated summaries to distinguish source agreement, conflict, and
 non-comparability without treating active asking prices as completed sales,
 appraisals, fair market value, or expected proceeds. Sold/completed evidence and
-automatic full-library collection remain deferred decisions.
+automatic full-library collection remain deferred decisions. Existing AbeBooks
+workbook and HTML projections remain unchanged until a later source-context
+design is explicitly approved.
 
 ## Later: Top-25 Market Research Workflow
 

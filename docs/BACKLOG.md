@@ -43,6 +43,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   deciding whether broader collection is justified.
 - [x] Add source-specific summary measures and explicit agreement, conflict, or
   non-comparability without naively pooling prices.
+- [x] Verify the ignored local multi-source summary workflow using the full
+  AbeBooks artifact and the two-row sandbox eBay smoke artifact.
 - [ ] Update workbook and HTML review artifacts with concise source context and
   active-listing caveats.
 - [ ] Complete v0.7.0 documentation and release readiness.
