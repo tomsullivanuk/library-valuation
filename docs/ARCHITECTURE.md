@@ -385,6 +385,27 @@ avoid repeated credential/token failures. It neither reads its own outputs nor
 automatically connects them to downstream artifacts, monthly import, or durable
 state. Production remains gated and unverified.
 
+### v0.8.0 production validation boundary
+
+v0.8.0 PR1 removes seller username from the normalized eBay client object and
+leaves the shared observation `seller` field blank for eBay rows. Seller
+identity is neither retained in the source-specific object nor written to
+`match_notes`.
+
+On 2026-07-18, PR2 ran the existing targeted collector against production for a
+two-book, ISBN-13 cohort with at most three results per book and a one-second
+delay. The run produced four `observed` rows in ignored paired CSV/XLSX files.
+All rows used `ebay_active_listings`, retained item ID, URL, title, item price,
+USD currency, condition, buying options, marketplace, item-location country,
+query, and strategy, and kept match confidence `unknown`. All four `seller`
+values were blank and seller identity was absent from `match_notes`.
+
+This validates production OAuth, bounded Browse requests, normalization, the
+privacy-hardened observation adapter, and generated artifact writing. It does
+not add or authorize full-library collection, downstream workbook/report
+integration, shipping-inclusive pricing, conversion, sold/completed evidence,
+or new match-confidence rules.
+
 PR6 extends the existing summary command to accept repeated observation inputs.
 The aggregator still groups to one row per catalog item and adds a source-aware
 projection for AbeBooks and eBay counts, statuses, currencies, price summaries,

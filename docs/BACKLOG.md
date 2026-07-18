@@ -32,8 +32,10 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] Define the v0.7.0 release plan and staged architecture.
 - [x] Confirm sandbox keyset, OAuth token flow, Browse request behavior, and
   explicit marketplace selection.
-- [ ] Confirm production access, notification compliance, representative search
-  behavior, and effective call limits before any production rollout.
+- [x] Confirm production access and run a bounded privacy-hardened targeted
+  smoke collection.
+- [ ] Confirm representative search behavior and effective call limits before
+  any broader production rollout.
 - [x] Add an isolated Browse API client with redaction, bounded results, and
   fixture-backed failure handling.
 - [x] Normalize active listings into source-specific eBay observation/status

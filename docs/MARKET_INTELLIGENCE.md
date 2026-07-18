@@ -648,6 +648,32 @@ and deliberate repeated-input summary generation. Outputs remain asking-price
 evidence, not appraisals or realized-sale estimates. Existing AbeBooks workbook
 and HTML projections do not consume the multi-source fields.
 
+### v0.8.0 production targeted smoke
+
+Before production collection, v0.8.0 PR1 removed seller username from the
+normalized eBay listing object and eBay observation projection. The shared
+25-field schema remains unchanged, but `seller` is blank for eBay rows and
+seller identity is not included in `match_notes`.
+
+On 2026-07-18, PR2 ran the existing targeted collector in production against
+the first two deterministic `review_for_possible_sale` candidates from the
+generated full AbeBooks summary. Both used ISBN-13 queries, with a maximum of
+three results per book and a one-second delay. The bounded run completed and
+produced four `observed` rows:
+
+- four item prices in USD: 389.30, 333.10, 379.49, and 326.23;
+- four item IDs and four listing URLs;
+- four conditions and fixed-price buying-option context;
+- source `ebay_active_listings` and match confidence `unknown` for every row;
+- blank `seller` for every row; and
+- no seller identity or seller label in any `match_notes` value.
+
+The paired CSV/XLSX smoke artifacts remain ignored under `output/`; they are
+validation evidence, not committed data or durable market history. No raw API
+response was retained. This small cohort validates the production targeted
+observation path and seller-suppression boundary, not representative coverage,
+price quality, edition matching, broader collection, or downstream integration.
+
 ## Non-Goals
 
 This document does not define or implement:

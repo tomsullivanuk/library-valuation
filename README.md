@@ -453,8 +453,8 @@ v0.6.0; eBay active-listing integration is planned for v0.7.0.
 Version 0.7.0 introduces eBay incrementally as a second source of active-listing
 asking-price evidence. It includes isolated credential/access handling, a Browse
 API client, normalized eBay observations, bounded reviewer-priority collection,
-and repeated-input multi-source summaries. Production access and broader
-collection remain gated.
+and repeated-input multi-source summaries. A two-book production smoke run has
+validated the bounded observation path; broader collection remains gated.
 
 Active eBay listings are not sold prices, fair market value, appraisals,
 realized sale prices, or expected proceeds. Credentials and tokens must remain
@@ -483,11 +483,11 @@ marketplace, success/count fields, and up to three title/price/currency snippets
 It does not create eBay observations, update market evidence, collect the full
 library, or provide sold/completed evidence.
 
-PR2 validation is sandbox-only. Production has not been tested: the production
-keyset is currently disabled pending eBay Marketplace Account Deletion/Closure
-notification compliance (subscription or exemption). Do not infer production
-access from sandbox behavior. Run the smoke command only after exporting the
-sandbox variables into the process that launches the command.
+Sandbox and production must use their corresponding local keysets. On
+2026-07-18, the production keyset acquired an application token and completed a
+bounded Browse access check after a local Production Client ID typo was fixed.
+The earlier `invalid_client` response was a local configuration error, not a
+code, TLS, compliance, or Production Cert ID failure.
 
 The local Python 3.14 environment had no active default CA file. Pointing
 `SSL_CERT_FILE` to the installed certifi bundle restored verified HTTPS without
@@ -523,9 +523,13 @@ authentication attempts.
 This collector is capped at 50 books and 10 results per book; both command
 defaults and examples are smaller. Item price and returned currency are
 preserved, shipping is excluded, and match confidence remains unknown. PR5 does
-not automatically feed these rows into downstream artifacts. Only
-sandbox access has been validated, sandbox result quality is not representative,
-and production remains disabled/unverified pending the existing compliance gate.
+not automatically feed these rows into downstream artifacts. A 2026-07-18
+production smoke run used two books, at most three results per book, and a
+one-second delay. It produced four observed rows with item prices, currencies,
+conditions, item IDs, and listing URLs. Seller identity was not normalized;
+every eBay `seller` field was blank and no `match_notes` contained seller
+identity. See [`docs/RELEASE_READINESS_v0.8.0.md`](docs/RELEASE_READINESS_v0.8.0.md).
+This small run does not authorize broader or full-library collection.
 
 PR6 extends `summarize-market-evidence` so `--observations` can be repeated for
 an explicit prototype combining AbeBooks and targeted eBay observation files:
