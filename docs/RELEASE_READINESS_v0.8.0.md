@@ -121,3 +121,23 @@ scoped reviewer-facing source-context design. It does not authorize automatic
 matching, price pooling, workbook/report changes, broader production cadence,
 or full-library collection. Detailed metrics and interpretation are recorded in
 [`PRODUCTION_EBAY_VALIDATION_v0.8.0.md`](PRODUCTION_EBAY_VALIDATION_v0.8.0.md).
+
+## PR4 Source-Aware Reviewer Workbook
+
+PR4 extends the existing generated reviewer workbook when its input contains
+multi-source summary fields. The four queue sheets add five compact columns:
+Evidence Sources, eBay Listings, eBay Price Range, eBay Status, and Source Price
+Comparability. Existing AbeBooks range, confidence, and recommendation columns
+remain unchanged.
+
+Evidence Detail retains the raw source-mix, core-range-source, comparability,
+and AbeBooks/eBay count, currency, and price fields. Run Summary adds source-mix,
+eBay listing/status, rows-with-eBay, core-range-source, and comparability counts.
+Field Definitions explains the supplemental active-listing boundary, excluded
+shipping, absent conversion, unknown eBay match confidence, human review need,
+non-appraisal caveat, and seller-identity suppression.
+
+Legacy AbeBooks-only summaries remain valid inputs and render their existing
+tabs with conservative source defaults. The HTML report remains unchanged and
+does not yet expose eBay/source-aware fields. No workbook output is durable or
+read by monthly import.

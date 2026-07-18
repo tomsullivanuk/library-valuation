@@ -717,12 +717,39 @@ eBay listings and 13 eBay statuses. Price comparability was
 comparison found no changes to AbeBooks `likely_low`, `likely_mid`,
 `likely_high`, `market_confidence`, or `review_recommendation`.
 
-The evidence is useful enough to justify a later, separately designed
-reviewer-facing source-context PR: coverage is high, identity/URL provenance is
-present, and title plausibility is generally strong. It is not sufficient to
-auto-match editions, pool prices, add shipping, convert currencies, infer sold
-prices, or start broader/full-library collection. Workbook and HTML report
-integration remain unchanged and deferred.
+The evidence is useful enough to justify a separately designed reviewer-facing
+source-context PR: coverage is high, identity/URL provenance is present, and
+title plausibility is generally strong. It is not sufficient to auto-match
+editions, pool prices, add shipping, convert currencies, infer sold prices, or
+start broader/full-library collection.
+
+### v0.8.0 source-aware reviewer workbook
+
+PR4 projects the existing multi-source summary into the generated reviewer
+workbook without changing aggregation semantics. Review Queue, Possible Sale,
+Manual Research, and Edition Condition Review retain their existing core fields
+and append five compact displays: Evidence Sources, eBay Listings, eBay Price
+Range, eBay Status, and Source Price Comparability.
+
+The compact price range presents eBay minimum/median/maximum item prices with
+their returned currency. It does not include shipping, convert currency, pool
+prices with AbeBooks, or alter `likely_low`, `likely_mid`, `likely_high`, market
+confidence, or recommendation. Status text is explicitly source-specific; an
+eBay status-only row does not imply global market absence.
+
+Evidence Detail retains source-aware technical fields from the input summary,
+including source mix, core range source, comparability, source-specific counts,
+currencies, and price summaries. Run Summary adds source-mix, total eBay
+listing/status, eBay coverage, core-range-source, and comparability counts only
+when the source-aware schema is present. Field Definitions documents the active-
+listing, non-appraisal, human-review, seller-suppression, shipping, conversion,
+and unknown-match-confidence boundaries.
+
+Legacy AbeBooks-only summary inputs remain supported. They preserve all seven
+workbook sheets and existing AbeBooks review behavior, with a conservative
+`AbeBooks only` source display and blank eBay details. The generated workbook
+remains ignored and non-durable. HTML report integration remains unchanged and
+deferred for separate layout review.
 
 ## Non-Goals
 

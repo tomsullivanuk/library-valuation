@@ -434,6 +434,16 @@ detail, run counts, and field definitions. Books whose latest acquisition is
 before 2021 are flagged for physical verification. The workbook does not alter
 the canonical evidence summary or durable catalog and acquisition data.
 
+When the input is a source-aware multi-source summary, the same workbook adds
+compact `Evidence Sources`, `eBay Listings`, `eBay Price Range`, `eBay Status`,
+and `Source Price Comparability` columns to its reviewer queues. Evidence Detail
+retains the source-specific audit fields, and Run Summary reports source mix,
+eBay listing/status totals, core range source, and comparability. AbeBooks
+remains the core range source for mixed rows; eBay remains supplemental active-
+listing item-price evidence with shipping excluded, no conversion, unknown
+match confidence, and no stored seller identity. Legacy AbeBooks-only summaries
+remain supported. The HTML report does not yet expose these fields.
+
 The generated static HTML report is a simpler, self-contained sharing view. It
 uses tabbed review queues, queue-specific guidance, a single human-readable
 AbeBooks range, acquisition-year possession prompts, and a field guide with the

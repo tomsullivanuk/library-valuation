@@ -20,6 +20,14 @@ REVIEW_WORKBOOK_SHEETS = [
     "Field Definitions",
 ]
 
+SOURCE_AWARE_REVIEW_FIELDNAMES = [
+    "Evidence Sources",
+    "eBay Listings",
+    "eBay Price Range",
+    "eBay Status",
+    "Source Price Comparability",
+]
+
 REVIEW_QUEUE_FIELDNAMES = [
     "catalog_item_id",
     "title",
@@ -35,12 +43,14 @@ REVIEW_QUEUE_FIELDNAMES = [
     "best_match_confidence",
     "listing_count",
     "isbn_13",
+    *SOURCE_AWARE_REVIEW_FIELDNAMES,
 ]
 
 POSSIBLE_SALE_FIELDNAMES = [
     "catalog_item_id", "title", "author", "latest_acquired_date", "possession_confidence",
     "likely_low", "likely_mid", "likely_high", "market_confidence", "outlier_sensitivity",
     "listing_count", "best_match_confidence", "review_reason", "isbn_13",
+    *SOURCE_AWARE_REVIEW_FIELDNAMES,
 ]
 
 MANUAL_RESEARCH_FIELDNAMES = [
@@ -48,12 +58,14 @@ MANUAL_RESEARCH_FIELDNAMES = [
     "review_recommendation", "review_reason", "likely_mid", "likely_high", "market_confidence",
     "outlier_sensitivity", "listing_count", "best_match_confidence", "research_score",
     "research_band", "isbn_13",
+    *SOURCE_AWARE_REVIEW_FIELDNAMES,
 ]
 
 EDITION_CONDITION_FIELDNAMES = [
     "catalog_item_id", "title", "author", "isbn_13", "review_reason", "best_match_confidence",
     "market_confidence", "likely_mid", "likely_high", "listing_count", "latest_acquired_date",
     "possession_confidence",
+    *SOURCE_AWARE_REVIEW_FIELDNAMES,
 ]
 
 ACQUISITION_CONTEXT_FIELDNAMES = [
@@ -90,7 +102,7 @@ def write_abebooks_review_workbook(
     acquisitions: Iterable[Mapping[str, str]],
 ) -> None:
     """Write a generated review workbook without changing canonical evidence rows."""
-    enriched = add_acquisition_context(summary_rows, acquisitions)
+    enriched = add_reviewer_source_context(add_acquisition_context(summary_rows, acquisitions))
     review_rows = sorted(enriched, key=review_sort_key)
     evidence_fieldnames = list(summary_rows[0]) if summary_rows else []
     evidence_fieldnames.extend(field for field in ACQUISITION_CONTEXT_FIELDNAMES if field not in evidence_fieldnames)
@@ -142,6 +154,84 @@ def add_acquisition_context(
         row.update(possession_context(acquisitions_by_id.get(row.get("catalog_item_id", ""), [])))
         enriched.append(row)
     return enriched
+
+
+def add_reviewer_source_context(rows: Iterable[Mapping[str, str]]) -> list[dict[str, str]]:
+    """Add compact display-only source context without changing summary semantics."""
+    enriched = []
+    for source in rows:
+        row = dict(source)
+        row.update(
+            {
+                "Evidence Sources": evidence_sources_display(row),
+                "eBay Listings": row.get("ebay_active_listing_count", ""),
+                "eBay Price Range": ebay_price_range_display(row),
+                "eBay Status": ebay_status_display(row),
+                "Source Price Comparability": source_comparability_display(row),
+            }
+        )
+        enriched.append(row)
+    return enriched
+
+
+def evidence_sources_display(row: Mapping[str, str]) -> str:
+    value = row.get("evidence_source_mix", "")
+    return {
+        "abebooks_only": "AbeBooks only",
+        "abebooks_and_ebay_active_listings": "AbeBooks + eBay",
+        "ebay_active_listings_only": "eBay only",
+        "other_or_mixed_sources": "Other/mixed sources",
+        "": "AbeBooks only",
+    }.get(value, value.replace("_", " ").strip())
+
+
+def ebay_price_range_display(row: Mapping[str, str]) -> str:
+    currency = row.get("ebay_active_currency", "")
+    values = [
+        row.get("ebay_active_min_asking_price", ""),
+        row.get("ebay_active_median_asking_price", ""),
+        row.get("ebay_active_max_asking_price", ""),
+    ]
+    if currency == "mixed":
+        return "Mixed currencies; not summarized"
+    if not currency or not any(values):
+        return ""
+    low, middle, high = (value or "–" for value in values)
+    return f"{currency} {low} / {middle} / {high} (min/median/max)"
+
+
+def ebay_status_display(row: Mapping[str, str]) -> str:
+    listing_count = integer_value(row.get("ebay_active_listing_count", ""))
+    status_count = integer_value(row.get("ebay_status_count", ""))
+    if listing_count:
+        label = f"{listing_count} listing{'s' if listing_count != 1 else ''}"
+        if status_count:
+            label += f"; {status_count} source status row{'s' if status_count != 1 else ''}"
+        return label
+    if status_count:
+        return f"No listings; {status_count} source status row{'s' if status_count != 1 else ''}"
+    if row.get("evidence_source_mix", ""):
+        return "Not checked"
+    return ""
+
+
+def source_comparability_display(row: Mapping[str, str]) -> str:
+    value = row.get("source_price_comparability", "")
+    return {
+        "same_currency_separate_source_summaries": "Same currency; separate source summaries",
+        "cross_source_currency_mismatch": "Currency mismatch across sources",
+        "mixed_currency_within_source": "Mixed currency within source",
+        "single_source_currency": "Single priced source",
+        "no_priced_listings": "No priced listings",
+        "": "",
+    }.get(value, value.replace("_", " ").strip())
+
+
+def integer_value(value: object) -> int:
+    try:
+        return int(str(value or "0"))
+    except ValueError:
+        return 0
 
 
 def possession_context(acquisitions: Iterable[Mapping[str, str]]) -> dict[str, str]:
@@ -220,6 +310,57 @@ def build_run_summary_rows(rows: list[Mapping[str, str]]) -> list[dict[str, str]
     ):
         counts = Counter(row.get(field, "") or "(blank)" for row in rows)
         output.extend(summary_row(section, value, count) for value, count in sorted(counts.items()))
+    if has_source_aware_evidence(rows):
+        source_mix_counts = Counter(row.get("Evidence Sources", "") or "(blank)" for row in rows)
+        output.extend(
+            summary_row("Source-aware evidence", value, count)
+            for value, count in sorted(source_mix_counts.items())
+        )
+        output.extend(
+            [
+                summary_row(
+                    "Source-aware evidence",
+                    "Total eBay active listings",
+                    sum(integer_value(row.get("ebay_active_listing_count", "")) for row in rows),
+                    "Supplemental active-listing asking-price evidence; shipping excluded.",
+                ),
+                summary_row(
+                    "Source-aware evidence",
+                    "Total eBay status rows",
+                    sum(integer_value(row.get("ebay_status_count", "")) for row in rows),
+                    "Source-specific statuses do not mean global market absence.",
+                ),
+                summary_row(
+                    "Source-aware evidence",
+                    "Rows with eBay listings",
+                    sum(integer_value(row.get("ebay_active_listing_count", "")) > 0 for row in rows),
+                ),
+                summary_row(
+                    "Source-aware evidence",
+                    "Rows with eBay status only",
+                    sum(
+                        integer_value(row.get("ebay_status_count", "")) > 0
+                        and integer_value(row.get("ebay_active_listing_count", "")) == 0
+                        for row in rows
+                    ),
+                    "May represent no results or another source-specific status; inspect Evidence Detail.",
+                ),
+            ]
+        )
+        for field, section, display in (
+            ("market_range_source", "Core range source counts", lambda value: value or "(blank)"),
+            ("Source Price Comparability", "Source price comparability counts", lambda value: value or "(blank)"),
+        ):
+            counts = Counter(display(row.get(field, "")) for row in rows)
+            output.extend(summary_row(section, value, count) for value, count in sorted(counts.items()))
+        output.append(
+            summary_row(
+                "Source-aware evidence",
+                "Interpretation",
+                "eBay is supplemental",
+                "For mixed-source rows, AbeBooks remains the core range source. eBay item prices exclude shipping, are not converted, retain unknown match confidence, and require human edition/title review.",
+            )
+        )
     candidates = [row for row in rows if row.get("review_recommendation") == "review_for_possible_sale"][:20]
     output.extend(
         summary_row(
@@ -231,6 +372,22 @@ def build_run_summary_rows(rows: list[Mapping[str, str]]) -> list[dict[str, str]
         for row in candidates
     )
     return output
+
+
+def has_source_aware_evidence(rows: Iterable[Mapping[str, str]]) -> bool:
+    return any(
+        any(
+            field in row
+            for field in (
+                "evidence_source_mix",
+                "market_range_source",
+                "source_price_comparability",
+                "ebay_active_listing_count",
+                "ebay_status_count",
+            )
+        )
+        for row in rows
+    )
 
 
 def summary_row(section: str, metric: str, value: str | int, note: str = "") -> dict[str, str]:
@@ -248,6 +405,26 @@ ASKING_PRICE_CAVEAT = (
 
 
 FIELD_DEFINITIONS = {
+    "Evidence Sources": definition("Reviewer-friendly summary of marketplace sources represented for the book.", "Derived from evidence_source_mix without changing range or recommendation logic.", "AbeBooks only; AbeBooks + eBay; eBay only", "For mixed-source rows, AbeBooks remains the core range source and eBay remains supplemental."),
+    "eBay Listings": definition("Count of observed eBay active listings for the book.", "Copied from ebay_active_listing_count.", "0; 1; 3", "Active listings are asking-price evidence, not completed sales; seller identity is not stored."),
+    "eBay Price Range": definition("Compact eBay minimum/median/maximum item-price display.", "Derived from eBay source-specific price fields and currency without conversion.", "USD 42.50 / 55.00 / 120.00 (min/median/max)", "Shipping is excluded. Review title, edition, format, and condition before relying on a listing."),
+    "eBay Status": definition("Compact eBay listing and source-status summary.", "Derived from ebay_active_listing_count and ebay_status_count.", "3 listings; No listings; 1 source status row; Not checked", "An eBay source status is source-specific and does not mean global market absence."),
+    "Source Price Comparability": definition("Whether source-specific price summaries can be compared directly by currency.", "Reviewer-friendly rendering of source_price_comparability.", "Same currency; separate source summaries; Currency mismatch across sources", "Prices are never pooled across sources and no currency conversion is performed."),
+    "evidence_source_mix": definition("Technical code for the sources represented in the summary row.", "Derived by source-aware Market Evidence Summary aggregation.", "abebooks_only; abebooks_and_ebay_active_listings; ebay_active_listings_only", "Use Evidence Sources for the compact reviewer rendering."),
+    "market_range_source": definition("Marketplace source used for the core likely-low/mid/high range.", "Assigned by source-aware aggregation; AbeBooks remains primary when present.", "abebooks; ebay_active_listings", "Supplemental eBay evidence does not automatically change a mixed-source row's range, confidence, or recommendation."),
+    "source_price_comparability": definition("Technical currency-comparability classification across source summaries.", "Derived from source-specific currencies without conversion or price pooling.", "same_currency_separate_source_summaries; cross_source_currency_mismatch", "Use source-specific summaries separately even when currencies match."),
+    "abebooks_listing_count": definition("Observed AbeBooks listing count.", "Source-specific count from the multi-source summary.", "0; 3", "This remains part of the core evidence path when AbeBooks rows are present."),
+    "abebooks_status_count": definition("AbeBooks source-status row count.", "Source-specific count from the multi-source summary.", "0; 1", "A source status explains missing evidence but is not global market absence."),
+    "abebooks_currency": definition("Currency of summarized AbeBooks prices when one currency is usable.", "Source-specific aggregation without conversion.", "USD", "Compare only with explicit attention to source and currency."),
+    "abebooks_min_asking_price": definition("Lowest summarized AbeBooks asking price.", "Source-specific aggregation.", "42.50", ASKING_PRICE_CAVEAT),
+    "abebooks_median_asking_price": definition("Median summarized AbeBooks asking price.", "Source-specific aggregation.", "55.00", ASKING_PRICE_CAVEAT),
+    "abebooks_max_asking_price": definition("Highest summarized AbeBooks asking price.", "Source-specific aggregation.", "120.00", ASKING_PRICE_CAVEAT),
+    "ebay_active_listing_count": definition("Observed eBay active-listing count.", "Source-specific count from the multi-source summary.", "0; 3", "Seller identity is not stored; match confidence remains unknown pending human review."),
+    "ebay_status_count": definition("eBay source-status row count.", "Source-specific count from the multi-source summary.", "0; 1", "A nonzero value can reflect no results or another source-specific status; it is not global market absence."),
+    "ebay_active_currency": definition("Currency of summarized eBay item prices when one currency is usable.", "Source-specific aggregation without conversion.", "USD", "Shipping is excluded and prices are not pooled with AbeBooks."),
+    "ebay_active_min_asking_price": definition("Lowest summarized eBay active-listing item price.", "Source-specific aggregation over active listings.", "42.50", "Supplemental asking-price evidence only; shipping excluded and human match review required."),
+    "ebay_active_median_asking_price": definition("Median summarized eBay active-listing item price.", "Source-specific aggregation over active listings.", "55.00", "Supplemental asking-price evidence only; shipping excluded and human match review required."),
+    "ebay_active_max_asking_price": definition("Highest summarized eBay active-listing item price.", "Source-specific aggregation over active listings.", "120.00", "Supplemental asking-price evidence only; shipping excluded and human match review required."),
     "catalog_item_id": definition("Stable internal catalog identity.", "Copied from the durable catalog identity on the summary row.", "BK000001", "Use this key to reconcile a row to catalog and acquisition records."),
     "isbn_13": definition("Thirteen-digit book identifier.", "Copied from catalog/observation identity used by the evidence summary.", "9780198809647", "Confirm that it identifies the edition physically in hand."),
     "isbn_10": definition("Older ten-character book identifier.", "Copied from catalog/observation identity when available.", "0198809646", "Useful for older listings; a blank value may simply mean no ISBN-10 was available."),

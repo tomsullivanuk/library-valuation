@@ -117,8 +117,15 @@ supplemental and does not alter established AbeBooks core-range semantics.
 
 ## Remaining Gates
 
+PR4 implements the first reviewer-facing source-context projection in the
+generated workbook. It adds compact source mix, eBay listing count, eBay price
+range, source-specific status, and price-comparability columns while retaining
+technical source fields in Evidence Detail. Run Summary and Field Definitions
+make the supplemental boundary explicit. The workbook stores no seller identity
+and does not change ranges, confidence, recommendations, or durable state.
+
 Before any broader production cadence, separately review effective call limits,
-operational scheduling, overwrite/resume behavior, and the reviewer-facing
-source-context design. Shipping, conversion, sold/completed evidence, automatic
-matching, full-library collection, and changes to workbook/report semantics
-remain out of scope.
+operational scheduling, overwrite/resume behavior, and the workbook layout in
+human use. HTML report integration remains deferred to its own PR. Shipping,
+conversion, sold/completed evidence, automatic matching, and full-library
+collection remain out of scope.

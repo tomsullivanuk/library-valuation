@@ -53,8 +53,10 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   non-comparability without naively pooling prices.
 - [x] Verify the ignored local multi-source summary workflow using the full
   AbeBooks artifact and the two-row sandbox eBay smoke artifact.
-- [ ] Update workbook and HTML review artifacts with concise source context and
+- [x] Update the reviewer workbook with concise source-aware eBay context and
   active-listing caveats.
+- [ ] Update the HTML review report with reviewed source context in a separate
+  PR after workbook layout review.
 - [x] Complete v0.7.0 documentation and release readiness.
 - [ ] Design reviewed eBay match-confidence rules and shipping/total-cost
   treatment only after representative production evidence exists.

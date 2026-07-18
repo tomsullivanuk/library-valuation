@@ -389,6 +389,22 @@ readiness checks. Production access, representative eBay evidence, workbook and
 HTML integration, match-confidence rules, shipping treatment, sold/completed
 evidence, and any full-library strategy remain future work.
 
+## v0.8.0: Production Validation and Reviewer Source Context
+
+Validate production eBay evidence before reviewer integration, then expose only
+compact, source-aware context:
+
+- PR1: remove seller username from eBay evidence;
+- PR2: run and document a bounded production smoke test;
+- PR3: run and document a representative 100-book production validation; and
+- PR4: add source-aware eBay context to the generated reviewer workbook.
+
+The workbook keeps AbeBooks as the core range source for mixed rows and shows
+eBay as supplemental active-listing item-price evidence. HTML report integration
+remains a later PR after workbook layout review. Shipping, currency conversion,
+sold/completed evidence, automated match confidence, broader collection, and
+full-library collection remain deferred.
+
 ## Later: Top-25 Market Research Workflow
 
 After the Market Validation Spike, the project may create a focused workflow

@@ -109,6 +109,8 @@ def test_review_workbook_has_expected_tabs_subsets_detail_and_definitions(tmp_pa
     assert xml_header_values(possible_sale) == POSSIBLE_SALE_FIELDNAMES
     assert xml_header_values(manual) == MANUAL_RESEARCH_FIELDNAMES
     assert xml_header_values(edition) == EDITION_CONDITION_FIELDNAMES
+    assert "Evidence Sources" in review_queue
+    assert "AbeBooks only" in review_queue
     assert "Sale Book" in possible_sale and "Manual Book" not in possible_sale
     assert "Manual Book" in manual and "Sale Book" not in manual
     assert "Edition Book" in edition and "Sale Book" not in edition
@@ -126,6 +128,77 @@ def test_review_workbook_has_expected_tabs_subsets_detail_and_definitions(tmp_pa
     assert "Count of observed marketplace listings" not in definitions
     assert "Count of observation rows whose lookup status is observed" in definitions
     assert "See the canonical evidence model documentation" not in definitions
+
+
+def test_multisource_workbook_exposes_compact_ebay_context_and_source_summary(tmp_path):
+    output = tmp_path / "multisource-review.xlsx"
+    mixed = evidence_row("BK1", "Mixed Book", "review_for_possible_sale", "100", "120")
+    mixed.update(
+        {
+            "evidence_source_mix": "abebooks_and_ebay_active_listings",
+            "market_range_source": "abebooks",
+            "source_price_comparability": "same_currency_separate_source_summaries",
+            "abebooks_listing_count": "3",
+            "abebooks_status_count": "0",
+            "abebooks_currency": "USD",
+            "abebooks_min_asking_price": "50",
+            "abebooks_median_asking_price": "100",
+            "abebooks_max_asking_price": "120",
+            "ebay_active_listing_count": "3",
+            "ebay_status_count": "0",
+            "ebay_active_currency": "USD",
+            "ebay_active_min_asking_price": "42.50",
+            "ebay_active_median_asking_price": "55.00",
+            "ebay_active_max_asking_price": "120.00",
+        }
+    )
+    no_results = evidence_row("BK2", "No Results Book", "manual_market_research_needed", "", "")
+    no_results.update(
+        {
+            "evidence_source_mix": "abebooks_and_ebay_active_listings",
+            "market_range_source": "abebooks",
+            "source_price_comparability": "single_source_currency",
+            "ebay_active_listing_count": "0",
+            "ebay_status_count": "1",
+            "ebay_active_currency": "",
+            "ebay_active_min_asking_price": "",
+            "ebay_active_median_asking_price": "",
+            "ebay_active_max_asking_price": "",
+        }
+    )
+    write_abebooks_review_workbook(output, summary_rows=[mixed, no_results], acquisitions=[])
+
+    with zipfile.ZipFile(output) as workbook:
+        review_queue = workbook.read("xl/worksheets/sheet1.xml").decode()
+        possible_sale = workbook.read("xl/worksheets/sheet2.xml").decode()
+        manual = workbook.read("xl/worksheets/sheet3.xml").decode()
+        detail = workbook.read("xl/worksheets/sheet5.xml").decode()
+        run_summary = workbook.read("xl/worksheets/sheet6.xml").decode()
+        definitions = workbook.read("xl/worksheets/sheet7.xml").decode()
+
+    for reviewer_sheet in (review_queue, possible_sale, manual):
+        assert "Evidence Sources" in reviewer_sheet
+        assert "eBay Listings" in reviewer_sheet
+        assert "eBay Price Range" in reviewer_sheet
+        assert "eBay Status" in reviewer_sheet
+        assert "Source Price Comparability" in reviewer_sheet
+    assert "AbeBooks + eBay" in possible_sale
+    assert "USD 42.50 / 55.00 / 120.00 (min/median/max)" in possible_sale
+    assert "3 listings" in possible_sale
+    assert "Same currency; separate source summaries" in possible_sale
+    assert "No listings; 1 source status row" in manual
+    assert "ebay_active_listing_count" in detail
+    assert "market_range_source" in detail
+    assert "Total eBay active listings" in run_summary
+    assert "Total eBay status rows" in run_summary
+    assert "Rows with eBay status only" in run_summary
+    assert "Core range source counts" in run_summary
+    assert "eBay is supplemental" in run_summary
+    assert "seller identity is not stored" in definitions
+    assert "Shipping is excluded" in definitions
+    assert "example-books" not in "".join(
+        (review_queue, possible_sale, manual, detail, run_summary, definitions)
+    )
 
 
 def test_cli_builds_review_workbook(tmp_path, capsys):
