@@ -520,7 +520,7 @@ safe query receive `no_query`; zero results receive `no_results`; the first safe
 client failure receives `source_unavailable` and stops the run to avoid repeated
 authentication attempts.
 
-This collector is capped at 50 books and 10 results per book; both command
+This collector is capped at 100 books and 10 results per book; both command
 defaults and examples are smaller. Item price and returned currency are
 preserved, shipping is excluded, and match confidence remains unknown. PR5 does
 not automatically feed these rows into downstream artifacts. A 2026-07-18
@@ -530,6 +530,16 @@ conditions, item IDs, and listing URLs. Seller identity was not normalized;
 every eBay `seller` field was blank and no `match_notes` contained seller
 identity. See [`docs/RELEASE_READINESS_v0.8.0.md`](docs/RELEASE_READINESS_v0.8.0.md).
 This small run does not authorize broader or full-library collection.
+
+v0.8.0 PR3 completed a representative but still bounded 100-book production
+validation across three review queues. A deterministic ignored cohort contained
+34 `review_for_possible_sale`, 33 `manual_market_research_needed`, and 33
+`review_edition_or_condition` books. The run produced 229 observed listings for
+87 books and 13 `no_results` rows. All 242 rows had blank `seller`, no
+`match_notes` mentioned seller identity, and all match confidence remained
+`unknown`. Results support later design of concise reviewer-facing eBay context,
+but no workbook/report integration or broader collection is enabled. See
+[`docs/PRODUCTION_EBAY_VALIDATION_v0.8.0.md`](docs/PRODUCTION_EBAY_VALIDATION_v0.8.0.md).
 
 PR6 extends `summarize-market-evidence` so `--observations` can be repeated for
 an explicit prototype combining AbeBooks and targeted eBay observation files:

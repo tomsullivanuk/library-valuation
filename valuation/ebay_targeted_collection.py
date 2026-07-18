@@ -22,7 +22,7 @@ SUPPORTED_REVIEW_RECOMMENDATIONS = (
     "review_edition_or_condition",
 )
 REVIEW_PRIORITY = {value: index for index, value in enumerate(SUPPORTED_REVIEW_RECOMMENDATIONS)}
-MAX_TARGETED_BOOKS = 50
+MAX_TARGETED_BOOKS = 100
 MAX_RESULTS_PER_BOOK = 10
 
 

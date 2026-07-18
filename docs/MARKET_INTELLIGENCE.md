@@ -674,6 +674,56 @@ response was retained. This small cohort validates the production targeted
 observation path and seller-suppression boundary, not representative coverage,
 price quality, edition matching, broader collection, or downstream integration.
 
+### v0.8.0 representative production validation
+
+PR3 expands validation—not product integration—to 100 production books. The
+collector ceiling is now 100, with 101 still rejected. The normal multi-queue
+selector intentionally preserves review-priority order, so a local ignored
+cohort file selected the strongest 34 `review_for_possible_sale`, 33
+`manual_market_research_needed`, and 33 `review_edition_or_condition` candidates
+using the existing deterministic ordering within each queue. No recommendation
+or production-selection semantics changed.
+
+All 100 books had ISBN-13 queries. The run produced 242 rows: 229 `observed`
+listings across 87 books and 13 `no_results` rows. There were no `no_query` or
+`source_unavailable` rows. Every observed listing had a USD price, condition,
+item ID, and listing URL; all 229 item IDs were unique. USD item prices ranged
+from 4.43 to 475.87, with a median of 57.87. Shipping remains excluded, so those
+figures are evidence-distribution diagnostics rather than valuation ranges.
+
+Observed coverage by input queue was:
+
+- `review_for_possible_sale`: 32 of 34 books, 88 listing rows;
+- `manual_market_research_needed`: 24 of 33 books, 51 listing rows; and
+- `review_edition_or_condition`: 31 of 33 books, 90 listing rows.
+
+A conservative token-overlap review found that 224 of 229 listing titles shared
+at least half of the catalog-title tokens, 202 shared at least three quarters,
+and 175 included all catalog-title tokens. The five lower-overlap rows were
+largely plausible truncations, translated titles, or format variants, although
+a bundle-like result demonstrates that ISBN queries do not remove the need for
+reviewed matching. Match confidence therefore remains `unknown`.
+
+Privacy suppression held across the entire artifact: all 242 `seller` values
+were blank, no `match_notes` mentioned seller identity, and seller username was
+not reintroduced into normalized objects. No raw API response was retained.
+
+The representative multi-source summary contained 3,014 rows: 100
+`abebooks_and_ebay_active_listings` and 2,914 `abebooks_only`. It recorded 229
+eBay listings and 13 eBay statuses. Price comparability was
+`same_currency_separate_source_summaries` for 87 books,
+`single_source_currency` for 2,809, and `no_priced_listings` for 118.
+`market_range_source` remained `abebooks` for all 3,014 rows, and direct
+comparison found no changes to AbeBooks `likely_low`, `likely_mid`,
+`likely_high`, `market_confidence`, or `review_recommendation`.
+
+The evidence is useful enough to justify a later, separately designed
+reviewer-facing source-context PR: coverage is high, identity/URL provenance is
+present, and title plausibility is generally strong. It is not sufficient to
+auto-match editions, pool prices, add shipping, convert currencies, infer sold
+prices, or start broader/full-library collection. Workbook and HTML report
+integration remain unchanged and deferred.
+
 ## Non-Goals
 
 This document does not define or implement:

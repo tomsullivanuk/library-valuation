@@ -34,8 +34,10 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   explicit marketplace selection.
 - [x] Confirm production access and run a bounded privacy-hardened targeted
   smoke collection.
-- [ ] Confirm representative search behavior and effective call limits before
-  any broader production rollout.
+- [x] Run a representative bounded 100-book production cohort across possible
+  sale, manual research, and edition/condition review queues.
+- [ ] Confirm effective call limits and operating cadence before any broader
+  production rollout.
 - [x] Add an isolated Browse API client with redaction, bounded results, and
   fixture-backed failure handling.
 - [x] Normalize active listings into source-specific eBay observation/status
@@ -45,8 +47,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   generated CSV/XLSX outputs and conservative pacing.
 - [x] Run a two-book sandbox workflow smoke test through generated observations
   and multi-source summary output.
-- [ ] Run a representative bounded production cohort before deciding whether
-  broader collection is justified.
+- [x] Review representative bounded production evidence before deciding whether
+  later reviewer-facing source context is justified.
 - [x] Add source-specific summary measures and explicit agreement, conflict, or
   non-comparability without naively pooling prices.
 - [x] Verify the ignored local multi-source summary workflow using the full

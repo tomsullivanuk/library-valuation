@@ -376,7 +376,7 @@ PR5 adds `valuation/ebay_targeted_collection.py` and the explicit
 Market Evidence Summary input, an output under `output/`, and a book limit. It
 defaults to the possible-sale queue, deterministically orders selected
 candidates, and constructs one query using ISBN-13, ISBN-10, title plus author,
-or usable title. Limits are capped at 50 books and 10 results per book, with a
+or usable title. Limits are capped at 100 books and 10 results per book, with a
 one-second default delay between requests.
 
 The workflow writes only the existing 25-field observation schema as paired
@@ -405,6 +405,23 @@ privacy-hardened observation adapter, and generated artifact writing. It does
 not add or authorize full-library collection, downstream workbook/report
 integration, shipping-inclusive pricing, conversion, sold/completed evidence,
 or new match-confidence rules.
+
+PR3 raises the explicit targeted-book ceiling from 50 to 100 so the requested
+representative cohort remains enforced at the CLI boundary; 101 books are still
+rejected. Because the existing multi-queue selector preserves review-priority
+ordering rather than applying quotas, validation used an ignored,
+deterministically selected 34/33/33 cohort file as collector input. This avoids
+changing review recommendation or selection semantics merely to balance a
+validation sample.
+
+The balanced production run yielded 229 listing rows and 13 `no_results` rows
+for 100 unique books. A repeated-input multi-source summary added those eBay
+facts to the 3,014-row AbeBooks baseline while leaving `likely_low`,
+`likely_mid`, `likely_high`, `market_confidence`, and `review_recommendation`
+unchanged for every catalog item. `market_range_source` remained `abebooks` for
+all 3,014 rows. This validates the supplemental boundary: production eBay data
+is separately auditable and does not silently replace established core-range
+semantics.
 
 PR6 extends the existing summary command to accept repeated observation inputs.
 The aggregator still groups to one row per catalog item and adds a source-aware

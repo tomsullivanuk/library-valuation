@@ -103,6 +103,13 @@ def test_candidate_filtering_and_deterministic_reviewer_priority_order():
     assert [row["catalog_item_id"] for row in selected] == ["high", "low", "manual"]
 
 
+def test_candidate_limit_allows_representative_cohort_but_remains_bounded():
+    rows = [summary_row(f"book-{index:03d}") for index in range(100)]
+    assert len(select_targeted_candidates(rows, limit_books=100)) == 100
+    with pytest.raises(ValueError, match="between 1 and 100"):
+        select_targeted_candidates(rows, limit_books=101)
+
+
 @pytest.mark.parametrize(
     ("values", "expected"),
     [

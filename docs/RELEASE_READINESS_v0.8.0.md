@@ -5,7 +5,7 @@
 **The bounded production targeted-collection path is validated after seller
 suppression. Broader production collection remains deferred.**
 
-This record covers v0.8.0 PR1 and PR2 only. It does not approve full-library
+This record covers v0.8.0 PR1 through PR3. It does not approve full-library
 collection or change valuation, review, workbook, report, or monthly-import
 behavior.
 
@@ -87,3 +87,37 @@ or reviewed match confidence. Active listings remain seller asking-price
 evidence, not appraisals, fair market value, realized prices, or expected
 proceeds. Broader or full-library production collection requires a separate
 review and explicit approval.
+
+## PR3 Representative Production Validation
+
+PR3 used an ignored deterministic 100-book cohort spanning three reviewer
+queues: 34 possible-sale, 33 manual-research, and 33 edition/condition books.
+The existing targeted-book ceiling was raised from 50 to 100 solely to permit
+this bounded validation; 101 remains invalid.
+
+The production collector completed 100 ISBN-13 searches with a maximum of three
+results per book and a one-second delay. It wrote ignored paired observation
+files containing 242 rows: 229 `observed` listings across 87 books and 13
+`no_results` rows. There were no `no_query` or `source_unavailable` outcomes.
+
+All observed rows included USD item price, item ID, listing URL, title, and
+condition. Prices ranged from 4.43 to 475.87 USD with a median of 57.87. These
+exclude shipping and are distribution diagnostics, not valuation conclusions.
+All 242 seller fields were blank, no notes mentioned seller identity, and all
+match confidence remained `unknown`.
+
+Title-token review found at least 50% catalog-title overlap in 224 of 229 listing
+rows. The five lower-overlap titles were mostly explainable by truncation,
+translation, or format variation, while a bundle-like listing confirms that
+human match review remains necessary.
+
+The ignored multi-source summary contained 3,014 rows, including 100 mixed
+AbeBooks/eBay books. It recorded 229 eBay listings and 13 eBay statuses without
+changing any catalog item's AbeBooks core range, confidence, or recommendation.
+`market_range_source` remained `abebooks` throughout.
+
+This representative evidence is useful enough to support a future, explicitly
+scoped reviewer-facing source-context design. It does not authorize automatic
+matching, price pooling, workbook/report changes, broader production cadence,
+or full-library collection. Detailed metrics and interpretation are recorded in
+[`PRODUCTION_EBAY_VALIDATION_v0.8.0.md`](PRODUCTION_EBAY_VALIDATION_v0.8.0.md).
