@@ -121,6 +121,66 @@ def test_report_marks_old_and_unknown_acquisitions_for_possession_verification()
     assert html.count("Verify possession") >= 2
 
 
+def test_report_adds_compact_source_aware_ebay_evidence_without_seller_identity():
+    rows = [
+        evidence_row(
+            "BK1", "Mixed Source Book", "review_for_possible_sale",
+            evidence_source_mix="abebooks_and_ebay_active_listings",
+            market_range_source="abebooks",
+            source_price_comparability="same_currency_separate_source_summaries",
+            ebay_active_listing_count="3",
+            ebay_status_count="0",
+            ebay_active_currency="USD",
+            ebay_active_min_asking_price="42.50",
+            ebay_active_median_asking_price="55.00",
+            ebay_active_max_asking_price="120.00",
+            seller_username="must-not-appear",
+            seller="also-must-not-appear",
+        ),
+        evidence_row(
+            "BK2", "No eBay Results", "manual_market_research_needed",
+            evidence_source_mix="abebooks_and_ebay_active_listings",
+            market_range_source="abebooks",
+            source_price_comparability="single_source_currency",
+            ebay_active_listing_count="0",
+            ebay_status_count="1",
+        ),
+    ]
+
+    html = render_report(rows, summary_filename="multi-source-summary.csv")
+
+    for label in (
+        "Evidence Sources", "eBay Listings", "eBay Price Range", "eBay Status",
+        "Source Price Comparability",
+    ):
+        assert label in html
+    assert "AbeBooks + eBay" in html
+    assert "USD 42.50 / 55.00 / 120.00 (min/median/max)" in html
+    assert "3 listings" in html
+    assert "No listings; 1 source status row" in html
+    assert "Same currency; separate source summaries" in html
+    assert "AbeBooks remains the core range source for mixed-source rows" in html
+    assert "Shipping is excluded" in html
+    assert "Currency conversion is not performed" in html
+    assert "match confidence remains unknown" in html
+    assert "Seller identity is not stored or displayed" in html
+    assert "must-not-appear" not in html
+    assert "also-must-not-appear" not in html
+
+
+def test_legacy_abebooks_report_omits_source_aware_columns():
+    html = render_report(
+        [evidence_row("BK1", "Legacy Book", "review_for_possible_sale")],
+        summary_filename="legacy-summary.csv",
+    )
+
+    assert "AbeBooks Baseline" in html
+    assert "AbeBooks asking prices only" in html
+    assert "eBay Price Range" not in html
+    assert "Evidence Sources" not in html
+    assert "eBay and other market sources are not included yet" in html
+
+
 def test_cli_builds_static_review_report(tmp_path, capsys):
     summary_path = tmp_path / "summary.csv"
     data_dir = tmp_path / "data"

@@ -493,16 +493,15 @@ These are generated artifacts unless and until a durable repository format is
 explicitly defined. They should not become canonical source-of-truth data by
 accident.
 
-The static AbeBooks review report is a reviewer-facing projection of the full
-Market Evidence Summary. It separates recommendation queues with CSS-only tabs
-and includes only essential identity, asking-price, research, and acquisition
-context. Its one displayed range remains an observed asking-price reference—not
-an appraisal, fair market value, or realized price. The latest acquisition year
-is shown with a verification prompt for pre-2021 or unknown acquisitions; this
-presentation never suppresses market evidence. Detailed market confidence,
-outlier sensitivity, and possession-confidence fields remain in the workbook
-and evidence artifacts. eBay active listings are the v0.7.0 theme;
-multi-source evidence is not part of v0.6.0.
+The static review report is a reviewer-facing projection of the full Market
+Evidence Summary. It separates recommendation queues with CSS-only tabs and
+includes only essential identity, asking-price, research, and acquisition
+context. Its AbeBooks range remains an observed asking-price reference—not an
+appraisal, fair market value, or realized price. With source-aware input, five
+compact displays align it with the workbook: Evidence Sources, eBay Listings,
+eBay Price Range, eBay Status, and Source Price Comparability. eBay remains
+supplemental, source prices remain separate, and seller identity is not shown.
+Legacy AbeBooks-only summaries retain the original report columns.
 
 ## v0.7.0 eBay Active-Listing Evidence
 
@@ -748,8 +747,19 @@ and unknown-match-confidence boundaries.
 Legacy AbeBooks-only summary inputs remain supported. They preserve all seven
 workbook sheets and existing AbeBooks review behavior, with a conservative
 `AbeBooks only` source display and blank eBay details. The generated workbook
-remains ignored and non-durable. HTML report integration remains unchanged and
-deferred for separate layout review.
+remains ignored and non-durable.
+
+### v0.8.0 source-aware HTML report
+
+PR5 conditionally adds the same five compact displays to each HTML reviewer
+queue when the input includes multi-source fields. A source-aware evidence
+summary reports mixed-source books, books/listings with observed eBay evidence,
+and status-only books. The field guide and caveats state that eBay is
+supplemental active-listing item-price evidence, shipping is excluded, no
+currency conversion or price pooling occurs, match confidence remains unknown,
+and human title/edition review is required. Seller identity is not stored or
+displayed. AbeBooks-only input omits the new columns and retains the prior
+presentation.
 
 ## Non-Goals
 

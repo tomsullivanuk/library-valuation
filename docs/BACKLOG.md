@@ -55,8 +55,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   AbeBooks artifact and the two-row sandbox eBay smoke artifact.
 - [x] Update the reviewer workbook with concise source-aware eBay context and
   active-listing caveats.
-- [ ] Update the HTML review report with reviewed source context in a separate
-  PR after workbook layout review.
+- [x] Update the HTML review report with compact source-aware context aligned to
+  the reviewed workbook layout.
 - [x] Complete v0.7.0 documentation and release readiness.
 - [ ] Design reviewed eBay match-confidence rules and shipping/total-cost
   treatment only after representative production evidence exists.

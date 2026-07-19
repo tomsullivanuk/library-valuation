@@ -124,8 +124,13 @@ technical source fields in Evidence Detail. Run Summary and Field Definitions
 make the supplemental boundary explicit. The workbook stores no seller identity
 and does not change ranges, confidence, recommendations, or durable state.
 
+PR5 mirrors those compact displays in the static HTML reviewer queues and adds
+source-aware counts, field guidance, and caveats. It uses the same display
+helpers as the workbook, keeps AbeBooks as the mixed-source core range, and does
+not display seller identity. AbeBooks-only HTML input remains backward
+compatible.
+
 Before any broader production cadence, separately review effective call limits,
-operational scheduling, overwrite/resume behavior, and the workbook layout in
-human use. HTML report integration remains deferred to its own PR. Shipping,
-conversion, sold/completed evidence, automatic matching, and full-library
-collection remain out of scope.
+operational scheduling, overwrite/resume behavior, and the reviewer artifacts
+in human use. Shipping, conversion, sold/completed evidence, automatic matching,
+and full-library collection remain out of scope.

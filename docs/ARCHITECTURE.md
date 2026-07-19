@@ -297,6 +297,14 @@ needed. Detailed confidence and outlier fields remain available in the workbook
 and evidence artifacts. The report does not change or persist Market Evidence
 Summary, catalog, or acquisition records.
 
+When the input has multi-source fields, both reviewer transformations reuse the
+same display helpers for evidence source, eBay listing count, eBay item-price
+range, source-specific status, and price comparability. The HTML report adds
+these compact fields conditionally, plus source counts and interpretation text;
+legacy AbeBooks-only input keeps the original report columns. Neither projection
+pools source prices or changes the summary's core range, confidence, or
+recommendation. Seller identity is neither stored nor displayed.
+
 Together, the full-library collector and these two review transformations are
 the v0.6.0 Full AbeBooks Baseline & Review Artifacts workflow. A second-source
 adapter and cross-source interpretation are deferred to v0.7.0 or later.

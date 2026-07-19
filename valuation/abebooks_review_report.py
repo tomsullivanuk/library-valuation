@@ -7,7 +7,26 @@ from collections.abc import Iterable, Mapping
 from html import escape
 from pathlib import Path
 
-from valuation.abebooks_review_workbook import POSSESSION_PRIORITY, add_acquisition_context, number_value
+from valuation.abebooks_review_workbook import (
+    POSSESSION_PRIORITY,
+    add_acquisition_context,
+    ebay_price_range_display,
+    ebay_status_display,
+    evidence_sources_display,
+    has_source_aware_evidence,
+    integer_value,
+    number_value,
+    source_comparability_display,
+)
+
+
+SOURCE_AWARE_FIELDS = [
+    "evidence_sources",
+    "ebay_listings",
+    "ebay_price_range",
+    "ebay_status",
+    "source_price_comparability",
+]
 
 
 SECTION_SPECS = [
@@ -63,6 +82,14 @@ GLOSSARY = [
     ("Sort Order", "Rows are sorted first by possession priority, then by asking-price references, then by title and Catalog Item ID. Possession priority is likely present, unknown, then possibly absent. Within those groups, rows sort by likely_mid descending, likely_high descending, title alphabetically without regard to case, and Catalog Item ID as a stable tie-breaker. Possible Sale, Manual Research, and Edition / Condition generally show likely-present books first and then higher AbeBooks asking-price references. Fallback and Metadata Cleanup usually lack price ranges, so they mostly sort by possession priority and title. Possession confidence is not displayed as a separate column, but acquisition-date rules still influence sorting."),
 ]
 
+SOURCE_AWARE_GLOSSARY = [
+    ("Evidence Sources", "The marketplace sources represented for the book. For mixed-source rows, AbeBooks remains the core range source and eBay is supplemental."),
+    ("eBay Listings", "The count of observed eBay active listings. These are asking-price observations, not completed sales."),
+    ("eBay Price Range", "The eBay minimum, median, and maximum item prices in their reported currency. Shipping is excluded and currency conversion is not performed."),
+    ("eBay Status", "A source-specific eBay result. No listings does not mean that no market exists elsewhere."),
+    ("Source Price Comparability", "Whether source-specific price summaries share a currency. AbeBooks and eBay prices remain separate even when directly comparable."),
+]
+
 
 def write_abebooks_review_report(
     output_path: Path,
@@ -78,6 +105,7 @@ def write_abebooks_review_report(
 
 
 def render_report(rows: list[Mapping[str, str]], *, summary_filename: str) -> str:
+    source_aware = has_source_aware_evidence(rows)
     recommendation_counts = Counter(row.get("review_recommendation", "") for row in rows)
     generated_at = next(
         (row.get("evidence_generated_at", "") for row in rows if row.get("evidence_generated_at")), ""
@@ -88,12 +116,12 @@ def render_report(rows: list[Mapping[str, str]], *, summary_filename: str) -> st
         for index in range(len(SECTION_SPECS))
     )
     panels = "".join(
-        render_section(index, title, recommendation, fields, rows)
+        render_section(index, title, recommendation, fields + (SOURCE_AWARE_FIELDS if source_aware else []), rows)
         for index, (title, recommendation, fields) in enumerate(SECTION_SPECS)
     )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Library Review Report — AbeBooks Baseline</title><style>
+<title>Library Review Report — {'Source-Aware Market Evidence' if source_aware else 'AbeBooks Baseline'}</title><style>
 :root{{--ink:#20242a;--muted:#616975;--line:#d9dde3;--accent:#244d72;--accent-soft:#eaf0f5;--warn:#fff4df}}
 *{{box-sizing:border-box}} body{{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);margin:0;background:#f5f6f8;line-height:1.45}}
 main{{max-width:1500px;min-height:100vh;margin:auto;background:white;padding:2rem clamp(1rem,3vw,3rem)}} h1,h2{{color:var(--accent)}} h1{{margin:.1rem 0 0;font-size:clamp(1.7rem,3vw,2.5rem)}}
@@ -112,14 +140,14 @@ th{{background:var(--accent-soft);text-align:left;position:sticky;top:0;white-sp
 code{{white-space:nowrap}} @media(max-width:700px){{.tab-label{{flex:1 1 45%;border-radius:5px;border-bottom:1px solid var(--line)}}.tabs{{border:0}}}}
 @media print{{body{{background:white}} main{{max-width:none;padding:0}} .tab-control,.tab-label{{display:none}} .panel{{display:block!important;break-before:page}} .panel:first-child{{break-before:auto}} th{{position:static}}}}
 </style></head><body><main>
-<header><h1>Library Review Report</h1><p class="subtitle">AbeBooks Baseline</p>
-<p class="brief-caveat">AbeBooks asking prices only; not appraisals or sale estimates.</p>
-<section><h2>How to Use This Report</h2><ol><li>Start with Possible Sale, then work through the other tabs.</li><li>Locate each book and verify its edition, condition, dust jacket, and signatures.</li><li>For older or unknown acquisitions, confirm that the book is still physically present.</li><li>Use the AbeBooks range only as a research signal; inspect current comparable listings before deciding what to do.</li></ol></section></header>
+<header><h1>Library Review Report</h1><p class="subtitle">{'Source-Aware Market Evidence' if source_aware else 'AbeBooks Baseline'}</p>
+<p class="brief-caveat">{'AbeBooks core ranges with supplemental eBay active-listing evidence' if source_aware else 'AbeBooks asking prices only'}; not appraisals or sale estimates.</p>
+<section><h2>How to Use This Report</h2><ol><li>Start with Possible Sale, then work through the other tabs.</li><li>Locate each book and verify its edition, condition, dust jacket, and signatures.</li><li>For older or unknown acquisitions, confirm that the book is still physically present.</li><li>Use the AbeBooks range only as a research signal; inspect current comparable listings before deciding what to do.</li>{'<li>Use eBay as supplemental active-listing asking-price evidence only. Match confidence remains unknown, so verify title and edition before relying on a listing.</li>' if source_aware else ''}</ol></section>{render_source_summary(rows) if source_aware else ''}</header>
 {controls}<nav class="tabs" aria-label="Review sections">{''.join(f'<label class="tab-label" for="tab-{i}">{escape(title)} <span>{recommendation_counts[recommendation]}</span></label>' for i, (title, recommendation, _fields) in enumerate(SECTION_SPECS))}</nav>
 <div class="panels">{panels}</div>
-<div class="support"><section><h2>Field Guide</h2>{render_glossary()}</section>
+<div class="support"><section><h2>Field Guide</h2>{render_glossary(source_aware=source_aware)}</section>
 <p class="meta">Source: <code>{escape(Path(summary_filename).name)}</code>{(' · Report generated: <code>' + escape(generated_at) + '</code>') if generated_at else ''}</p>
-<section><h2>Full Caveats</h2><div class="caveats"><ul><li>This report uses observed AbeBooks asking-price evidence.</li><li>Asking prices are not appraisals.</li><li>Asking prices are not fair market value.</li><li>Asking prices are not realized sale prices or expected sale proceeds.</li><li>Physical possession should be verified before sale or further research, especially for older acquisitions.</li><li>Edition, condition, dust jacket, signature, and seller credibility may materially affect value.</li><li>eBay and other market sources are not included yet.</li></ul></div></section></div>
+<section><h2>Full Caveats</h2><div class="caveats"><ul><li>This report uses observed AbeBooks asking-price evidence.{(' eBay active-listing item prices are supplemental; shipping is excluded.' if source_aware else '')}</li><li>Asking prices are not appraisals.</li><li>Asking prices are not fair market value.</li><li>Asking prices are not realized sale prices or expected sale proceeds.</li><li>Physical possession should be verified before sale or further research, especially for older acquisitions.</li><li>Edition, condition, dust jacket, and signature may materially affect value.</li>{('<li>eBay no-results statuses are source-specific, not evidence of global market absence.</li><li>Currency conversion is not performed and prices from different sources are not pooled.</li><li>eBay match confidence remains unknown; human title and edition review is required.</li><li>Seller identity is not stored or displayed.</li>' if source_aware else '<li>eBay and other market sources are not included yet.</li>')}</ul></div></section></div>
 </main></body></html>"""
 
 
@@ -145,7 +173,7 @@ def render_section(
 def render_table_row(row: Mapping[str, str], fields: list[str]) -> str:
     cells = []
     for field in fields:
-        css = {"abebooks_range": "range", "listing_count": "count", "acquired": "acquired"}.get(field, "")
+        css = {"abebooks_range": "range", "ebay_price_range": "range", "listing_count": "count", "ebay_listings": "count", "acquired": "acquired"}.get(field, "")
         cells.append(f'<td{f" class={css!r}" if css else ""}>{format_field(field, row)}</td>')
     verify_class = ' class="verify"' if row.get("possession_confidence") != "likely_present" else ""
     return f"<tr{verify_class}>{''.join(cells)}</tr>"
@@ -161,6 +189,16 @@ def format_field(field: str, row: Mapping[str, str]) -> str:
         return escape(year)
     if field == "abebooks_range":
         return format_range(row.get("likely_low", ""), row.get("likely_mid", ""), row.get("likely_high", ""))
+    if field == "evidence_sources":
+        return escape(evidence_sources_display(row))
+    if field == "ebay_listings":
+        return escape(row.get("ebay_active_listing_count", "") or "0")
+    if field == "ebay_price_range":
+        return escape(ebay_price_range_display(row)) or "&mdash;"
+    if field == "ebay_status":
+        return escape(ebay_status_display(row)) or "&mdash;"
+    if field == "source_price_comparability":
+        return escape(source_comparability_display(row)) or "&mdash;"
     if field == "review_reason":
         labels = [reason_label(reason.strip()) for reason in row.get(field, "").split(";") if reason.strip()]
         return "<br>".join(escape(value) for value in labels) or "&mdash;"
@@ -193,10 +231,31 @@ def field_label(field: str) -> str:
         "acquired": "Acquired", "abebooks_range": "AbeBooks Range", "isbn_13": "ISBN-13",
         "catalog_item_id": "Catalog Item ID", "listing_count": "Listings", "review_reason": "Suggested Next Step",
         "research_band": "Research Band",
+        "evidence_sources": "Evidence Sources", "ebay_listings": "eBay Listings",
+        "ebay_price_range": "eBay Price Range", "ebay_status": "eBay Status",
+        "source_price_comparability": "Source Price Comparability",
     }.get(field, field.replace("_", " ").title())
 
 
-def render_glossary() -> str:
+def render_glossary(*, source_aware: bool = False) -> str:
+    entries = GLOSSARY + (SOURCE_AWARE_GLOSSARY if source_aware else [])
     return "<dl>" + "".join(
-        f"<dt>{escape(term)}</dt><dd>{escape(definition)}</dd>" for term, definition in GLOSSARY
+        f"<dt>{escape(term)}</dt><dd>{escape(definition)}</dd>" for term, definition in entries
     ) + "</dl>"
+
+
+def render_source_summary(rows: list[Mapping[str, str]]) -> str:
+    mixed_rows = sum(row.get("evidence_source_mix") == "abebooks_and_ebay_active_listings" for row in rows)
+    listing_rows = sum(integer_value(row.get("ebay_active_listing_count", "")) > 0 for row in rows)
+    listings = sum(integer_value(row.get("ebay_active_listing_count", "")) for row in rows)
+    status_only = sum(
+        integer_value(row.get("ebay_status_count", "")) > 0
+        and integer_value(row.get("ebay_active_listing_count", "")) == 0
+        for row in rows
+    )
+    return (
+        '<section><h2>Source-Aware Evidence Summary</h2><p>'
+        f'{mixed_rows} books include AbeBooks and eBay evidence; {listing_rows} books have '
+        f'{listings} observed eBay active listings; {status_only} books have eBay status only. '
+        'AbeBooks remains the core range source for mixed-source rows.</p></section>'
+    )

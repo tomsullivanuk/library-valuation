@@ -657,9 +657,10 @@ Generated outputs:
 - Generated CSV, XLSX, reports, and workbooks live under `output/`.
 - The review workbook and static HTML report are projections of the generated
   Market Evidence Summary plus acquisition context; neither is a repository or
-  an input to monthly updates. The v0.8.0 workbook can project compact
-  source-aware eBay context from multi-source summary fields while leaving the
-  HTML report AbeBooks-only.
+  an input to monthly updates. The v0.8.0 workbook and HTML report can project
+  compact source-aware eBay context from multi-source summary fields without
+  changing core ranges, confidence, or recommendations. Legacy AbeBooks-only
+  inputs remain valid.
 - Nothing in `output/` is source data.
 - Everything in `output/` must be reproducible from `input/`, `data/`,
   `cache/`, `config/`, and code.

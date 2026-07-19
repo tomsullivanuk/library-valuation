@@ -138,6 +138,17 @@ shipping, absent conversion, unknown eBay match confidence, human review need,
 non-appraisal caveat, and seller-identity suppression.
 
 Legacy AbeBooks-only summaries remain valid inputs and render their existing
-tabs with conservative source defaults. The HTML report remains unchanged and
-does not yet expose eBay/source-aware fields. No workbook output is durable or
-read by monthly import.
+tabs with conservative source defaults. No workbook output is durable or read
+by monthly import.
+
+## PR5 Source-Aware HTML Report
+
+PR5 aligns the static HTML reviewer artifact with the workbook. For source-aware
+input, every reviewer queue adds Evidence Sources, eBay Listings, eBay Price
+Range, eBay Status, and Source Price Comparability, using the same compact
+display helpers as the workbook. The report also adds source-aware counts and
+interpretation/caveat text. AbeBooks stays the core range source for mixed rows;
+eBay is supplemental active-listing item-price evidence with shipping excluded,
+no conversion or pooling, unknown match confidence, and required human review.
+Seller identity is not stored or displayed. Legacy AbeBooks-only input retains
+the existing report layout. Generated HTML remains ignored and non-durable.

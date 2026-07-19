@@ -442,14 +442,19 @@ eBay listing/status totals, core range source, and comparability. AbeBooks
 remains the core range source for mixed rows; eBay remains supplemental active-
 listing item-price evidence with shipping excluded, no conversion, unknown
 match confidence, and no stored seller identity. Legacy AbeBooks-only summaries
-remain supported. The HTML report does not yet expose these fields.
+remain supported.
 
 The generated static HTML report is a simpler, self-contained sharing view. It
 uses tabbed review queues, queue-specific guidance, a single human-readable
 AbeBooks range, acquisition-year possession prompts, and a field guide with the
-report sort order. Detailed evidence-quality fields remain in the review
-workbook rather than the public-facing tables. Re-running the command replaces
-the requested HTML output; the report is generated, ignored data.
+report sort order. With a source-aware summary, its tables mirror the workbook's
+five compact source displays and its summary/guidance explain the supplemental
+eBay boundary. AbeBooks remains the core mixed-source range; eBay item prices
+exclude shipping, are not converted or pooled, retain unknown match confidence,
+and require human title/edition review. Seller identity is not stored or shown.
+Legacy AbeBooks-only reports retain their existing columns and presentation.
+Re-running the command replaces the requested HTML output; the report is
+generated, ignored data.
 
 All files produced under `output/` by this workflow are generated artifacts and
 remain ignored/untracked. AbeBooks asking prices are not appraisals, fair market
