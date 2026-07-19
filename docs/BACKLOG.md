@@ -60,8 +60,42 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] Complete v0.7.0 documentation and release readiness.
 - [ ] Design reviewed eBay match-confidence rules and shipping/total-cost
   treatment only after representative production evidence exists.
-- [ ] Keep sold/completed eBay evidence and automatic full-library collection
-  deferred unless separate access and product decisions are approved.
+- [ ] Keep sold/completed eBay evidence deferred; implement full-library active-
+  listing collection only through the separately designed v0.9.0 workflow.
+
+## v0.9.0 Full-Library eBay Baseline & Resumable Collection
+
+- [ ] Design minimum crash-safe checkpoint/run-manifest state.
+- [ ] Add a separate guarded full-library eBay command; do not lift the targeted
+  command ceiling as a substitute.
+- [ ] Add deterministic resume, duplicate prevention, bounded retries, pacing,
+  progress, and safe interruption handling.
+- [ ] Validate a small production interruption/resume run before the full run.
+- [ ] Complete and document the approximately 3,014-book production baseline.
+- [ ] Regenerate the multi-source summary, workbook, and HTML report from final
+  ignored artifacts.
+
+## v0.10.0 Libib Physical Inventory Integration
+
+- [ ] Design a CSV/batch import boundary and tentative inventory concepts.
+- [ ] Preserve physical items separately from catalog identity.
+- [ ] Match inventory with provenance, confidence, duplicates, unmatched items,
+  location, presence, and audit context.
+
+## v0.11.0 Library Explorer and Action Center
+
+- [ ] Define one generated presentation model for both static pages.
+- [ ] Build the searchable/filterable Library Explorer.
+- [ ] Build the next-action-focused Action Center.
+- [ ] Prevent either presentation from recalculating valuation semantics.
+
+## v0.12.0 Automated Monthly Refresh Workflow
+
+- [ ] Design one refresh command over Amazon, optional Libib, incremental market
+  checks, evidence summaries, web outputs, and a run report.
+- [ ] Design configurable freshness/retry policies and manual overrides.
+- [ ] Define durable collection-state/provenance needs without promoting raw or
+  detailed generated artifacts by accident.
 
 ---
 

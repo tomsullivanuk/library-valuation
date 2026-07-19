@@ -55,6 +55,7 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
+- `docs/RELEASE_PLAN_v0.9.0.md`: planned resumable full-library eBay baseline.
 - `docs/MARKET_INTELLIGENCE.md`: v0.5.0 market-evidence-first architecture,
   generated summary schema, confidence, range, and review rules.
 - `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether

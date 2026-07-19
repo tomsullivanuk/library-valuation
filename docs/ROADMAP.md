@@ -389,7 +389,7 @@ readiness checks. Production access, representative eBay evidence, workbook and
 HTML integration, match-confidence rules, shipping treatment, sold/completed
 evidence, and any full-library strategy remain future work.
 
-## v0.8.0: Production Validation and Reviewer Source Context
+## v0.8.0: Production Validation and Reviewer Source Context — Released
 
 Validate production eBay evidence before reviewer integration, then expose only
 compact, source-aware context:
@@ -408,6 +408,66 @@ both reviewer projections are complete. Shipping-aware pricing, currency
 normalization, sold/completed evidence, improved match-confidence heuristics,
 automated edition matching, richer reviewer workflow, additional evidence
 sources, and production full-library collection remain deferred.
+
+Released as `v0.8.0` at `192271ecb658e82cd0a28c181316b5d5bf9476c9`.
+
+## v0.9.0: Full-Library eBay Baseline and Resumable Collection
+
+Build a separate production-only workflow for the approximately 3,014 assessed
+catalog items. It must be resumable, checkpointed, deterministic, safely paced,
+bounded in retries, restartable without duplicating completed work, and suitable
+for unattended overnight execution. A run manifest must preserve provenance and
+support final observation, multi-source summary, workbook, and HTML artifacts.
+
+This is not an increase to the targeted command's 100-book limit. The minimum
+checkpoint state needed for safe v0.9.0 operation will be designed before code;
+the broader durable refresh-history model remains future work. Seller identity
+remains suppressed. Detailed and reviewer artifacts remain ignored and
+non-durable unless a later design explicitly promotes them.
+
+## v0.10.0: Libib Physical Inventory Integration
+
+Use Libib CSV/batch exports as a separate physical-inventory and location layer,
+without treating them as durable intellectual/catalog identity. Planned design
+work includes physical presence, shelf/location, audit status and date,
+duplicate copies, unmatched items, ISBN/title/author match provenance,
+confidence, and manual review. Potential durable concepts include imports,
+physical items, and catalog-to-inventory matches; their schemas are not final.
+
+## v0.11.0: Library Explorer and Action Center
+
+Create two static, self-contained web experiences backed by one shared generated
+presentation model:
+
+- Library Explorer: searchable, sortable, filterable catalog, inventory,
+  acquisition, market-evidence, recommendation, and freshness context.
+- Action Center: next-step queues for sale review, market research, edition or
+  condition review, physical-audit exceptions, metadata cleanup, missing market
+  evidence, and stale evidence.
+
+Neither page independently recalculates ranges, confidence, or recommendations.
+A server-backed application requires a later explicit justification.
+
+## v0.12.0: Automated Monthly Refresh Workflow
+
+Provide one repeatable refresh command that discovers the latest Amazon export,
+optionally imports Libib inventory, updates acquisitions and physical context,
+selects new/stale/missing-source market checks, incrementally refreshes AbeBooks
+and eBay evidence, rebuilds the shared summary and both web experiences, and
+writes a concise run report. Refresh intervals should become configuration-
+driven, with manual selected/all overrides.
+
+Reliable monthly refresh will likely require durable collection state and
+provenance such as source, catalog item, strategy, attempt/success dates,
+staleness, retry state, run identity, environment, and summary provenance.
+v0.9.0 should choose only the minimum safe checkpoint subset and avoid
+prematurely finalizing the v0.12.0 architecture.
+
+Across these releases, AbeBooks remains the primary/core range source unless a
+future reviewed design explicitly changes that behavior. eBay active listings
+remain supplemental asking-price evidence, not sold/completed evidence,
+appraisals, fair-market-value estimates, or realized-sale estimates. Shipping,
+currency conversion, and sold/completed eBay evidence remain deferred.
 
 ## Later: Top-25 Market Research Workflow
 

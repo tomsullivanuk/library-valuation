@@ -15,6 +15,14 @@ retained for historical or family reasons.
 The project should preserve evidence and minimize manual effort. Human judgment
 belongs in review and decision points, not in hand-editing generated outputs.
 
+The post-v0.8.0 direction separates four concerns into staged releases: a
+resumable full-library eBay baseline, Libib physical-inventory context, a shared
+presentation model serving Library Explorer and Action Center, and incremental
+monthly orchestration. Detailed listing artifacts can remain generated, but
+safe resume and later refresh will require deliberately scoped collection state
+and provenance. v0.9.0 will define only its minimum checkpoint state; it must not
+prematurely finalize the longer-term durable schema.
+
 ## Current Architecture
 
 The current system is a compact Python command-line pipeline implemented in
