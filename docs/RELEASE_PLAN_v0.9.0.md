@@ -113,6 +113,45 @@ can inform a future durable checked/attempted/success/staleness model. v0.9.0
 must keep the ledger scoped to safe execution and must not declare it the final
 durable market-history schema.
 
+### PR2 implemented state contract
+
+PR2 implements this state layer in `valuation/ebay_full_library_state.py`
+without adding a collection command or network behavior. Manifest, ledger, and
+observation-part envelopes use explicit `1.0` schema versions. The generated run
+layout is:
+
+```text
+output/full_library_ebay/
+  manifest.json
+  ledger.json
+  parts/<zero-padded ordinal>-<catalog-id-hash>.json
+  run_summary.json        # reserved for later orchestration
+  final/                  # reserved for later materialization
+```
+
+Manifest compatibility is intentionally limited to fields whose changes make
+resume unsafe: schema version, environment, marketplace, input fingerprint,
+candidate count/order hash, query-strategy version, observation-schema version,
+maximum results, source name, and seller-suppression policy. Delay and retry
+settings may vary safely between resumed invocations.
+
+The ledger statuses are `pending`, `in_progress`, `observed`, `no_results`,
+`no_query`, `source_unavailable_retryable`, `source_unavailable_terminal`, and
+`failed_terminal`. Recovery adopts a valid deterministic part written before an
+interruption; otherwise it changes `in_progress` back to `pending`, retaining
+attempt/query metadata and adding a sanitized interruption reason. Completed
+source outcomes reference one immutable atomic JSON part;
+terminal internal failures may be partless. Each part contains an envelope plus
+one or more rows with exactly the canonical 25 observation fields, source
+`ebay_active_listings`, and a blank seller field.
+
+JSON writes use a same-directory temporary file, flush, file `fsync`, atomic
+`os.replace`, and best-effort directory `fsync`; temporary files are cleaned up
+on failure. Integrity validation reconciles manifest count/order, ledger item
+identity and ordinals, part paths, part schema/identity/outcome, canonical rows,
+row counts, and unreferenced parts. Final CSV/XLSX materialization remains
+deferred to later PRs.
+
 ## 6. Command Design
 
 Proposed separate command:

@@ -774,6 +774,23 @@ sold/completed evidence, improved matching heuristics, automated edition
 matching, shipping-aware pricing, currency normalization, additional sources,
 and richer reviewer workflow remain future work.
 
+### v0.9.0 checkpoint provenance boundary
+
+The full-library design separates minimum resumability state from market
+evidence. A versioned immutable manifest records input fingerprint, ordered
+candidate hash, source/environment, marketplace, query/observation versions,
+result limit, and seller-suppression policy. A versioned ledger records only
+sanitized per-item attempts and outcomes. Immutable atomic item parts contain
+the canonical 25-field eBay observations. No credentials, tokens, authorization
+headers, raw responses, or seller identity belong in any checkpoint file.
+
+Interrupted `in_progress` items adopt a valid deterministic part if the part was
+committed before interruption, otherwise they recover to eligible pending state.
+Observed, no-results, no-query, terminal source-unavailable, and terminal
+internal failures are skipped. This supports later deterministic materialization
+and may inform a future monthly freshness design, but it is not yet durable
+collection history.
+
 ## Non-Goals
 
 This document does not define or implement:

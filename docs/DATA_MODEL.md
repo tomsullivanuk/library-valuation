@@ -664,6 +664,11 @@ Generated outputs:
 - Nothing in `output/` is source data.
 - Everything in `output/` must be reproducible from `input/`, `data/`,
   `cache/`, `config/`, and code.
+- v0.9.0 resumable eBay runs may also keep ignored execution state beneath a
+  caller-selected `output/` run directory: immutable `manifest.json`, atomic
+  `ledger.json`, and immutable per-item `parts/*.json`. These versioned JSON
+  envelopes support crash recovery and final artifact reconstruction; they are
+  not durable market-history repositories or monthly-refresh state.
 - `output/research_candidates.csv` and `.xlsx` are generated collector-facing
   views over current catalog items, acquisitions, metadata, and Research
   Assessments.

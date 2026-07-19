@@ -23,6 +23,14 @@ safe resume and later refresh will require deliberately scoped collection state
 and provenance. v0.9.0 will define only its minimum checkpoint state; it must not
 prematurely finalize the longer-term durable schema.
 
+The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
+run directory. An immutable manifest identifies compatible work; a deterministic
+per-item ledger records sanitized execution state; and atomic per-item JSON
+parts contain canonical eBay observation rows. Same-directory temporary writes,
+`fsync`, and atomic replacement prevent partial active state. This checkpoint is
+minimum execution state, not durable market history, and no client or network
+dependency enters the state module.
+
 ## Current Architecture
 
 The current system is a compact Python command-line pipeline implemented in
