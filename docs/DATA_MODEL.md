@@ -669,6 +669,10 @@ Generated outputs:
   `ledger.json`, and immutable per-item `parts/*.json`. These versioned JSON
   envelopes support crash recovery and final artifact reconstruction; they are
   not durable market-history repositories or monthly-refresh state.
+- `run_summary.json` is a generated orchestration report containing schema
+  versions, candidate/completion/status/attempt counts, timestamps, elapsed
+  seconds, resume count, safe paths, optional archive path, stop reason, and the
+  seller-suppression flag. It contains no listing detail or raw response.
 - `output/research_candidates.csv` and `.xlsx` are generated collector-facing
   views over current catalog items, acquisitions, metadata, and Research
   Assessments.

@@ -547,6 +547,29 @@ every eBay `seller` field was blank and no `match_notes` contained seller
 identity. See [`docs/RELEASE_READINESS_v0.8.0.md`](docs/RELEASE_READINESS_v0.8.0.md).
 This small run does not authorize broader or full-library collection.
 
+The v0.9.0 full-library command is a separate production-only, resumable path:
+
+```bash
+.venv/bin/python library_pipeline.py collect-full-library-ebay-observations \
+  --summary output/full_abebooks_market_evidence_summary.csv \
+  --output-dir output/full_library_ebay \
+  --checkpoint output/full_library_ebay \
+  --delay 1 \
+  --max-results-per-book 3 \
+  --max-retries 2 \
+  --retry-delay 5 \
+  --confirm-production
+```
+
+It requires `EBAY_ENVIRONMENT=production` and explicit confirmation. Compatible
+state resumes by default; `--restart` archives the existing checkpoint as a
+sibling before creating a new run. State is written atomically after every
+transition, and concise progress plus `run_summary.json` contain no listing
+details. PR3 writes only ignored manifest, ledger, and per-item JSON parts; final
+combined CSV/XLSX and reviewer regeneration remain later work. Active listings
+remain supplemental item asking prices with blank sellers, excluded shipping,
+no currency conversion, and unknown match confidence.
+
 v0.8.0 PR3 completed a representative but still bounded 100-book production
 validation across three review queues. A deterministic ignored cohort contained
 34 `review_for_possible_sale`, 33 `manual_market_research_needed`, and 33

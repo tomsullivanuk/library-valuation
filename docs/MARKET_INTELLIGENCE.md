@@ -791,6 +791,17 @@ internal failures are skipped. This supports later deterministic materialization
 and may inform a future monthly freshness design, but it is not yet durable
 collection history.
 
+PR3 uses this state through a separate production-only full-library command.
+The command preserves the ISBN-13, ISBN-10, title/author, then title query order
+and the existing observation adapter. It writes one atomic part per terminal
+source outcome, never stores seller identity or raw responses, and reports only
+aggregate progress. Rate-limit/temporary failures retry within configured
+bounds; authentication-class failures stop the run after a sanitized terminal
+status. Final combined observations, summary regeneration, and reviewer
+artifacts remain later PRs. The existing client still acquires an application
+token per search; token reuse/renewal is deferred to long-run hardening rather
+than being changed inside the initial orchestration PR.
+
 ## Non-Goals
 
 This document does not define or implement:

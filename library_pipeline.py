@@ -41,6 +41,10 @@ from valuation.calibration_simulation import (
 from valuation.collector_workbook import write_collector_workbook
 from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials
 from valuation.ebay_active_listings import EbayActiveListingsClient
+from valuation.ebay_full_library_collection import (
+    FullLibraryCollectionError,
+    collect_full_library_ebay,
+)
 from valuation.ebay_targeted_collection import (
     DEFAULT_REVIEW_RECOMMENDATIONS,
     MAX_RESULTS_PER_BOOK,
@@ -2364,6 +2368,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repeat to include multiple reviewer queues; defaults to review_for_possible_sale",
     )
 
+    full_ebay_parser = subparsers.add_parser(
+        "collect-full-library-ebay-observations",
+        help=(
+            "Production-only resumable eBay active-listing collection; requires explicit "
+            "confirmation and writes ignored checkpoint state"
+        ),
+        description=(
+            "Collect production eBay active-listing asking-price evidence into resumable ignored "
+            "state. Seller identity is not stored; shipping is excluded; currency is not converted; "
+            "match confidence remains unknown. Use --restart only to archive an existing checkpoint "
+            "and start again."
+        ),
+    )
+    full_ebay_parser.add_argument("--summary", required=True, type=Path)
+    full_ebay_parser.add_argument("--output-dir", required=True, type=Path)
+    full_ebay_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    full_ebay_parser.add_argument("--checkpoint", type=Path)
+    full_ebay_parser.add_argument(
+        "--resume", action="store_true", default=True,
+        help="Resume compatible checkpoint state (safe default)",
+    )
+    full_ebay_parser.add_argument(
+        "--restart", action="store_true",
+        help="Archive an existing checkpoint and initialize a new run",
+    )
+    full_ebay_parser.add_argument("--delay", type=float, default=1.0)
+    full_ebay_parser.add_argument("--max-results-per-book", type=int, default=3)
+    full_ebay_parser.add_argument("--max-retries", type=int, default=2)
+    full_ebay_parser.add_argument("--retry-delay", type=float, default=5.0)
+    full_ebay_parser.add_argument("--limit", type=int)
+    full_ebay_parser.add_argument(
+        "--confirm-production", action="store_true",
+        help="Required acknowledgement that this command uses production eBay",
+    )
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2538,6 +2577,26 @@ def main(argv: list[str] | None = None) -> int:
             )
             csv_path, xlsx_path = paired_output_paths(args.output)
             print(f"Wrote {count} targeted eBay observation rows to {csv_path} and {xlsx_path}")
+            return 0
+        if args.command == "collect-full-library-ebay-observations":
+            try:
+                summary = collect_full_library_ebay(
+                    args.summary,
+                    args.output_dir,
+                    checkpoint_dir=args.checkpoint,
+                    data_dir=args.data_dir,
+                    resume=args.resume,
+                    restart=args.restart,
+                    delay_seconds=args.delay,
+                    max_results_per_book=args.max_results_per_book,
+                    max_retries=args.max_retries,
+                    retry_delay_seconds=args.retry_delay,
+                    limit=args.limit,
+                    confirm_production=args.confirm_production,
+                )
+            except FullLibraryCollectionError as error:
+                raise UserFacingError(str(error)) from None
+            print(json.dumps(summary, indent=2, sort_keys=True))
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

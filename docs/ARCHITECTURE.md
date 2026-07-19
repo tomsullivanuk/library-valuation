@@ -31,6 +31,14 @@ parts contain canonical eBay observation rows. Same-directory temporary writes,
 minimum execution state, not durable market history, and no client or network
 dependency enters the state module.
 
+PR3 adds orchestration above that boundary without changing the client, adapter,
+or targeted collector. The production-only command fingerprints and orders the
+summary, initializes or validates checkpoint state, performs one item transition
+at a time, and writes only canonical atomic parts. Authentication-class failures
+stop globally; bounded transient failures may retry; sanitized unexpected
+failures terminalize one item. Restart archives rather than deletes. Aggregate
+progress and run summary remain generated and contain no listing details.
+
 ## Current Architecture
 
 The current system is a compact Python command-line pipeline implemented in

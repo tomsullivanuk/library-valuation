@@ -67,8 +67,9 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 - [x] Design and implement minimum crash-safe checkpoint/run-manifest state with
   versioned pure state functions and network-independent tests.
-- [ ] Add a separate guarded full-library eBay command; do not lift the targeted
-  command ceiling as a substitute.
+- [x] Add a separate production-guarded, resumable full-library eBay command
+  with mocked orchestration tests; do not lift the targeted command ceiling as
+  a substitute.
 - [ ] Add deterministic resume, duplicate prevention, bounded retries, pacing,
   progress, and safe interruption handling.
 - [ ] Validate a small production interruption/resume run before the full run.

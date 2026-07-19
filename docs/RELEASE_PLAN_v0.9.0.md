@@ -193,6 +193,37 @@ restart must never be implicit. Partial item results and state are written
 incrementally. Final CSV is assembled deterministically from completed parts;
 XLSX should normally be built only after a coherent CSV is available.
 
+### PR3 implemented orchestration boundary
+
+PR3 adds `collect-full-library-ebay-observations` with the options above. Both
+output and checkpoint paths must resolve below `output/`, and neither may be the
+output root itself. Production environment and `--confirm-production` are
+mandatory. Candidate IDs are unique and sorted deterministically; `--limit`
+selects only the first compatible bounded subset and becomes part of manifest
+count/order compatibility.
+
+New runs create manifest, ledger, `parts/`, and reserved `final/` state. Resume
+is the default, validates the manifest and checkpoint, recovers interrupted
+entries, skips terminal items, and continues retry-eligible work. `--restart`
+renames the whole existing run directory to a timestamped sibling archive and
+then creates fresh state; it never deletes or silently overwrites the only
+checkpoint.
+
+Every transition is saved atomically. No-query, observed, no-results, and
+terminal source-unavailable outcomes receive immutable parts. Transient/rate-
+limit failures retry within configured bounds; authentication/credential/token
+failures terminalize the current item and stop the run; unexpected sanitized
+failures become terminal for that item without stopping later candidates. A
+safe aggregate `run_summary.json` records completion/status/attempt counts,
+timing, resume count, paths, schemas, archive, and stop reason. Final combined
+CSV/XLSX remains deferred.
+
+The existing reusable active-listings client currently acquires an application
+token for each search. PR3 preserves that tested behavior rather than adding a
+new token lifecycle. It is safe but potentially inefficient for a multi-hour
+run; token reuse/renewal and long-run authentication behavior remain explicit
+PR4 hardening work.
+
 ## 7. Rate-Limit and Runtime Planning
 
 The initial input is approximately 3,014 books. Under the current conservative
