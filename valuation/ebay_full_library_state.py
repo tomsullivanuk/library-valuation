@@ -454,6 +454,46 @@ def validate_checkpoint_integrity(run_dir: Path) -> list[str]:
     return checked
 
 
+def materialize_observation_rows(run_dir: Path) -> list[dict[str, str]]:
+    """Return a complete deterministic observation table from validated parts.
+
+    Materialization is deliberately network-free and requires one valid part
+    for every ledger item. It rejects incomplete runs and duplicate evidence
+    rather than silently producing a partial or ambiguous final artifact.
+    """
+    paths = run_paths(run_dir)
+    ledger = load_ledger(paths["ledger"])
+    checked = validate_checkpoint_integrity(paths["root"])
+    entries = sorted(ledger["entries"], key=lambda entry: int(entry["ordinal"]))
+    if len(checked) != len(entries):
+        raise CheckpointIntegrityError(
+            "Checkpoint is not fully materializable: every ledger item must reference a valid part"
+        )
+
+    rows: list[dict[str, str]] = []
+    observation_ids: set[str] = set()
+    listing_urls: set[str] = set()
+    for entry in entries:
+        part_path = safe_run_relative_path(paths["root"], str(entry["observation_part_path"]))
+        part = load_observation_part(part_path)
+        for row in part["rows"]:
+            if row["catalog_id"] != entry["catalog_item_id"]:
+                raise CheckpointIntegrityError(
+                    f"Observation catalog identity mismatch for {entry['catalog_item_id']}"
+                )
+            observation_id = row["observation_id"]
+            if not observation_id or observation_id in observation_ids:
+                raise CheckpointIntegrityError("Duplicate or blank observation ID detected")
+            observation_ids.add(observation_id)
+            if row["lookup_status"] == "observed":
+                listing_url = row["listing_url"]
+                if not listing_url or listing_url in listing_urls:
+                    raise CheckpointIntegrityError("Duplicate or blank observed listing URL detected")
+                listing_urls.add(listing_url)
+            rows.append(dict(row))
+    return rows
+
+
 def summarize_run_state(ledger: Mapping[str, object]) -> dict[str, object]:
     validate_ledger_shape(ledger)
     counts = Counter(entry["status"] for entry in ledger["entries"])

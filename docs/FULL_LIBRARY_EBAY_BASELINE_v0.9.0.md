@@ -131,11 +131,13 @@ CSV/XLSX/workbook/report artifacts also remain uncommitted.
 
 ## Remaining Work Before Release
 
-PR7 will deterministically materialize combined eBay observation CSV/XLSX files
-from the validated parts, combine them with full AbeBooks observations, build
-the complete multi-source summary, regenerate the source-aware workbook and
-HTML report, reconcile counts and ranges, and review lower-overlap and price-
-outlier behavior. All generated outputs remain ignored and untracked.
+PR7 deterministically materialized combined eBay observation CSV/XLSX files
+from the validated parts, combined them with full AbeBooks observations, built
+the complete multi-source summary, regenerated the source-aware workbook and
+HTML report, reconciled counts and ranges, and reviewed lower-overlap and price-
+outlier behavior. All generated outputs remain ignored and untracked. See
+`docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md` for the completed
+reconciliation.
 
 Final release documentation, privacy checks, and artifact audits follow after
 that reconciliation. Sold/completed listings, shipping-inclusive pricing,

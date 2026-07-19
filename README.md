@@ -58,6 +58,8 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/RELEASE_PLAN_v0.9.0.md`: planned resumable full-library eBay baseline.
 - `docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md`: completed production baseline,
   integrity, evidence-quality, and privacy results.
+- `docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md`: deterministic
+  materialization, full source reconciliation, and reviewer-artifact QA.
 - `docs/MARKET_INTELLIGENCE.md`: v0.5.0 market-evidence-first architecture,
   generated summary schema, confidence, range, and review rules.
 - `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether
@@ -584,9 +586,17 @@ interruption writes a safe summary and leaves the current item recoverable.
 The v0.9.0 PR6 production baseline completed all 3,014 assessed books in one
 invocation: 2,881 books produced 8,293 observed listings and 133 produced
 source-specific no-results rows. Checkpoint integrity, duplicate prevention,
-and seller/privacy scans passed. Final combined observations and reviewer
-artifact regeneration remain PR7 work; see
+and seller/privacy scans passed. PR7 subsequently completed final combined
+observations and reviewer-artifact regeneration; see
 [`docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md`](docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md).
+
+PR7 adds the network-free `materialize-full-library-ebay-observations` command.
+It validates completed checkpoint state and writes canonical eBay CSV/XLSX
+files in deterministic ledger order. The complete local workflow reconciled
+8,426 eBay rows plus 8,311 AbeBooks rows into a 3,014-book source-aware summary,
+workbook, and HTML report with no AbeBooks core-semantic changes. Generated
+artifacts remain ignored; see
+[`docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md`](docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md).
 
 v0.8.0 PR3 completed a representative but still bounded 100-book production
 validation across three review queues. A deterministic ignored cohort contained

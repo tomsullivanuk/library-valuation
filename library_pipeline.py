@@ -45,6 +45,7 @@ from valuation.ebay_full_library_collection import (
     FullLibraryCollectionError,
     collect_full_library_ebay,
 )
+from valuation.ebay_full_library_state import CheckpointError, materialize_observation_rows
 from valuation.ebay_targeted_collection import (
     DEFAULT_REVIEW_RECOMMENDATIONS,
     MAX_RESULTS_PER_BOOK,
@@ -1397,6 +1398,16 @@ def summarize_market_evidence(
     return len(summary_rows)
 
 
+def materialize_full_library_ebay_observations(checkpoint: Path, output: Path) -> int:
+    """Write deterministic CSV/XLSX observations from validated checkpoint state."""
+    try:
+        rows = materialize_observation_rows(checkpoint)
+    except CheckpointError as error:
+        raise UserFacingError(f"Cannot materialize eBay checkpoint: {error}") from None
+    write_table_outputs(output, MARKET_OBSERVATION_FIELDNAMES, rows, "eBay Observations")
+    return len(rows)
+
+
 def build_abebooks_review_workbook(summary: Path, output_xlsx: Path, data_dir: Path) -> int:
     summary_rows = read_csv_rows(summary)
     acquisitions = read_optional_csv_rows(data_dir / "acquisitions.csv")
@@ -2407,6 +2418,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Required acknowledgement that this command uses production eBay",
     )
 
+    materialize_ebay_parser = subparsers.add_parser(
+        "materialize-full-library-ebay-observations",
+        help="Materialize deterministic CSV/XLSX observations from a completed eBay checkpoint",
+        description=(
+            "Validate completed local checkpoint state and materialize canonical eBay observation "
+            "CSV/XLSX files without network access."
+        ),
+    )
+    materialize_ebay_parser.add_argument("--checkpoint", required=True, type=Path)
+    materialize_ebay_parser.add_argument("--output", required=True, type=Path)
+
     analysis_parser = subparsers.add_parser("analyze-market-validation")
     analysis_parser.add_argument("--output-dir", type=Path, default=Path("output"))
 
@@ -2602,6 +2624,11 @@ def main(argv: list[str] | None = None) -> int:
             except FullLibraryCollectionError as error:
                 raise UserFacingError(str(error)) from None
             print(json.dumps(summary, indent=2, sort_keys=True))
+            return 0
+        if args.command == "materialize-full-library-ebay-observations":
+            count = materialize_full_library_ebay_observations(args.checkpoint, args.output)
+            csv_path, xlsx_path = paired_output_paths(args.output)
+            print(f"Wrote {count} full-library eBay observation rows to {csv_path} and {xlsx_path}")
             return 0
         if args.command == "analyze-market-validation":
             count = analyze_market_validation(args.output_dir)

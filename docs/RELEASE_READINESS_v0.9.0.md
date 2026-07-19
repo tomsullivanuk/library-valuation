@@ -2,9 +2,10 @@
 
 ## Status
 
-**In progress.** PR6 completed and validated the full 3,014-book production
-eBay baseline. The next gate is PR7 deterministic observation materialization,
-multi-source summary generation, and reviewer workbook/report reconciliation.
+**In progress; artifact reconciliation complete.** PR7 deterministically
+materialized the full eBay checkpoint and reconciled the multi-source summary,
+reviewer workbook, and HTML report. Final release documentation and artifact
+audits remain before tagging v0.9.0.
 
 ## PR5 Bounded Production Resume Validation
 
@@ -87,9 +88,6 @@ The resume invocation used the identical command and did not use `--restart`.
 
 ## Remaining Release Gates
 
-- Deterministically materialize final observation CSV/XLSX artifacts.
-- Regenerate and reconcile the multi-source summary, reviewer workbook, and
-  HTML report from ignored final artifacts.
 - Complete final privacy, credential, test, documentation, and release audits.
 
 The evidence remains supplemental active-listing asking-price evidence, not an
@@ -109,3 +107,15 @@ All 8,426 seller fields were blank; no notes contained seller identity; and no
 credential, token, header, expiration, or raw-response material was persisted.
 See `docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md` for the exact command, aggregate
 evidence, title-plausibility results, privacy audit, and interpretation limits.
+
+## PR7 Full Multi-Source Reconciliation
+
+PR7 materialized 8,426 canonical eBay rows from 3,014 validated parts without
+network access, combined them with 8,311 AbeBooks rows, and generated a 3,014-
+book summary. It then regenerated the seven-tab workbook and five-queue HTML
+report. All source-aware fields reconciled, all AbeBooks core semantics remained
+unchanged, and generated outputs stayed ignored.
+
+See `docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md` for exact commands,
+counts, workbook/report results, lower-overlap sampling, price-extreme review,
+and privacy findings.

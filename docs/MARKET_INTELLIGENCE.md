@@ -855,8 +855,25 @@ the core range source, and no valuation or recommendation rule changes.
 
 All 8,426 seller fields were blank, no notes referenced sellers, and no
 credential, token, header, expiration, or raw-response material appeared in
-checkpoint state. PR7 will materialize and reconcile ignored final observations,
-the multi-source summary, workbook, and HTML report.
+checkpoint state. PR7 subsequently materialized and reconciled ignored final
+observations, the multi-source summary, workbook, and HTML report.
+
+### v0.9.0 full multi-source reconciliation
+
+PR7 materialized all 8,426 eBay rows locally and combined them with 8,311
+AbeBooks rows. The 3,014-row summary contains 2,769 books observed at both
+sources, 127 AbeBooks-only observed, 112 eBay-only observed, and 6 with neither
+source observed. All rows retain `market_range_source=abebooks`; comparison to
+the prior AbeBooks-only summary found zero core range, confidence,
+recommendation, or reason differences.
+
+The reviewer workbook contains all 3,014 unique books and the HTML contains the
+944 actionable books expected from existing recommendations. Source labels,
+eBay counts/ranges/statuses, and comparability fields reconcile exactly. A
+bounded review of the 249 lower-overlap listings found a mixture of benign
+abbreviation/markup, incomplete marketplace titles, and genuinely questionable
+edition/volume matches. Price extremes and disagreements remain visible and
+separate; neither diagnostic changed evidence semantics.
 
 ## Non-Goals
 

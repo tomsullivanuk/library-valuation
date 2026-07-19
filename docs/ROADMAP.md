@@ -427,8 +427,12 @@ non-durable unless a later design explicitly promotes them.
 
 PR6 completed the full 3,014-book production checkpoint: 2,881 books produced
 8,293 observed listings, 133 produced no results, and integrity, duplicate, and
-privacy validation passed. PR7 will materialize the ignored combined outputs
-and reconcile the multi-source summary, reviewer workbook, and HTML report.
+privacy validation passed. PR7 then materialized the ignored combined outputs
+and reconciled the multi-source summary, reviewer workbook, and HTML report.
+
+PR7 completed that materialization and reconciliation without changing
+valuation or matching semantics. Final v0.9.0 release documentation and audits
+remain.
 
 ## v0.10.0: Libib Physical Inventory Integration
 

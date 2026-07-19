@@ -30,6 +30,7 @@ from library_pipeline import (
     load_catalog_items,
     load_collector_reviews,
     load_research_assessments,
+    materialize_full_library_ebay_observations,
     main,
     paired_output_paths,
     reconcile_research_assessments,
@@ -124,6 +125,26 @@ def test_paired_output_paths():
 
     assert csv_path == output
     assert xlsx_path == Path("output/books.xlsx")
+
+
+def test_materialize_full_library_ebay_command_writes_outputs_without_network(
+    monkeypatch, tmp_path, capsys
+):
+    row = {field: "" for field in library_pipeline.MARKET_OBSERVATION_FIELDNAMES}
+    row.update({
+        "observation_id": "E1", "catalog_id": "BK1", "source": "ebay_active_listings",
+        "lookup_status": "no_results", "match_confidence": "unknown", "seller": "",
+    })
+    monkeypatch.setattr(library_pipeline, "materialize_observation_rows", lambda checkpoint: [row])
+    output = tmp_path / "ebay.csv"
+    assert main([
+        "materialize-full-library-ebay-observations",
+        "--checkpoint", str(tmp_path / "checkpoint"),
+        "--output", str(output),
+    ]) == 0
+    assert output.exists()
+    assert output.with_suffix(".xlsx").exists()
+    assert "Wrote 1 full-library eBay observation rows" in capsys.readouterr().out
 
 
 def test_library_paths_default_layout():

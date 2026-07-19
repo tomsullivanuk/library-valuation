@@ -21,6 +21,7 @@ from valuation.ebay_full_library_state import (
     load_ledger,
     load_manifest,
     load_observation_part,
+    materialize_observation_rows,
     mark_completed,
     mark_in_progress,
     mark_retryable_failure,
@@ -70,6 +71,7 @@ def observation(catalog_id="BK1", status="observed"):
         "catalog_id": catalog_id,
         "source": "ebay_active_listings",
         "lookup_status": status,
+        "listing_url": f"https://example.test/{catalog_id}" if status == "observed" else "",
         "seller": "",
         "match_confidence": "unknown",
     })
@@ -186,6 +188,97 @@ def test_interrupted_entry_does_not_adopt_invalid_part(tmp_path):
     part_path.write_text('{"schema_version":"broken"}', encoding="utf-8")
     with pytest.raises(CheckpointError, match="Unsupported observation-part"):
         recover_interrupted_entries(active, recovered_at="recovered", run_dir=run_dir)
+
+
+def test_materialization_is_deterministic_network_free_and_includes_status_rows(
+    tmp_path, monkeypatch
+):
+    run_dir = completed_run(
+        tmp_path,
+        [("BK2", [observation("BK2", "no_results")]), ("BK1", [observation("BK1")])],
+    )
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *_args, **_kwargs: pytest.fail("materialization must not use the network"),
+    )
+    first = materialize_observation_rows(run_dir)
+    second = materialize_observation_rows(run_dir)
+    assert first == second
+    assert [(row["catalog_id"], row["lookup_status"]) for row in first] == [
+        ("BK2", "no_results"), ("BK1", "observed")
+    ]
+    assert all(row["seller"] == "" for row in first)
+
+
+def test_materialization_rejects_missing_malformed_and_incomplete_parts(tmp_path):
+    run_dir = completed_run(tmp_path, [("BK1", [observation("BK1")])])
+    part_path = next((run_dir / "parts").glob("*.json"))
+    part_path.unlink()
+    with pytest.raises(CheckpointIntegrityError, match="Missing observation part"):
+        materialize_observation_rows(run_dir)
+
+    run_dir = completed_run(tmp_path / "malformed", [("BK1", [observation("BK1")])])
+    next((run_dir / "parts").glob("*.json")).write_text("not json", encoding="utf-8")
+    with pytest.raises(CheckpointError, match="Unable to load checkpoint JSON"):
+        materialize_observation_rows(run_dir)
+
+    run_dir = tmp_path / "incomplete"
+    create_manifest(run_dir / "manifest.json", **manifest_values(candidate_count=1, ordered_catalog_ids_hash=catalog_ids_hash(["BK1"])))
+    initialize_ledger(run_dir / "ledger.json", ["BK1"], created_at=NOW)
+    with pytest.raises(CheckpointIntegrityError, match="fully materializable"):
+        materialize_observation_rows(run_dir)
+
+
+def test_materialization_rejects_duplicate_observations_and_listing_urls(tmp_path):
+    duplicate_id = observation("BK2")
+    duplicate_id["observation_id"] = "MOB-BK1"
+    run_dir = completed_run(
+        tmp_path / "ids", [("BK1", [observation("BK1")]), ("BK2", [duplicate_id])]
+    )
+    with pytest.raises(CheckpointIntegrityError, match="observation ID"):
+        materialize_observation_rows(run_dir)
+
+    first = observation("BK1")
+    second = observation("BK2")
+    first["listing_url"] = second["listing_url"] = "https://example.test/shared"
+    run_dir = completed_run(tmp_path / "urls", [("BK1", [first]), ("BK2", [second])])
+    with pytest.raises(CheckpointIntegrityError, match="listing URL"):
+        materialize_observation_rows(run_dir)
+
+
+def completed_run(tmp_path, item_rows):
+    run_dir = tmp_path / "run"
+    catalog_ids = [catalog_id for catalog_id, _rows in item_rows]
+    create_manifest(
+        run_dir / "manifest.json",
+        **manifest_values(
+            candidate_count=len(catalog_ids),
+            ordered_catalog_ids_hash=catalog_ids_hash(catalog_ids),
+        ),
+    )
+    ledger = initialize_ledger(run_dir / "ledger.json", catalog_ids, created_at=NOW)
+    for ordinal, (catalog_id, rows) in enumerate(item_rows):
+        ledger = mark_in_progress(
+            ledger, catalog_id, attempted_at="attempt", query="query", search_strategy="isbn13"
+        )
+        relative = observation_part_relative_path(catalog_id, ordinal)
+        write_observation_part_atomic(
+            run_dir / relative,
+            catalog_item_id=catalog_id,
+            ordinal=ordinal,
+            rows=rows,
+            created_at="completed",
+        )
+        ledger = mark_completed(
+            ledger,
+            catalog_id,
+            status=rows[0]["lookup_status"],
+            completed_at="completed",
+            observation_part_path=str(relative),
+            observation_row_count=len(rows),
+        )
+    save_ledger_atomic(run_dir / "ledger.json", ledger)
+    return run_dir
 
 
 @pytest.mark.parametrize("status", ["observed", "no_results", "no_query", "source_unavailable_terminal", "failed_terminal"])

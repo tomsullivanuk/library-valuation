@@ -322,8 +322,9 @@ data requires a separate design decision.
 6. **PR6 — Full-library production run and evidence-quality report.** Completed:
    collected all 3,014 books in one invocation and documented coverage,
    runtime, integrity, privacy, and matching limitations.
-7. **PR7 — Full summary and reviewer-artifact regeneration.** Produce and
-   reconcile the multi-source summary, workbook, and HTML report locally.
+7. **PR7 — Full summary and reviewer-artifact regeneration.** Completed:
+   deterministically materialized eBay CSV/XLSX, generated and reconciled the
+   multi-source summary, workbook, and HTML report locally.
 8. **PR8 — Final documentation and release readiness.** Finalize release notes,
    operational instructions, limitations, validation, and artifact audits.
 
