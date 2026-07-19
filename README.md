@@ -553,7 +553,8 @@ validation across three review queues. A deterministic ignored cohort contained
 87 books and 13 `no_results` rows. All 242 rows had blank `seller`, no
 `match_notes` mentioned seller identity, and all match confidence remained
 `unknown`. Results support later design of concise reviewer-facing eBay context,
-but no workbook/report integration or broader collection is enabled. See
+which is now available in the generated workbook and HTML report; broader
+collection is not enabled. See
 [`docs/PRODUCTION_EBAY_VALIDATION_v0.8.0.md`](docs/PRODUCTION_EBAY_VALIDATION_v0.8.0.md).
 
 PR6 extends `summarize-market-evidence` so `--observations` can be repeated for
@@ -597,8 +598,10 @@ The PR7 local readiness run combined the full AbeBooks observations with the
 two-row sandbox smoke artifact and produced 3,014 summary rows: 3,012
 `abebooks_only` and 2 `abebooks_and_ebay_active_listings`. The two eBay rows were
 `no_results` statuses, not global market absence. Generated files remained
-ignored. The summary is not an appraisal, and workbook/HTML integration remains
-deferred. See [`docs/RELEASE_READINESS_v0.7.0.md`](docs/RELEASE_READINESS_v0.7.0.md).
+ignored. The summary is not an appraisal. At the v0.7.0 release boundary,
+workbook/HTML integration remained deferred; v0.8.0 now provides those
+projections. See
+[`docs/RELEASE_READINESS_v0.7.0.md`](docs/RELEASE_READINESS_v0.7.0.md).
 
 Extract candidate books from an Amazon order-history CSV. This writes both
 `book_candidates.csv` and `book_candidates.xlsx`:

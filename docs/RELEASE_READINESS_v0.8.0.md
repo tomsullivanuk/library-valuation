@@ -2,12 +2,21 @@
 
 ## Status
 
-**The bounded production targeted-collection path is validated after seller
-suppression. Broader production collection remains deferred.**
+**Ready for the v0.8.0 tag and GitHub Release after PR6 is committed.**
 
-This record covers v0.8.0 PR1 through PR3. It does not approve full-library
-collection or change valuation, review, workbook, report, or monthly-import
-behavior.
+The privacy-hardened bounded production path, representative evidence, reviewer
+workbook, and static HTML report are validated. This release does not approve
+full-library collection or change AbeBooks range, confidence, recommendation,
+Research Assessment, durable-data, or monthly-import behavior.
+
+## PR Checklist
+
+- [x] PR1 — remove seller username from normalized eBay evidence.
+- [x] PR2 — validate and document the bounded production targeted smoke run.
+- [x] PR3 — complete representative 100-book production validation.
+- [x] PR4 — add and validate source-aware reviewer workbook fields.
+- [x] PR5 — add and validate source-aware static HTML report fields.
+- [x] PR6 — finalize changelog, release notes, roadmap, and readiness records.
 
 ## Baseline
 
@@ -152,3 +161,79 @@ eBay is supplemental active-listing item-price evidence with shipping excluded,
 no conversion or pooling, unknown match confidence, and required human review.
 Seller identity is not stored or displayed. Legacy AbeBooks-only input retains
 the existing report layout. Generated HTML remains ignored and non-durable.
+
+## Reviewer Artifact Validation
+
+The representative workbook was generated from the 3,014-row multi-source
+summary. All four reviewer tabs contained the source-aware columns; all 87 books
+with observed eBay listings had matching compact ranges, all 13 status-only
+books displayed `No listings`, and no AbeBooks/core range changed. Run Summary
+reported 100 mixed-source books, 229 listings, and 13 statuses.
+
+The representative HTML report exposed the same five fields in all five review
+sections. It displayed eBay ranges for the same 87 books and status-specific
+no-listings text for the same 13 books, with zero eBay range mismatches, zero
+blank ranges for observed books, and zero AbeBooks/core range mismatches.
+
+Legacy AbeBooks-only workbook and HTML inputs remain supported. No reviewer
+artifact changes canonical evidence, recommendations, or durable state.
+
+## Seller Privacy Validation
+
+- Seller username is absent from normalized client objects.
+- All 242 representative observation seller fields were blank.
+- No representative `match_notes` value contained seller identity.
+- Workbook and HTML scans found no seller identity.
+- No raw API responses, credentials, tokens, or authorization headers were
+  retained or committed.
+
+## Generated-Artifact Policy
+
+Production cohorts, observations, multi-source summaries, reviewer workbooks,
+HTML reports, and smoke outputs remain ignored under `output/`. They are
+generated, replaceable, non-durable artifacts and do not feed the monthly Amazon
+import. `.env` remains ignored; raw API responses are not retained.
+
+## Known Limitations and Deferred Work
+
+- eBay active listings are asking-price evidence, not sold/completed evidence.
+- Shipping is excluded; currency conversion and source-price pooling are absent.
+- eBay match confidence remains `unknown`; human edition/title review is needed.
+- The 100-book production study does not establish a full-library cadence.
+- Sold/completed evidence, production full-library collection, improved matching
+  heuristics, automated edition matching, shipping-aware prices, currency
+  normalization, additional sources, and richer reviewer workflow are deferred.
+- Outputs are not appraisals, fair-market-value estimates, realized-sale
+  estimates, expected proceeds, or pricing guarantees.
+
+## Release Validation Checklist
+
+- [x] Production `EBAY_US` OAuth token and bounded Browse request succeeded.
+- [x] Representative 100-book production validation completed.
+- [x] Seller suppression verified from client normalization through artifacts.
+- [x] Workbook and HTML source-aware projections reconciled to the summary.
+- [x] AbeBooks-only backward compatibility covered by regression tests.
+- [x] Full automated test suite passed.
+- [x] Python compilation and `git diff --check` passed.
+- [x] Five release CLI help paths inspected.
+- [x] Credential/token/header audit found no committed sensitive material.
+- [x] `.env` and generated production artifacts confirmed ignored.
+
+## Tagging Checklist
+
+- [ ] Commit PR6 with only stable release documentation.
+- [ ] Confirm a clean working tree at the release commit.
+- [ ] Create annotated tag `v0.8.0` at the PR6 commit.
+- [ ] Verify the tag target and release title
+  `v0.8.0 — Production eBay Validation & Reviewer Integration`.
+- [ ] Push the release commit and tag after explicit approval.
+
+## GitHub Release Checklist
+
+- [ ] Create the GitHub Release from tag `v0.8.0`.
+- [ ] Use [`RELEASE_NOTES_v0.8.0.md`](RELEASE_NOTES_v0.8.0.md) as the release
+  description or source text.
+- [ ] Confirm the non-appraisal notice and deferred boundaries are visible.
+- [ ] Do not attach `.env`, credentials, tokens, raw responses, or ignored
+  production/generated artifacts.
+- [ ] Verify links and published tag target before marking the release final.

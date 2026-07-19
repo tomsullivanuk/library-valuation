@@ -397,13 +397,17 @@ compact, source-aware context:
 - PR1: remove seller username from eBay evidence;
 - PR2: run and document a bounded production smoke test;
 - PR3: run and document a representative 100-book production validation; and
-- PR4: add source-aware eBay context to the generated reviewer workbook.
+- PR4: add source-aware eBay context to the generated reviewer workbook;
+- PR5: align the static HTML report with the source-aware workbook; and
+- PR6: finalize release notes and release readiness.
 
-The workbook keeps AbeBooks as the core range source for mixed rows and shows
-eBay as supplemental active-listing item-price evidence. HTML report integration
-remains a later PR after workbook layout review. Shipping, currency conversion,
-sold/completed evidence, automated match confidence, broader collection, and
-full-library collection remain deferred.
+The workbook and HTML report keep AbeBooks as the core range source for mixed
+rows and show eBay as supplemental active-listing item-price evidence. Production
+OAuth, bounded collection, representative evidence, seller suppression, and
+both reviewer projections are complete. Shipping-aware pricing, currency
+normalization, sold/completed evidence, improved match-confidence heuristics,
+automated edition matching, richer reviewer workflow, additional evidence
+sources, and production full-library collection remain deferred.
 
 ## Later: Top-25 Market Research Workflow
 

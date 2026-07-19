@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.8.0 - 2026-07-19
+
+Release focus: Production eBay Validation & Reviewer Integration.
+
+Added:
+
+- Production OAuth/Browse validation and a bounded representative 100-book
+  study covering possible-sale, manual-research, and edition/condition queues.
+- Compact source-aware eBay evidence in the generated reviewer workbook and
+  static HTML report, with source mix, listing counts, item-price ranges,
+  source-specific statuses, and price-comparability context.
+- Release-readiness and production-validation records for the ignored,
+  non-durable workflow.
+
+Changed:
+
+- Seller username is removed from normalized eBay listing objects and is not
+  written to observation seller fields, notes, workbooks, or HTML reports.
+- The targeted collection ceiling is 100 books, with validation rejecting 101.
+- Reviewer artifacts explain that eBay is supplemental active-listing evidence;
+  AbeBooks remains the core range source for mixed-source rows.
+
+Unchanged:
+
+- AbeBooks collection, conservative range, confidence, and recommendation
+  behavior; Research Assessments; monthly imports; and durable data.
+- Source prices are not pooled, shipping is excluded, currency is not converted,
+  and eBay match confidence remains unknown pending human review.
+
+Known limitations:
+
+- Active listings are not sold/completed evidence, appraisals, fair market
+  value, realized prices, or expected proceeds.
+- Full-library eBay collection, automated edition matching, improved match
+  confidence, shipping-aware prices, and currency normalization remain deferred.
+
 ## v0.7.0 - 2026-07-18
 
 Release focus: eBay Active Listings Integration.

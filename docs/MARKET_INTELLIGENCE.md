@@ -626,7 +626,8 @@ its `no_results` does not mean global market absence. eBay-only items use the
 existing cautious rules and retain unknown match confidence. Mixed currencies
 within a source blank that source's numeric price summary; differing currencies
 across sources are labeled non-comparable. No conversion or shipping is added.
-Workbook and HTML report integration remains deferred.
+At the v0.7.0 source-summary boundary, workbook and HTML report integration
+remained deferred; v0.8.0 now provides those reviewer projections.
 
 ### PR7 local workflow readiness
 
@@ -760,6 +761,18 @@ currency conversion or price pooling occurs, match confidence remains unknown,
 and human title/edition review is required. Seller identity is not stored or
 displayed. AbeBooks-only input omits the new columns and retains the prior
 presentation.
+
+### v0.8.0 release boundary
+
+The release boundary is the privacy-hardened, bounded production eBay path plus
+source-aware reviewer workbook and HTML projections. AbeBooks remains primary
+for mixed-source conservative ranges. eBay remains supplemental active-listing
+item-price evidence: it excludes shipping, is not converted or pooled, retains
+unknown match confidence, and requires human edition/title review. Seller
+identity is not stored or displayed. Production full-library eBay collection,
+sold/completed evidence, improved matching heuristics, automated edition
+matching, shipping-aware pricing, currency normalization, additional sources,
+and richer reviewer workflow remain future work.
 
 ## Non-Goals
 

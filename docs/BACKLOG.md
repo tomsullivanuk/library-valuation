@@ -94,7 +94,7 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] First experimental external asking-price source (AbeBooks)
 - [x] Generated review recommendation and fallback-priority fields
 - [x] Static, shareable AbeBooks review report with acquisition/possession context
-- [ ] eBay access spike and isolated integration (v0.7.0)
+- [x] eBay access spike and isolated integration (v0.7.0)
 - [ ] Incremental valuation (only value new books)
 
 ### Workflow
@@ -118,6 +118,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Improve Metadata Gap classification
 - [ ] Export seller worksheets
 - [ ] Insurance inventory report
+- [ ] Add richer source-aware reviewer workflow and disposition tracking.
+- [ ] Add additional reviewed market-evidence sources.
 
 ---
 
