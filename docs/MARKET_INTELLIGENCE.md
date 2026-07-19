@@ -833,6 +833,31 @@ tokens, headers, expiration metadata, or raw responses. The remaining gate is
 the approximately 3,014-book production baseline and its evidence-quality
 report; final summaries and reviewer artifacts remain later work.
 
+### v0.9.0 full-library production baseline
+
+PR6 completed all 3,014 assessed books in one uninterrupted 4,930.068-second
+production invocation. It produced 8,293 observed USD listings across 2,881
+books and 133 no-results status rows. One in-memory token served all 3,014
+Browse requests without refresh; no retry, rate-limit, temporary-failure,
+terminal-failure, or global-stop event occurred.
+
+Integrity validation reconciled all 3,014 deterministic parts and found zero
+missing, orphaned, or duplicate references. All 8,426 observation IDs and all
+8,293 listing URLs were unique. Item asking prices ranged from $1.09 to $999.51
+with an $18.53 median. Those extremes are source asking-price outliers, not
+valuation anchors.
+
+The broad title diagnostic found 8,044 listings at or above half-token overlap,
+7,557 at or above three quarters, 7,085 with all catalog-title tokens, and 249
+below half overlap. This remains a plausibility aid only: match confidence is
+`unknown`, lower-overlap and outlier evidence needs human review, AbeBooks stays
+the core range source, and no valuation or recommendation rule changes.
+
+All 8,426 seller fields were blank, no notes referenced sellers, and no
+credential, token, header, expiration, or raw-response material appeared in
+checkpoint state. PR7 will materialize and reconcile ignored final observations,
+the multi-source summary, workbook, and HTML report.
+
 ## Non-Goals
 
 This document does not define or implement:

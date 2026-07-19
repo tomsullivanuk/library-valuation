@@ -425,6 +425,11 @@ the broader durable refresh-history model remains future work. Seller identity
 remains suppressed. Detailed and reviewer artifacts remain ignored and
 non-durable unless a later design explicitly promotes them.
 
+PR6 completed the full 3,014-book production checkpoint: 2,881 books produced
+8,293 observed listings, 133 produced no results, and integrity, duplicate, and
+privacy validation passed. PR7 will materialize the ignored combined outputs
+and reconcile the multi-source summary, reviewer workbook, and HTML report.
+
 ## v0.10.0: Libib Physical Inventory Integration
 
 Use Libib CSV/batch exports as a separate physical-inventory and location layer,

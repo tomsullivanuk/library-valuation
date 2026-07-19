@@ -319,9 +319,9 @@ data requires a separate design decision.
 5. **PR5 — Small bounded production resume validation.** Completed: interrupted
    and resumed a 20-book cohort; verified privacy, integrity, pacing, token
    reuse, and duplicate prevention.
-6. **PR6 — Full-library production run and evidence-quality report.** Run the
-   approximately 3,014-book baseline and document coverage, runtime, failures,
-   privacy, and matching limitations.
+6. **PR6 — Full-library production run and evidence-quality report.** Completed:
+   collected all 3,014 books in one invocation and documented coverage,
+   runtime, integrity, privacy, and matching limitations.
 7. **PR7 — Full summary and reviewer-artifact regeneration.** Produce and
    reconcile the multi-source summary, workbook, and HTML report locally.
 8. **PR8 — Final documentation and release readiness.** Finalize release notes,
@@ -354,18 +354,15 @@ validation PRs contact production.
 
 ## 12. Risks and Open Questions
 
-- What are the verified production Browse quota and rate-limit signals?
-- How often will proactive application-token renewal be exercised during the
-  full run? The bounded validation reused tokens but was too short to refresh.
-- What rate-limit or temporary-failure signals will occur at full-library scale?
-  The bounded validation encountered none.
+- What rate-limit or temporary-failure signals will occur in future runs? The
+  completed 3,014-book baseline encountered none.
+- When will proactive token renewal be exercised? One token remained valid for
+  the complete 4,930-second baseline, so the refresh path was not needed live.
 - Is `no_results` terminal for the baseline, and when should it become stale?
 - How should listings changing during a multi-hour run be described in
   provenance and reviewer guidance?
 - How will a later monthly refresh distinguish baseline completion from stale
   evidence without treating the v0.9.0 ledger as final durable history?
-- What is the measured runtime, and what guidance is needed for laptop sleep,
-  `caffeinate`, network loss, and disk space?
 - Should XLSX be materialized only at completion, on demand, or after a fully
   coherent checkpoint snapshot?
 

@@ -77,7 +77,9 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] Validate a 20-book production interruption/resume run before the full run;
   integrity, duplicate prevention, token reuse, seller suppression, and safe
   state persistence passed without retry or rate-limit events.
-- [ ] Complete and document the approximately 3,014-book production baseline.
+- [x] Complete and document the 3,014-book production baseline; 2,881 books had
+  observed listings, 133 had no results, integrity/privacy checks passed, and
+  no retries or failures occurred.
 - [ ] Regenerate the multi-source summary, workbook, and HTML report from final
   ignored artifacts.
 

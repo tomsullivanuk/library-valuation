@@ -56,6 +56,8 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
 - `docs/RELEASE_PLAN_v0.9.0.md`: planned resumable full-library eBay baseline.
+- `docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md`: completed production baseline,
+  integrity, evidence-quality, and privacy results.
 - `docs/MARKET_INTELLIGENCE.md`: v0.5.0 market-evidence-first architecture,
   generated summary schema, confidence, range, and review rules.
 - `docs/MARKET_VALIDATION_SPIKE.md`: v0.4.0 plan for validating whether
@@ -578,6 +580,13 @@ rate-limit, and selected 5xx failures use per-invocation bounded exponential
 backoff; a safe server retry-after value is honored subject to the configured
 cap. Exhausted temporary failures remain retryable for a later resume. Normal
 interruption writes a safe summary and leaves the current item recoverable.
+
+The v0.9.0 PR6 production baseline completed all 3,014 assessed books in one
+invocation: 2,881 books produced 8,293 observed listings and 133 produced
+source-specific no-results rows. Checkpoint integrity, duplicate prevention,
+and seller/privacy scans passed. Final combined observations and reviewer
+artifact regeneration remain PR7 work; see
+[`docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md`](docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md).
 
 v0.8.0 PR3 completed a representative but still bounded 100-book production
 validation across three review queues. A deterministic ignored cohort contained

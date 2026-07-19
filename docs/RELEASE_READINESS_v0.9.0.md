@@ -2,10 +2,9 @@
 
 ## Status
 
-**In progress.** PR5 completed the bounded production interruption/resume gate.
-The next gate is PR6: the approximately 3,014-book production baseline and its
-evidence-quality report. Final observation materialization and reviewer-artifact
-regeneration remain later PRs.
+**In progress.** PR6 completed and validated the full 3,014-book production
+eBay baseline. The next gate is PR7 deterministic observation materialization,
+multi-source summary generation, and reviewer workbook/report reconciliation.
 
 ## PR5 Bounded Production Resume Validation
 
@@ -88,8 +87,6 @@ The resume invocation used the identical command and did not use `--restart`.
 
 ## Remaining Release Gates
 
-- Run and document the full approximately 3,014-book production baseline.
-- Report coverage, runtime, failures, rate-limit behavior, and evidence quality.
 - Deterministically materialize final observation CSV/XLSX artifacts.
 - Regenerate and reconcile the multi-source summary, reviewer workbook, and
   HTML report from ignored final artifacts.
@@ -98,3 +95,17 @@ The resume invocation used the identical command and did not use `--restart`.
 The evidence remains supplemental active-listing asking-price evidence, not an
 appraisal, fair-market-value estimate, realized-sale estimate, or expected
 proceeds. AbeBooks remains the primary source for core market ranges.
+
+## PR6 Full-Library Production Baseline
+
+The production run completed all 3,014 candidates in 4,930.068 seconds without
+resume, retry, rate-limit, temporary-failure, or terminal-failure events. It
+produced 8,293 USD listings for 2,881 books plus 133 no-results status rows.
+One in-memory token served all 3,014 Browse requests without refresh.
+
+Integrity validation accepted all 3,014 deterministic parts and found no
+missing, orphaned, or duplicate references, observation IDs, or listing URLs.
+All 8,426 seller fields were blank; no notes contained seller identity; and no
+credential, token, header, expiration, or raw-response material was persisted.
+See `docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md` for the exact command, aggregate
+evidence, title-plausibility results, privacy audit, and interpretation limits.
