@@ -39,6 +39,14 @@ stop globally; bounded transient failures may retry; sanitized unexpected
 failures terminalize one item. Restart archives rather than deletes. Aggregate
 progress and run summary remain generated and contain no listing details.
 
+Long-run authentication is isolated in an injectable in-memory Browse session.
+It stores token value/expiry only in process memory, uses monotonic refresh
+timing, and permits one refresh/retry after bearer rejection. Structured safe
+request errors preserve only operation, status, retry-after, and failure class.
+Per-invocation retry budgets and capped backoff prevent retry storms while
+leaving exhausted temporary items eligible for a later resume. Atomic summary
+writes and disk-ledger reload on interruption complete the recovery boundary.
+
 ## Current Architecture
 
 The current system is a compact Python command-line pipeline implemented in

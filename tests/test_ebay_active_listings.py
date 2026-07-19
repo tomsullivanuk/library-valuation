@@ -2,8 +2,8 @@ import urllib.parse
 
 import pytest
 
-from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials
-from valuation.ebay_active_listings import EbayActiveListingsClient, RAW_SOURCE
+from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials, EbayRequestError
+from valuation.ebay_active_listings import EbayActiveListingsClient, EbayBrowseSession, RAW_SOURCE
 
 
 ENVIRONMENT = {
@@ -144,3 +144,80 @@ def test_query_and_limit_validation_do_not_call_network():
         client.search(" ", 1)
     with pytest.raises(EbayAccessError, match="between 1 and 50"):
         client.search("book", 51)
+
+
+def test_browse_session_reuses_one_token_across_searches():
+    requests = []
+
+    def request_json(request, _timeout):
+        requests.append(request)
+        if request.method == "POST":
+            return {"access_token": "memory-only-token", "expires_in": 7200}
+        return {"total": 0, "itemSummaries": []}
+
+    access = EbayAccessClient(EbayCredentials.from_environment(ENVIRONMENT), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: 100.0)
+    client = EbayActiveListingsClient(access, session=session)
+    client.search("first", 1)
+    client.search("second", 1)
+    assert [request.method for request in requests].count("POST") == 1
+    assert session.token_acquisition_count == 1
+    assert session.token_refresh_count == 0
+    assert session.browse_request_count == 2
+    assert "memory-only-token" not in repr(session.token)
+
+
+def test_browse_session_refreshes_before_expiration():
+    clock = iter([0.0, 95.0])
+    tokens = iter(["token-one", "token-two"])
+
+    def request_json(request, _timeout):
+        if request.method == "POST":
+            return {"access_token": next(tokens), "expires_in": 100}
+        return {"total": 0, "itemSummaries": []}
+
+    access = EbayAccessClient(EbayCredentials.from_environment(ENVIRONMENT), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: next(clock), refresh_margin_seconds=10)
+    client = EbayActiveListingsClient(access, session=session)
+    client.search("first", 1)
+    client.search("second", 1)
+    assert session.token_acquisition_count == 2
+    assert session.token_refresh_count == 1
+    assert session.token.generation == 2
+
+
+def test_browse_session_refreshes_once_after_bearer_rejection():
+    token_count = 0
+    browse_count = 0
+
+    def request_json(request, _timeout):
+        nonlocal token_count, browse_count
+        if request.method == "POST":
+            token_count += 1
+            return {"access_token": f"token-{token_count}", "expires_in": 7200}
+        browse_count += 1
+        if browse_count == 1:
+            raise EbayRequestError("HTTP 401", status_code=401, failure_kind="http")
+        return {"total": 0, "itemSummaries": []}
+
+    access = EbayAccessClient(EbayCredentials.from_environment(ENVIRONMENT), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: 0.0)
+    EbayActiveListingsClient(access, session=session).search("book", 1)
+    assert token_count == 2
+    assert browse_count == 2
+    assert session.token_refresh_count == 1
+
+
+def test_repeated_bearer_rejection_stops_after_one_refresh():
+    def request_json(request, _timeout):
+        if request.method == "POST":
+            return {"access_token": "token", "expires_in": 7200}
+        raise EbayRequestError("HTTP 401", status_code=401, failure_kind="http")
+
+    access = EbayAccessClient(EbayCredentials.from_environment(ENVIRONMENT), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: 0.0)
+    with pytest.raises(EbayRequestError) as caught:
+        EbayActiveListingsClient(access, session=session).search("book", 1)
+    assert caught.value.failure_kind == "bearer_rejected_after_refresh"
+    assert session.token_acquisition_count == 2
+    assert session.browse_request_count == 2

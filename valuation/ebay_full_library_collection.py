@@ -11,8 +11,8 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 
-from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials
-from valuation.ebay_active_listings import EbayActiveListingsClient
+from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials, EbayRequestError
+from valuation.ebay_active_listings import EbayActiveListingsClient, EbayBrowseSession
 from valuation.ebay_full_library_state import (
     LEDGER_SCHEMA_VERSION,
     MANIFEST_SCHEMA_VERSION,
@@ -23,14 +23,13 @@ from valuation.ebay_full_library_state import (
     create_manifest,
     fingerprint_file,
     initialize_ledger,
-    is_retry_eligible,
+    load_observation_part,
     load_ledger,
     load_manifest,
     mark_completed,
     mark_in_progress,
     mark_retryable_failure,
     mark_terminal_failure,
-    next_eligible_item,
     observation_part_relative_path,
     recover_interrupted_entries,
     run_paths,
@@ -73,6 +72,7 @@ def collect_full_library_ebay(
     max_results_per_book: int = 3,
     max_retries: int = 2,
     retry_delay_seconds: float = 5.0,
+    max_retry_delay_seconds: float = 60.0,
     limit: int | None = None,
     confirm_production: bool = False,
     output_root: Path = DEFAULT_OUTPUT_ROOT,
@@ -82,6 +82,7 @@ def collect_full_library_ebay(
     now: Callable[[], str] | None = None,
     monotonic: Callable[[], float] = time.monotonic,
     progress: Callable[[str], None] = print,
+    transition_hook: Callable[[str, Path], None] | None = None,
 ) -> dict[str, object]:
     """Collect checkpointed per-item parts; no final CSV/XLSX is materialized."""
     del data_dir  # Reserved for the later catalog-aware command evolution.
@@ -90,6 +91,7 @@ def collect_full_library_ebay(
         max_results_per_book=max_results_per_book,
         max_retries=max_retries,
         retry_delay_seconds=retry_delay_seconds,
+        max_retry_delay_seconds=max_retry_delay_seconds,
         limit=limit,
     )
     if not confirm_production:
@@ -129,6 +131,7 @@ def collect_full_library_ebay(
     )
 
     archived_checkpoint = ""
+    recovered_parts_count = 0
     if restart and run_dir.exists():
         archived_checkpoint = str(archive_run_directory(run_dir, started_at))
     paths = run_paths(run_dir)
@@ -147,6 +150,7 @@ def collect_full_library_ebay(
                 "seller_identity_suppressed": True,
             })
             ledger = load_ledger(paths["ledger"])
+            recovered_parts_count = count_recoverable_parts(ledger, run_dir)
             ledger = recover_interrupted_entries(ledger, recovered_at=started_at, run_dir=run_dir)
             save_ledger_atomic(paths["ledger"], ledger)
             validate_checkpoint_integrity(run_dir)
@@ -165,123 +169,176 @@ def collect_full_library_ebay(
         resume_count = 0
 
     candidates_by_id = {row["catalog_item_id"]: row for row in candidates}
-    active_client = client or EbayActiveListingsClient(EbayAccessClient(active_credentials))
+    browse_session = None
+    if client is None:
+        access_client = EbayAccessClient(active_credentials)
+        browse_session = EbayBrowseSession(access_client, monotonic=monotonic)
+        active_client = EbayActiveListingsClient(access_client, session=browse_session)
+    else:
+        active_client = client
     start_clock = monotonic()
     request_made = False
     stop_reason = ""
+    invocation_attempts: dict[str, int] = {}
+    metrics = {
+        "retry_event_count": 0,
+        "rate_limit_event_count": 0,
+        "temporary_failure_count": 0,
+        "global_stop_count": 0,
+        "resumed_items_count": sum(
+            entry["status"] not in {"pending", "in_progress"} for entry in ledger["entries"]
+        ) if resume_count else 0,
+        "recovered_parts_count": recovered_parts_count,
+    }
 
-    while (entry := next_eligible_item(ledger, max_retries=max_retries)) is not None:
-        catalog_id = str(entry["catalog_item_id"])
-        candidate = candidates_by_id[catalog_id]
-        strategy, query = build_ebay_query(candidate)
-        attempt_at = timestamp()
-        ledger = mark_in_progress(
-            ledger, catalog_id, attempted_at=attempt_at, query=query, search_strategy=strategy
+    def save_summary(reason: str = "") -> dict[str, object]:
+        summary = build_run_summary(
+            ledger,
+            started_at=started_at,
+            updated_at=timestamp(),
+            elapsed_seconds=max(0.0, monotonic() - start_clock),
+            resume_count=resume_count,
+            output_dir=output_dir,
+            checkpoint_dir=run_dir,
+            archived_checkpoint=archived_checkpoint,
+            stop_reason=reason,
+            metrics=metrics,
+            client=active_client,
         )
-        save_ledger_atomic(paths["ledger"], ledger)
-        current = entry_by_id(ledger, catalog_id)
+        write_json_atomic(paths["run_summary"], summary)
+        return summary
 
-        if not query:
-            rows = [ebay_status_observation_row(
-                candidate,
-                observation_date=attempt_at,
-                lookup_status="no_query",
-                lookup_strategy=strategy,
-                search_query="",
-                diagnostic_code="no_query",
-                match_notes="No safe eBay query could be constructed from catalog metadata.",
-            )]
-            ledger = persist_completed_item(
-                paths, ledger, current, rows, status="no_query", completed_at=timestamp()
+    try:
+        while (entry := next_invocation_eligible_item(
+            ledger, invocation_attempts, max_retries=max_retries
+        )) is not None:
+            catalog_id = str(entry["catalog_item_id"])
+            candidate = candidates_by_id[catalog_id]
+            strategy, query = build_ebay_query(candidate)
+            attempt_at = timestamp()
+            ledger = mark_in_progress(
+                ledger, catalog_id, attempted_at=attempt_at, query=query, search_strategy=strategy
             )
-            progress(progress_line(ledger, current, monotonic() - start_clock))
-            continue
+            invocation_attempts[catalog_id] = invocation_attempts.get(catalog_id, 0) + 1
+            save_ledger_atomic(paths["ledger"], ledger)
+            current = entry_by_id(ledger, catalog_id)
 
-        if request_made and delay_seconds:
-            sleep(delay_seconds)
-        request_made = True
-        try:
-            result = active_client.search(query, max_results_per_book)
-            rows = adapt_ebay_search_result(
-                candidate, result, observation_date=attempt_at, lookup_strategy=strategy
-            )
-            status = "observed" if rows[0]["lookup_status"] == "observed" else "no_results"
-            ledger = persist_completed_item(
-                paths, ledger, current, rows, status=status, completed_at=timestamp()
-            )
-        except EbayAccessError as error:
-            safe_message = sanitize_failure_reason(active_credentials.redact(error))
-            kind, safe_code = classify_failure(safe_message)
-            if kind == "retryable" and int(current["attempt_count"]) <= max_retries:
-                ledger = mark_retryable_failure(
-                    ledger,
-                    catalog_id,
-                    updated_at=timestamp(),
-                    safe_error_code=safe_code,
-                    safe_error_message=safe_message,
-                )
-                save_ledger_atomic(paths["ledger"], ledger)
-                progress(progress_line(ledger, current, monotonic() - start_clock))
-                if retry_delay_seconds:
-                    sleep(retry_delay_seconds)
-                continue
-            if kind in {"retryable", "global_terminal"}:
-                rows = [ebay_source_unavailable_row(
+            if not query:
+                rows = [ebay_status_observation_row(
                     candidate,
                     observation_date=attempt_at,
+                    lookup_status="no_query",
                     lookup_strategy=strategy,
-                    search_query=query,
-                    safe_reason=safe_message,
-                    diagnostic_code=safe_code,
+                    search_query="",
+                    diagnostic_code="no_query",
+                    match_notes="No safe eBay query could be constructed from catalog metadata.",
                 )]
                 ledger = persist_completed_item(
-                    paths,
-                    ledger,
-                    current,
-                    rows,
-                    status="source_unavailable_terminal",
-                    completed_at=timestamp(),
+                    paths, ledger, current, rows, status="no_query", completed_at=timestamp(),
+                    transition_hook=transition_hook,
                 )
+                progress(progress_line(ledger, current, monotonic() - start_clock, metrics))
+                save_summary()
+                continue
+
+            if request_made and delay_seconds:
+                sleep(delay_seconds)
+            request_made = True
+            try:
+                result = active_client.search(query, max_results_per_book)
+                rows = adapt_ebay_search_result(
+                    candidate, result, observation_date=attempt_at, lookup_strategy=strategy
+                )
+                status = "observed" if rows[0]["lookup_status"] == "observed" else "no_results"
+                ledger = persist_completed_item(
+                    paths, ledger, current, rows, status=status, completed_at=timestamp(),
+                    transition_hook=transition_hook,
+                )
+            except EbayAccessError as error:
+                safe_message = sanitize_failure_reason(active_credentials.redact(error))
+                kind, safe_code, server_retry_after = classify_failure(error, safe_message)
+                if kind == "retryable":
+                    metrics["retry_event_count"] += 1
+                    metrics["temporary_failure_count"] += 1
+                    if getattr(error, "status_code", None) == 429:
+                        metrics["rate_limit_event_count"] += 1
+                    ledger = mark_retryable_failure(
+                        ledger,
+                        catalog_id,
+                        updated_at=timestamp(),
+                        safe_error_code=safe_code,
+                        safe_error_message=safe_message,
+                        retry_after=str(server_retry_after or ""),
+                    )
+                    save_ledger_atomic(paths["ledger"], ledger)
+                    progress(progress_line(ledger, current, monotonic() - start_clock, metrics))
+                    save_summary()
+                    if invocation_attempts[catalog_id] <= max_retries:
+                        wait = retry_wait_seconds(
+                            retry_delay_seconds,
+                            invocation_attempts[catalog_id],
+                            max_retry_delay_seconds,
+                            server_retry_after,
+                        )
+                        if wait:
+                            progress(
+                                f"Retry wait {wait:.1f}s ordinal={int(current['ordinal']) + 1} "
+                                f"retry_events={metrics['retry_event_count']}"
+                            )
+                            sleep(wait)
+                    continue
                 if kind == "global_terminal":
+                    rows = [ebay_source_unavailable_row(
+                        candidate,
+                        observation_date=attempt_at,
+                        lookup_strategy=strategy,
+                        search_query=query,
+                        safe_reason=safe_message,
+                        diagnostic_code=safe_code,
+                    )]
+                    ledger = persist_completed_item(
+                        paths,
+                        ledger,
+                        current,
+                        rows,
+                        status="source_unavailable_terminal",
+                        completed_at=timestamp(),
+                        transition_hook=transition_hook,
+                    )
                     stop_reason = safe_code
-            else:
+                    metrics["global_stop_count"] += 1
+                else:
+                    ledger = mark_terminal_failure(
+                        ledger,
+                        catalog_id,
+                        completed_at=timestamp(),
+                        safe_error_code=safe_code,
+                        safe_error_message=safe_message,
+                    )
+                    save_ledger_atomic(paths["ledger"], ledger)
+            except Exception as error:
+                safe_message = sanitize_failure_reason(active_credentials.redact(error))
                 ledger = mark_terminal_failure(
                     ledger,
                     catalog_id,
                     completed_at=timestamp(),
-                    safe_error_code=safe_code,
+                    safe_error_code="unexpected_failure",
                     safe_error_message=safe_message,
                 )
                 save_ledger_atomic(paths["ledger"], ledger)
+
+            progress(progress_line(ledger, current, monotonic() - start_clock, metrics))
+            save_summary(stop_reason)
             if stop_reason:
-                progress(progress_line(ledger, current, monotonic() - start_clock))
                 break
-        except Exception as error:
-            safe_message = sanitize_failure_reason(active_credentials.redact(error))
-            ledger = mark_terminal_failure(
-                ledger,
-                catalog_id,
-                completed_at=timestamp(),
-                safe_error_code="unexpected_failure",
-                safe_error_message=safe_message,
-            )
-            save_ledger_atomic(paths["ledger"], ledger)
+    except KeyboardInterrupt:
+        ledger = load_ledger(paths["ledger"])
+        save_summary("interrupted")
+        raise FullLibraryCollectionError(
+            "Full-library eBay collection interrupted safely; rerun to resume"
+        ) from None
 
-        progress(progress_line(ledger, current, monotonic() - start_clock))
-
-    summary = build_run_summary(
-        ledger,
-        started_at=started_at,
-        updated_at=timestamp(),
-        elapsed_seconds=max(0.0, monotonic() - start_clock),
-        resume_count=resume_count,
-        output_dir=output_dir,
-        checkpoint_dir=run_dir,
-        archived_checkpoint=archived_checkpoint,
-        stop_reason=stop_reason,
-    )
-    write_json_atomic(paths["run_summary"], summary)
-    return summary
+    return save_summary(stop_reason)
 
 
 def select_full_library_candidates(
@@ -334,15 +391,24 @@ def manifest_parameters(
     }
 
 
-def persist_completed_item(paths, ledger, entry, rows, *, status: str, completed_at: str):
+def persist_completed_item(
+    paths, ledger, entry, rows, *, status: str, completed_at: str,
+    transition_hook: Callable[[str, Path], None] | None = None,
+):
     relative = observation_part_relative_path(entry["catalog_item_id"], entry["ordinal"])
+    part_path = paths["root"] / relative
     write_observation_part_atomic(
-        paths["root"] / relative,
+        part_path,
         catalog_item_id=entry["catalog_item_id"],
         ordinal=entry["ordinal"],
         rows=rows,
         created_at=completed_at,
     )
+    if transition_hook:
+        transition_hook("after_part_write", part_path)
+    load_observation_part(part_path)
+    if transition_hook:
+        transition_hook("after_part_validation", part_path)
     updated = mark_completed(
         ledger,
         entry["catalog_item_id"],
@@ -352,22 +418,38 @@ def persist_completed_item(paths, ledger, entry, rows, *, status: str, completed
         observation_row_count=len(rows),
     )
     save_ledger_atomic(paths["ledger"], updated)
+    if transition_hook:
+        transition_hook("after_ledger_completion", paths["ledger"])
     return updated
 
 
-def classify_failure(message: str) -> tuple[FailureKind, str]:
+def classify_failure(
+    error: EbayAccessError, message: str
+) -> tuple[FailureKind, str, float | None]:
+    if isinstance(error, EbayRequestError):
+        if error.failure_kind == "bearer_rejected_after_refresh":
+            return "global_terminal", "bearer_authentication_failure", None
+        if error.operation == "token request":
+            return "global_terminal", "credential_authentication_failure", None
+        if error.status_code in {401, 403}:
+            return "global_terminal", "authorization_failure", None
+        if error.status_code == 429:
+            return "retryable", "rate_limited", error.retry_after_seconds
+        if error.status_code in {500, 502, 503, 504} or error.failure_kind == "network":
+            return "retryable", "temporary_source_failure", error.retry_after_seconds
     text = message.casefold()
     if any(value in text for value in (
         "invalid_client", "invalid client", "token request", "oauth", "credential",
+        "token response",
         "http 401", "http 403", "unauthorized", "forbidden",
     )):
-        return "global_terminal", "authentication_failure"
+        return "global_terminal", "authentication_failure", None
     if any(value in text for value in (
         "http 429", "rate limit", "too many requests", "timeout", "timed out",
         "temporarily", "temporary", "connection", "http 500", "http 502", "http 503", "http 504",
     )):
-        return "retryable", "temporary_source_failure"
-    return "terminal", "source_failure"
+        return "retryable", "temporary_source_failure", None
+    return "terminal", "source_failure", None
 
 
 def build_run_summary(
@@ -381,6 +463,8 @@ def build_run_summary(
     checkpoint_dir: Path,
     archived_checkpoint: str,
     stop_reason: str,
+    metrics: Mapping[str, int],
+    client: object,
 ) -> dict[str, object]:
     state = summarize_run_state(ledger)
     counts = state["status_counts"]
@@ -407,10 +491,14 @@ def build_run_summary(
         "archived_checkpoint": archived_checkpoint,
         "stop_reason": stop_reason,
         "seller_identity_suppressed": True,
+        "token_acquisition_count": client_metric(client, "token_acquisition_count"),
+        "token_refresh_count": client_metric(client, "token_refresh_count"),
+        "browse_request_count": client_metric(client, "browse_request_count"),
+        **{field: int(value) for field, value in metrics.items()},
     }
 
 
-def progress_line(ledger, entry, elapsed_seconds: float) -> str:
+def progress_line(ledger, entry, elapsed_seconds: float, metrics: Mapping[str, int]) -> str:
     state = summarize_run_state(ledger)
     counts = state["status_counts"]
     current = entry_by_id(ledger, entry["catalog_item_id"])
@@ -420,6 +508,7 @@ def progress_line(ledger, entry, elapsed_seconds: float) -> str:
         f"observed={counts['observed']} no_results={counts['no_results']} "
         f"retryable={counts['source_unavailable_retryable']} "
         f"terminal_failures={counts['source_unavailable_terminal'] + counts['failed_terminal']} "
+        f"retry_events={metrics['retry_event_count']} "
         f"elapsed={max(0.0, elapsed_seconds):.1f}s"
     )
 
@@ -443,9 +532,9 @@ def archive_run_directory(run_dir: Path, timestamp: str) -> Path:
 
 def validate_options(
     *, delay_seconds: float, max_results_per_book: int, max_retries: int,
-    retry_delay_seconds: float, limit: int | None
+    retry_delay_seconds: float, max_retry_delay_seconds: float, limit: int | None
 ) -> None:
-    if delay_seconds < 0 or retry_delay_seconds < 0:
+    if delay_seconds < 0 or retry_delay_seconds < 0 or max_retry_delay_seconds < 0:
         raise FullLibraryCollectionError("Delay values must be zero or greater")
     if max_results_per_book < 1 or max_results_per_book > MAX_RESULTS_PER_BOOK:
         raise FullLibraryCollectionError(
@@ -455,6 +544,47 @@ def validate_options(
         raise FullLibraryCollectionError("max-retries must be zero or greater")
     if limit is not None and limit < 1:
         raise FullLibraryCollectionError("limit must be at least 1")
+
+
+def next_invocation_eligible_item(
+    ledger: Mapping[str, object], invocation_attempts: Mapping[str, int], *, max_retries: int
+) -> dict[str, object] | None:
+    for entry in ledger["entries"]:
+        if entry["status"] not in {"pending", "source_unavailable_retryable"}:
+            continue
+        if invocation_attempts.get(entry["catalog_item_id"], 0) <= max_retries:
+            return dict(entry)
+    return None
+
+
+def retry_wait_seconds(
+    base_delay: float,
+    invocation_attempt: int,
+    maximum_delay: float,
+    server_retry_after: float | None,
+) -> float:
+    calculated = base_delay * (2 ** max(0, invocation_attempt - 1))
+    requested = server_retry_after if server_retry_after is not None else calculated
+    return min(maximum_delay, max(0.0, requested))
+
+
+def client_metric(client: object, field: str) -> int:
+    session = getattr(client, "session", None)
+    source = session if session is not None else client
+    try:
+        return int(getattr(source, field, 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def count_recoverable_parts(ledger: Mapping[str, object], run_dir: Path) -> int:
+    return sum(
+        entry["status"] == "in_progress"
+        and (Path(run_dir) / observation_part_relative_path(
+            entry["catalog_item_id"], entry["ordinal"]
+        )).is_file()
+        for entry in ledger["entries"]
+    )
 
 
 def read_summary_rows(path: Path) -> list[dict[str, str]]:

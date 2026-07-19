@@ -72,6 +72,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   a substitute.
 - [ ] Add deterministic resume, duplicate prevention, bounded retries, pacing,
   progress, and safe interruption handling.
+- [x] Harden token reuse/renewal, structured failure classification, bounded
+  backoff, per-invocation retry exhaustion, and graceful interruption.
 - [ ] Validate a small production interruption/resume run before the full run.
 - [ ] Complete and document the approximately 3,014-book production baseline.
 - [ ] Regenerate the multi-source summary, workbook, and HTML report from final

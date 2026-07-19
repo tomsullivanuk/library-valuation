@@ -175,6 +175,19 @@ def test_interrupted_entry_adopts_completed_atomic_part(tmp_path):
     assert should_skip_on_resume(entry)
 
 
+def test_interrupted_entry_does_not_adopt_invalid_part(tmp_path):
+    run_dir = tmp_path / "run"
+    ledger = initialize_ledger(run_dir / "ledger.json", ["BK1"], created_at=NOW)
+    active = mark_in_progress(
+        ledger, "BK1", attempted_at="attempted", query="9781", search_strategy="isbn13"
+    )
+    part_path = run_dir / observation_part_relative_path("BK1", 0)
+    part_path.parent.mkdir(parents=True)
+    part_path.write_text('{"schema_version":"broken"}', encoding="utf-8")
+    with pytest.raises(CheckpointError, match="Unsupported observation-part"):
+        recover_interrupted_entries(active, recovered_at="recovered", run_dir=run_dir)
+
+
 @pytest.mark.parametrize("status", ["observed", "no_results", "no_query", "source_unavailable_terminal", "failed_terminal"])
 def test_terminal_statuses_are_skipped(status):
     assert is_terminal_status(status)

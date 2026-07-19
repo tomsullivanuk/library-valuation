@@ -558,6 +558,7 @@ The v0.9.0 full-library command is a separate production-only, resumable path:
   --max-results-per-book 3 \
   --max-retries 2 \
   --retry-delay 5 \
+  --max-retry-delay 60 \
   --confirm-production
 ```
 
@@ -569,6 +570,14 @@ details. PR3 writes only ignored manifest, ledger, and per-item JSON parts; fina
 combined CSV/XLSX and reviewer regeneration remain later work. Active listings
 remain supplemental item asking prices with blank sellers, excluded shipping,
 no currency conversion, and unknown match confidence.
+
+For long runs, the command reuses one application token in memory, refreshes it
+before expiration, and refreshes once after a rejected bearer token. Credential
+or repeated bearer-authentication failures stop globally. Temporary network,
+rate-limit, and selected 5xx failures use per-invocation bounded exponential
+backoff; a safe server retry-after value is honored subject to the configured
+cap. Exhausted temporary failures remain retryable for a later resume. Normal
+interruption writes a safe summary and leaves the current item recoverable.
 
 v0.8.0 PR3 completed a representative but still bounded 100-book production
 validation across three review queues. A deterministic ignored cohort contained

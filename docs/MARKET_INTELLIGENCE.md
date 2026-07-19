@@ -798,9 +798,16 @@ source outcome, never stores seller identity or raw responses, and reports only
 aggregate progress. Rate-limit/temporary failures retry within configured
 bounds; authentication-class failures stop the run after a sanitized terminal
 status. Final combined observations, summary regeneration, and reviewer
-artifacts remain later PRs. The existing client still acquires an application
-token per search; token reuse/renewal is deferred to long-run hardening rather
-than being changed inside the initial orchestration PR.
+artifacts remain later PRs.
+
+PR4 adds an in-memory token session only to the full-library path. One token is
+reused, proactively refreshed, and refreshed once after a Browse 401. Structured
+HTTP/network metadata drives credential/global-stop, temporary/rate-limit, and
+item-terminal classifications. Retry-after and exponential backoff are capped;
+retry budgets reset per invocation while cumulative attempts remain auditable.
+Exhausted temporary failures remain eligible on resume. Aggregate token,
+request, retry, rate-limit, interruption, resume, and recovered-part metrics are
+safe summary data; tokens, headers, raw bodies, and expiration state are not.
 
 ## Non-Goals
 

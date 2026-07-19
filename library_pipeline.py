@@ -2397,6 +2397,10 @@ def build_parser() -> argparse.ArgumentParser:
     full_ebay_parser.add_argument("--max-results-per-book", type=int, default=3)
     full_ebay_parser.add_argument("--max-retries", type=int, default=2)
     full_ebay_parser.add_argument("--retry-delay", type=float, default=5.0)
+    full_ebay_parser.add_argument(
+        "--max-retry-delay", type=float, default=60.0,
+        help="Maximum bounded transient retry wait in seconds",
+    )
     full_ebay_parser.add_argument("--limit", type=int)
     full_ebay_parser.add_argument(
         "--confirm-production", action="store_true",
@@ -2591,6 +2595,7 @@ def main(argv: list[str] | None = None) -> int:
                     max_results_per_book=args.max_results_per_book,
                     max_retries=args.max_retries,
                     retry_delay_seconds=args.retry_delay,
+                    max_retry_delay_seconds=args.max_retry_delay,
                     limit=args.limit,
                     confirm_production=args.confirm_production,
                 )

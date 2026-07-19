@@ -673,6 +673,10 @@ Generated outputs:
   versions, candidate/completion/status/attempt counts, timestamps, elapsed
   seconds, resume count, safe paths, optional archive path, stop reason, and the
   seller-suppression flag. It contains no listing detail or raw response.
+  Long-run summaries additionally contain safe aggregate token acquisition and
+  refresh counts, Browse request count, retry/rate-limit/temporary/global-stop
+  counts, and resumed/recovered item counts. Token values and expiration data
+  remain memory-only.
 - `output/research_candidates.csv` and `.xlsx` are generated collector-facing
   views over current catalog items, acquisitions, metadata, and Research
   Assessments.

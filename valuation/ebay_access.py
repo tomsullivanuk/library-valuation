@@ -26,6 +26,25 @@ class EbayAccessError(ValueError):
     """Safe, user-facing eBay access failure."""
 
 
+class EbayRequestError(EbayAccessError):
+    """Sanitized request failure with safe structured retry/auth metadata."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        operation: str = "request",
+        status_code: int | None = None,
+        retry_after_seconds: float | None = None,
+        failure_kind: str = "request",
+    ) -> None:
+        super().__init__(message)
+        self.operation = operation
+        self.status_code = status_code
+        self.retry_after_seconds = retry_after_seconds
+        self.failure_kind = failure_kind
+
+
 @dataclass(frozen=True)
 class EbayCredentials:
     client_id: str
@@ -95,6 +114,10 @@ class EbayAccessClient:
         self.timeout = timeout
 
     def acquire_application_token(self) -> str:
+        token, _expires_in = self.acquire_application_token_details()
+        return token
+
+    def acquire_application_token_details(self) -> tuple[str, float]:
         _api_host, token_url = ENVIRONMENT_HOSTS[self.credentials.environment]
         basic = base64.b64encode(
             f"{self.credentials.client_id}:{self.credentials.client_secret}".encode("utf-8")
@@ -116,7 +139,13 @@ class EbayAccessClient:
         token = payload.get("access_token")
         if not isinstance(token, str) or not token:
             raise EbayAccessError("eBay token response did not include an access token")
-        return token
+        try:
+            expires_in = float(payload.get("expires_in", 7200))
+        except (TypeError, ValueError):
+            expires_in = 7200.0
+        if expires_in <= 0:
+            raise EbayAccessError("eBay token response contained an invalid expiration")
+        return token, expires_in
 
     def search_active_listings(self, query: str, limit: int, access_token: str) -> dict[str, Any]:
         api_host, _token_url = ENVIRONMENT_HOSTS[self.credentials.environment]
@@ -161,11 +190,22 @@ class EbayAccessClient:
     def _safe_request(self, request: urllib.request.Request, operation: str, *secrets: str) -> dict[str, Any]:
         try:
             return self.request_json(request, self.timeout)
+        except EbayRequestError as error:
+            safe_detail = self.credentials.redact(error, *secrets)
+            raise EbayRequestError(
+                f"eBay {operation} failed: {safe_detail}",
+                operation=operation,
+                status_code=error.status_code,
+                retry_after_seconds=error.retry_after_seconds,
+                failure_kind=error.failure_kind,
+            ) from None
         except EbayAccessError:
             raise
         except Exception as error:
             safe_detail = self.credentials.redact(error, *secrets)
-            raise EbayAccessError(f"eBay {operation} failed: {safe_detail}") from None
+            raise EbayRequestError(
+                f"eBay {operation} failed: {safe_detail}", operation=operation
+            ) from None
 
 
 def default_request_json(request: urllib.request.Request, timeout: float) -> dict[str, Any]:
@@ -173,10 +213,18 @@ def default_request_json(request: urllib.request.Request, timeout: float) -> dic
         with urllib.request.urlopen(request, timeout=timeout) as response:
             raw = response.read()
     except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError(f"HTTP {error.code}: {detail or error.reason}") from None
+        retry_after = parse_retry_after(error.headers.get("Retry-After") if error.headers else None)
+        raise EbayRequestError(
+            f"HTTP {error.code}: {clean_snippet(error.reason, 120) or 'request failed'}",
+            status_code=error.code,
+            retry_after_seconds=retry_after,
+            failure_kind="http",
+        ) from None
     except (urllib.error.URLError, TimeoutError, OSError) as error:
-        raise RuntimeError(str(error.reason if isinstance(error, urllib.error.URLError) else error)) from None
+        raise EbayRequestError(
+            clean_snippet(error.reason if isinstance(error, urllib.error.URLError) else error, 200),
+            failure_kind="network",
+        ) from None
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -199,3 +247,11 @@ def safe_listing_summary(item: Mapping[str, Any]) -> SafeListingSummary:
 
 def clean_snippet(value: object, limit: int) -> str:
     return " ".join(str(value).split())[:limit]
+
+
+def parse_retry_after(value: object) -> float | None:
+    try:
+        seconds = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None

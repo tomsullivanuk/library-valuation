@@ -183,6 +183,7 @@ Proposed options:
 - `--delay`: positive pacing delay; conservative default one second.
 - `--max-results-per-book`: default and initial maximum three.
 - `--max-retries` and `--retry-delay`: bounded retry policy.
+- `--max-retry-delay`: cap for exponential or server-requested retry waits.
 - `--limit`: optional safe implementation/smoke-test bound, not a way to define
   the full workflow.
 - `--confirm-production`: required deliberate production acknowledgement.
@@ -218,11 +219,25 @@ safe aggregate `run_summary.json` records completion/status/attempt counts,
 timing, resume count, paths, schemas, archive, and stop reason. Final combined
 CSV/XLSX remains deferred.
 
-The existing reusable active-listings client currently acquires an application
-token for each search. PR3 preserves that tested behavior rather than adding a
-new token lifecycle. It is safe but potentially inefficient for a multi-hour
-run; token reuse/renewal and long-run authentication behavior remain explicit
-PR4 hardening work.
+PR4 adds an in-memory Browse session for the full-library path. It reuses one
+application token, refreshes before expiration using monotonic time and a safety
+margin, and refreshes/retries once after a Browse 401. A repeated bearer failure
+or token-endpoint/credential failure stops globally. Tokens and expiration
+metadata are never persisted. The targeted collector retains its existing
+non-session path.
+
+Transient network, timeout, rate-limit, and selected 5xx failures use a bounded
+per-invocation retry budget. Backoff is deterministic exponential from
+`--retry-delay`, capped by `--max-retry-delay`; a safe numeric server retry-after
+overrides the calculated delay but remains capped. Cumulative attempts persist,
+while a later resume receives a fresh invocation budget. Exhaustion leaves
+`source_unavailable_retryable`, not a permanent terminal outcome.
+
+Keyboard interruption reloads the disk-authoritative ledger, writes an atomic
+summary with stop reason `interrupted`, and exits with a safe resume message.
+The completion sequence is in-progress ledger, atomic part, part reload and
+validation, atomic terminal ledger, then atomic summary. Recovery adopts a valid
+part or returns partless in-progress work to pending, preventing duplicates.
 
 ## 7. Rate-Limit and Runtime Planning
 

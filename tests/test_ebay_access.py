@@ -9,6 +9,8 @@ from valuation.ebay_access import (
     EbayAccessClient,
     EbayAccessError,
     EbayCredentials,
+    EbayRequestError,
+    parse_retry_after,
 )
 
 
@@ -155,3 +157,24 @@ def test_cli_command_is_exposed_and_missing_credentials_are_user_facing(monkeypa
     captured = capsys.readouterr()
     assert "Missing required eBay environment variables" in captured.err
     assert captured.out == ""
+
+
+def test_structured_request_metadata_is_preserved_without_secret_detail():
+    credentials = EbayCredentials.from_environment(ENVIRONMENT)
+
+    def request_json(_request, _timeout):
+        raise EbayRequestError(
+            "HTTP 429", status_code=429, retry_after_seconds=12,
+            failure_kind="http",
+        )
+
+    client = EbayAccessClient(credentials, request_json=request_json)
+    with pytest.raises(EbayRequestError) as caught:
+        client.search_active_listings("book", 1, "private-token")
+    error = caught.value
+    assert error.operation == "active-listing search"
+    assert error.status_code == 429
+    assert error.retry_after_seconds == 12
+    assert "private-token" not in str(error)
+    assert parse_retry_after("15") == 15
+    assert parse_retry_after("not-a-number") is None

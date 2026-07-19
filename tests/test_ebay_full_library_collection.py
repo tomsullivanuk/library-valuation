@@ -6,8 +6,10 @@ from pathlib import Path
 import pytest
 
 from library_pipeline import build_parser, main
-from valuation.ebay_access import EbayAccessError, EbayCredentials
-from valuation.ebay_active_listings import EbayActiveListing, EbayActiveListingSearchResult
+from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayCredentials, EbayRequestError
+from valuation.ebay_active_listings import (
+    EbayActiveListing, EbayActiveListingSearchResult, EbayActiveListingsClient, EbayBrowseSession,
+)
 from valuation.ebay_full_library_collection import (
     FullLibraryCollectionError,
     collect_full_library_ebay,
@@ -196,15 +198,24 @@ def test_retryable_failure_retries_with_persisted_attempt_count(tmp_path):
     assert result["attempts"] == 2
 
 
-def test_exhausted_retry_becomes_terminal_source_status(tmp_path):
+def test_exhausted_retry_remains_eligible_for_later_resume(tmp_path):
     result, run_dir, _messages = run(
         tmp_path, [summary_row("BK1")], [EbayAccessError("HTTP 503 temporary")], max_retries=0
     )
     entry = load_ledger(run_paths(run_dir)["ledger"])["entries"][0]
-    assert entry["status"] == "source_unavailable_terminal"
-    assert result["terminal_failures"] == 1
-    part = json.loads((run_dir / entry["observation_part_path"]).read_text())
-    assert part["rows"][0]["seller"] == ""
+    assert entry["status"] == "source_unavailable_retryable"
+    assert entry["attempt_count"] == 1
+    assert result["retryable_failures"] == 1
+    summary = tmp_path / "summary.csv"
+    resumed = collect_full_library_ebay(
+        summary, run_dir, output_root=tmp_path / "output", credentials=credentials(),
+        client=FakeClient([empty_result()]), confirm_production=True, max_retries=0,
+        delay_seconds=0, retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+        progress=lambda _value: None,
+    )
+    entry = load_ledger(run_paths(run_dir)["ledger"])["entries"][0]
+    assert entry["status"] == "no_results" and entry["attempt_count"] == 2
+    assert resumed["resume_count"] == 1
 
 
 def test_global_auth_failure_terminalizes_current_item_and_stops(tmp_path):
@@ -219,6 +230,7 @@ def test_global_auth_failure_terminalizes_current_item_and_stops(tmp_path):
     ]
     assert result["stop_reason"] == "authentication_failure"
     assert result["attempts"] == 1
+    assert result["global_stop_count"] == 1
 
 
 def test_unexpected_failure_is_sanitized_terminal_and_next_item_continues(tmp_path):
@@ -243,13 +255,17 @@ def test_resume_skips_completed_and_retries_interrupted_retryable_item(tmp_path)
     def interrupt(_seconds):
         raise KeyboardInterrupt
 
-    with pytest.raises(KeyboardInterrupt):
+    with pytest.raises(FullLibraryCollectionError, match="interrupted safely"):
         collect_full_library_ebay(
             summary, output_root / "run", output_root=output_root, credentials=credentials(),
             client=first_client, confirm_production=True, delay_seconds=0, retry_delay_seconds=1,
             max_retries=1, sleep=interrupt, now=now, monotonic=lambda: 1.0,
             progress=lambda _value: None,
         )
+    interrupted_summary = json.loads(
+        run_paths(output_root / "run")["run_summary"].read_text(encoding="utf-8")
+    )
+    assert interrupted_summary["stop_reason"] == "interrupted"
     second_client = FakeClient([empty_result()])
     result = collect_full_library_ebay(
         summary, output_root / "run", output_root=output_root, credentials=credentials(),
@@ -261,6 +277,165 @@ def test_resume_skips_completed_and_retries_interrupted_retryable_item(tmp_path)
     assert [entry["status"] for entry in ledger["entries"]] == ["observed", "no_results"]
     assert [entry["attempt_count"] for entry in ledger["entries"]] == [1, 2]
     assert result["resume_count"] == 1
+
+
+def test_structured_rate_limit_honors_capped_retry_after_and_records_metrics(tmp_path):
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1")])
+    sleeps = []
+    error = EbayRequestError(
+        "HTTP 429", operation="active-listing search", status_code=429,
+        retry_after_seconds=120, failure_kind="http",
+    )
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=FakeClient([error, empty_result()]), confirm_production=True,
+        max_retries=1, retry_delay_seconds=2, max_retry_delay_seconds=30,
+        delay_seconds=0, sleep=sleeps.append, now=now, monotonic=lambda: 1.0,
+        progress=lambda _value: None,
+    )
+    assert sleeps == [30]
+    assert result["retry_event_count"] == 1
+    assert result["rate_limit_event_count"] == 1
+    assert result["temporary_failure_count"] == 1
+
+
+def test_real_browse_session_metrics_are_safe_aggregates(tmp_path):
+    calls = []
+
+    def request_json(request, _timeout):
+        calls.append(request.method)
+        if request.method == "POST":
+            return {"access_token": "never-persist-this-token", "expires_in": 7200}
+        return {"total": 0, "itemSummaries": []}
+
+    access = EbayAccessClient(credentials(), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: 1.0)
+    client = EbayActiveListingsClient(access, session=session)
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1"), summary_row("BK2")])
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=client, confirm_production=True, delay_seconds=0, retry_delay_seconds=0,
+        now=now, monotonic=lambda: 1.0, progress=lambda _value: None,
+    )
+    assert calls.count("POST") == 1
+    assert result["token_acquisition_count"] == 1
+    assert result["token_refresh_count"] == 0
+    assert result["browse_request_count"] == 2
+    persisted = "".join(path.read_text() for path in (output_root / "run").rglob("*.json"))
+    assert "never-persist-this-token" not in persisted
+
+
+def test_token_refresh_metrics_are_included_in_run_summary(tmp_path):
+    token_calls = 0
+    browse_calls = 0
+
+    def request_json(request, _timeout):
+        nonlocal token_calls, browse_calls
+        if request.method == "POST":
+            token_calls += 1
+            return {"access_token": f"memory-token-{token_calls}", "expires_in": 7200}
+        browse_calls += 1
+        if browse_calls == 1:
+            raise EbayRequestError("HTTP 401", status_code=401, failure_kind="http")
+        return {"total": 0, "itemSummaries": []}
+
+    access = EbayAccessClient(credentials(), request_json=request_json)
+    session = EbayBrowseSession(access, monotonic=lambda: 1.0)
+    client = EbayActiveListingsClient(access, session=session)
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1")])
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=client, confirm_production=True, delay_seconds=0, retry_delay_seconds=0,
+        now=now, monotonic=lambda: 1.0, progress=lambda _value: None,
+    )
+    assert result["token_acquisition_count"] == 2
+    assert result["token_refresh_count"] == 1
+    assert result["browse_request_count"] == 2
+
+
+@pytest.mark.parametrize("stage", ["after_part_write", "after_part_validation"])
+def test_interruption_after_part_creation_adopts_part_without_duplicate_request(tmp_path, stage):
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1")])
+
+    def interrupt(current_stage, _path):
+        if current_stage == stage:
+            raise KeyboardInterrupt
+
+    with pytest.raises(FullLibraryCollectionError, match="interrupted safely"):
+        collect_full_library_ebay(
+            summary, output_root / "run", output_root=output_root, credentials=credentials(),
+            client=FakeClient([listing_result()]), confirm_production=True, delay_seconds=0,
+            retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+            progress=lambda _value: None, transition_hook=interrupt,
+        )
+    resumed_client = FakeClient([])
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=resumed_client, confirm_production=True, delay_seconds=0,
+        retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+        progress=lambda _value: None,
+    )
+    assert resumed_client.calls == []
+    assert result["observed"] == 1
+    assert result["recovered_parts_count"] == 1
+    assert len(list(run_paths(output_root / "run")["parts"].glob("*.json"))) == 1
+
+
+def test_interruption_before_part_write_recovers_item_to_pending(tmp_path):
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1")])
+    with pytest.raises(FullLibraryCollectionError, match="interrupted safely"):
+        collect_full_library_ebay(
+            summary, output_root / "run", output_root=output_root, credentials=credentials(),
+            client=FakeClient([KeyboardInterrupt()]), confirm_production=True, delay_seconds=0,
+            retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+            progress=lambda _value: None,
+        )
+    resumed_client = FakeClient([empty_result()])
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=resumed_client, confirm_production=True, delay_seconds=0,
+        retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+        progress=lambda _value: None,
+    )
+    assert len(resumed_client.calls) == 1
+    assert result["no_results"] == 1
+
+
+def test_interruption_after_ledger_completion_does_not_duplicate_item(tmp_path):
+    output_root = tmp_path / "output"
+    summary = tmp_path / "summary.csv"
+    write_summary(summary, [summary_row("BK1")])
+
+    def interrupt(stage, _path):
+        if stage == "after_ledger_completion":
+            raise KeyboardInterrupt
+
+    with pytest.raises(FullLibraryCollectionError, match="interrupted safely"):
+        collect_full_library_ebay(
+            summary, output_root / "run", output_root=output_root, credentials=credentials(),
+            client=FakeClient([listing_result()]), confirm_production=True, delay_seconds=0,
+            retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+            progress=lambda _value: None, transition_hook=interrupt,
+        )
+    resumed_client = FakeClient([])
+    result = collect_full_library_ebay(
+        summary, output_root / "run", output_root=output_root, credentials=credentials(),
+        client=resumed_client, confirm_production=True, delay_seconds=0,
+        retry_delay_seconds=0, now=now, monotonic=lambda: 1.0,
+        progress=lambda _value: None,
+    )
+    assert resumed_client.calls == []
+    assert result["observed"] == 1
 
 
 def test_incompatible_resume_is_rejected(tmp_path):
@@ -295,6 +470,7 @@ def test_cli_help_and_confirmation_error_are_safe(tmp_path, capsys):
         "--output-dir", "output/run",
     ])
     assert args.resume is True and args.confirm_production is False
+    assert args.max_retry_delay == 60.0
     assert main([
         "collect-full-library-ebay-observations", "--summary", str(tmp_path / "summary.csv"),
         "--output-dir", str(tmp_path / "output" / "run"),

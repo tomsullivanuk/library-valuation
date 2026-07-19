@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+import time
 from typing import Any
 
-from valuation.ebay_access import EbayAccessClient, EbayAccessError
+from valuation.ebay_access import EbayAccessClient, EbayAccessError, EbayRequestError
 
 
 RAW_SOURCE = "ebay_active_listing"
@@ -40,11 +41,87 @@ class EbayActiveListingSearchResult:
     listings: tuple[EbayActiveListing, ...]
 
 
+@dataclass(frozen=True)
+class EbayApplicationToken:
+    value: str = field(repr=False)
+    acquired_at: float
+    expires_in: float
+    refresh_at: float
+    generation: int
+
+
+class EbayBrowseSession:
+    """Reuse one in-memory application token and refresh it safely."""
+
+    def __init__(
+        self,
+        access_client: EbayAccessClient,
+        *,
+        monotonic: Callable[[], float] = time.monotonic,
+        refresh_margin_seconds: float = 300.0,
+    ) -> None:
+        if refresh_margin_seconds < 0:
+            raise ValueError("refresh_margin_seconds must be nonnegative")
+        self.access_client = access_client
+        self.monotonic = monotonic
+        self.refresh_margin_seconds = refresh_margin_seconds
+        self.token: EbayApplicationToken | None = None
+        self.token_acquisition_count = 0
+        self.token_refresh_count = 0
+        self.browse_request_count = 0
+
+    def search_active_listings(self, query: str, limit: int) -> dict[str, Any]:
+        token = self.current_token()
+        self.browse_request_count += 1
+        try:
+            return self.access_client.search_active_listings(query, limit, token.value)
+        except EbayRequestError as error:
+            if error.operation == "active-listing search" and error.status_code == 401:
+                token = self.refresh_token()
+                self.browse_request_count += 1
+                try:
+                    return self.access_client.search_active_listings(query, limit, token.value)
+                except EbayRequestError as repeated:
+                    if repeated.status_code in {401, 403}:
+                        raise EbayRequestError(
+                            "eBay active-listing authentication failed after one token refresh",
+                            operation="active-listing search",
+                            status_code=repeated.status_code,
+                            failure_kind="bearer_rejected_after_refresh",
+                        ) from None
+                    raise
+            raise
+
+    def current_token(self) -> EbayApplicationToken:
+        now = self.monotonic()
+        if self.token is None:
+            return self._acquire(now, refresh=False)
+        if now >= self.token.refresh_at:
+            return self._acquire(now, refresh=True)
+        return self.token
+
+    def refresh_token(self) -> EbayApplicationToken:
+        return self._acquire(self.monotonic(), refresh=self.token is not None)
+
+    def _acquire(self, now: float, *, refresh: bool) -> EbayApplicationToken:
+        value, expires_in = self.access_client.acquire_application_token_details()
+        self.token_acquisition_count += 1
+        if refresh:
+            self.token_refresh_count += 1
+        generation = 1 if self.token is None else self.token.generation + 1
+        refresh_at = now + max(0.0, expires_in - self.refresh_margin_seconds)
+        self.token = EbayApplicationToken(value, now, expires_in, refresh_at, generation)
+        return self.token
+
+
 class EbayActiveListingsClient:
     """Acquire an application token and normalize one bounded Browse search."""
 
-    def __init__(self, access_client: EbayAccessClient) -> None:
+    def __init__(
+        self, access_client: EbayAccessClient, *, session: EbayBrowseSession | None = None
+    ) -> None:
         self.access_client = access_client
+        self.session = session
 
     def search(self, query: str, limit: int = 10) -> EbayActiveListingSearchResult:
         normalized_query = " ".join(query.split())
@@ -53,8 +130,11 @@ class EbayActiveListingsClient:
         if limit < 1 or limit > MAX_SEARCH_LIMIT:
             raise EbayAccessError(f"eBay active-listings limit must be between 1 and {MAX_SEARCH_LIMIT}")
 
-        token = self.access_client.acquire_application_token()
-        payload = self.access_client.search_active_listings(normalized_query, limit, token)
+        if self.session is None:
+            token = self.access_client.acquire_application_token()
+            payload = self.access_client.search_active_listings(normalized_query, limit, token)
+        else:
+            payload = self.session.search_active_listings(normalized_query, limit)
         raw_items = payload.get("itemSummaries", [])
         if not isinstance(raw_items, list):
             raise EbayAccessError("eBay search response contained an invalid item summary list")
