@@ -809,6 +809,30 @@ Exhausted temporary failures remain eligible on resume. Aggregate token,
 request, retry, rate-limit, interruption, resume, and recovered-part metrics are
 safe summary data; tokens, headers, raw bodies, and expiration state are not.
 
+### v0.9.0 bounded production resume validation
+
+PR5 ran the full-library path against 20 deterministic production books, then
+interrupted it normally after seven completed items. The checkpoint retained
+seven valid observed parts, one recoverable partless in-progress item, and
+twelve pending items. Resume from the same checkpoint completed all 20 books
+without querying any previously completed catalog item again. Integrity checks
+accepted 20 unique deterministic parts and 60 canonical observation rows.
+
+All 20 queries used ISBN-13 and produced three listings, for 60 USD observations
+with asking prices from $4.04 to $196.07 and a median of $35.37. Every listing
+title shared at least half its catalog-title tokens in the broad diagnostic used
+for the prior 100-book validation. This supports operational and coarse
+plausibility readiness only; match confidence remains unknown and human
+edition/condition review remains required.
+
+The initial invocation reused one token across seven Browse requests, and the
+resumed invocation reused one token across 13 requests. No refresh, retry,
+rate-limit, temporary-failure, or global-stop event occurred. Seller fields and
+seller notes remained blank, and checkpoint files contained no credentials,
+tokens, headers, expiration metadata, or raw responses. The remaining gate is
+the approximately 3,014-book production baseline and its evidence-quality
+report; final summaries and reviewer artifacts remain later work.
+
 ## Non-Goals
 
 This document does not define or implement:

@@ -70,11 +70,13 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [x] Add a separate production-guarded, resumable full-library eBay command
   with mocked orchestration tests; do not lift the targeted command ceiling as
   a substitute.
-- [ ] Add deterministic resume, duplicate prevention, bounded retries, pacing,
+- [x] Add deterministic resume, duplicate prevention, bounded retries, pacing,
   progress, and safe interruption handling.
 - [x] Harden token reuse/renewal, structured failure classification, bounded
   backoff, per-invocation retry exhaustion, and graceful interruption.
-- [ ] Validate a small production interruption/resume run before the full run.
+- [x] Validate a 20-book production interruption/resume run before the full run;
+  integrity, duplicate prevention, token reuse, seller suppression, and safe
+  state persistence passed without retry or rate-limit events.
 - [ ] Complete and document the approximately 3,014-book production baseline.
 - [ ] Regenerate the multi-source summary, workbook, and HTML report from final
   ignored artifacts.

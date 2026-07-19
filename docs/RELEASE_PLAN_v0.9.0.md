@@ -239,6 +239,26 @@ The completion sequence is in-progress ledger, atomic part, part reload and
 validation, atomic terminal ledger, then atomic summary. Recovery adopts a valid
 part or returns partless in-progress work to pending, preventing duplicates.
 
+### PR5 bounded production validation
+
+PR5 validated this design in production with a deterministic 20-book limit,
+three results per book, one-second pacing, and bounded retry settings. A normal
+Ctrl-C interruption after seven completed items left seven valid parts, one
+partless `in_progress` item, twelve pending items, and an atomic summary with
+`stop_reason=interrupted`. Resume used the same checkpoint without `--restart`
+and completed all 20 books as observed, yielding 60 rows in 20 deterministic
+parts. Across both invocations there were exactly 20 Browse requests, so no
+completed book was requested twice.
+
+The first invocation acquired one token for seven Browse requests; the resumed
+invocation acquired one token for its 13 Browse requests. Neither invocation
+needed token refresh, retry, rate-limit handling, or a global stop. Integrity
+validation reconciled all ledger references and parts. Seller fields remained
+blank, seller identity was absent from notes, and no credentials, tokens,
+headers, expiration metadata, or raw responses appeared in checkpoint state.
+The local macOS environment required the virtual environment's certifi CA bundle
+for TLS validation; production OAuth and Browse access succeeded with it.
+
 ## 7. Rate-Limit and Runtime Planning
 
 The initial input is approximately 3,014 books. Under the current conservative
@@ -296,8 +316,9 @@ data requires a separate design decision.
    guard, selection/order, incremental processing, progress, and safe limits.
 4. **PR4 — Interruption, resume, token, and retry hardening.** Exercise crashes,
    partial writes, incompatible state, bounded backoff, and duplicate prevention.
-5. **PR5 — Small bounded production resume validation.** Interrupt and resume a
-   safe cohort; document privacy, state, pacing, and failure behavior.
+5. **PR5 — Small bounded production resume validation.** Completed: interrupted
+   and resumed a 20-book cohort; verified privacy, integrity, pacing, token
+   reuse, and duplicate prevention.
 6. **PR6 — Full-library production run and evidence-quality report.** Run the
    approximately 3,014-book baseline and document coverage, runtime, failures,
    privacy, and matching limitations.
@@ -334,15 +355,11 @@ validation PRs contact production.
 ## 12. Risks and Open Questions
 
 - What are the verified production Browse quota and rate-limit signals?
-- Will application-token lifetime require transparent renewal during the run?
-- Which API/network failures are retryable, and which must stop the run?
-- Should `source_unavailable` retry automatically on resume or require an
-  explicit flag after a likely credential/configuration failure?
+- How often will proactive application-token renewal be exercised during the
+  full run? The bounded validation reused tokens but was too short to refresh.
+- What rate-limit or temporary-failure signals will occur at full-library scale?
+  The bounded validation encountered none.
 - Is `no_results` terminal for the baseline, and when should it become stale?
-- What atomic format and validation/checksum best detects checkpoint corruption?
-- Should item parts be JSON, CSV, or another simple inspectable format?
-- Should checkpointing occur after every item or a configurable small batch?
-- How should restart preserve or archive prior run state?
 - How should listings changing during a multi-hour run be described in
   provenance and reviewer guidance?
 - How will a later monthly refresh distinguish baseline completion from stale
