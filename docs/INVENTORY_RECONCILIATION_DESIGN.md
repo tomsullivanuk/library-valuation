@@ -360,9 +360,9 @@ accepted `location_update` decision may change a holding's current
 `location_id`. A broad location remains valid; fine shelf discipline is not
 required.
 
-## 9. Tentative Repositories
+## 9. Implemented PR5 Repositories
 
-### `data/inventory_observations.csv`
+### `data/inventory_observations.csv` — schema version 1
 
 **Purpose:** Append-preserving row-level evidence for every accepted inventory
 import, including unmatched and unresolved rows.
@@ -370,7 +370,7 @@ import, including unmatched and unresolved rows.
 **Identity:** Project-owned `inventory_observation_id`, deterministic within
 `inventory_import_id`; never a Libib ID and never a holding identity.
 
-**Tentative field groups, not a final schema:**
+**Implemented field groups:**
 
 - identity and provenance: observation ID, import ID, source-row/logical-record
   reference, raw source reference, observation/schema/parser/privacy versions;
@@ -383,28 +383,41 @@ import, including unmatched and unresolved rows.
 - grouping flags: grouped quantity, duplicate occurrence, unsupported or
   ambiguous evidence markers.
 
-The repository should not contain mutable current holding or catalog links.
+The repository contains no mutable current holding or catalog links. Durable raw
+evidence uses a fixed privacy allowlist; unknown column names and diagnostic
+codes are retained, while unknown values and notes/tags/reviews are not copied.
+Accepted normalized values are frozen with `normalization_version`; improved
+normalization requires later versioned evidence or projection, never rewriting.
 
-### `data/inventory_reconciliation_decisions.csv` (tentative)
+### `data/inventory_reconciliation_decisions.csv` — schema version 1
 
 **Purpose:** Append-only explanation of observation-to-holding interpretation.
 
-**Tentative field groups:** Decision ID, observation ID, candidate/accepted
+**Implemented field groups:** Decision ID, observation ID, candidate/accepted
 holding IDs, outcome code, decision status, confidence, evidence/rule version,
 scope applicability, proposed current-state changes, actor, decided time,
 supersedes decision ID, and notes/reason codes.
 
-PR5 should evaluate whether multiple holding candidates require a normalized
-candidate repository or a deterministic encoded set. It must not store only the
-winner and discard the alternatives that made a case ambiguous.
+Candidate holding IDs and reason codes use deterministic JSON string lists. All
+plausible candidates are retained. A later explicit decision may supersede the
+one current decision for the same observation; the prior row remains immutable.
+Branching supersession and cycles fail closed.
 
-### Existing `data/inventory_holdings.csv`
+### Existing `data/inventory_holdings.csv` — schema version 2
 
-This remains the current-belief repository. PR5 may need a versioned migration
-to distinguish a normal one-copy holding from an unresolved quantity group and
-to store safe supersession/current-verification fields. The migration must
-preserve every PR3 `holding_id` and blank catalog/location references. This
-design does not authorize that migration in PR4.
+This remains the current-belief repository. Version 2 adds folder context,
+physical-copy versus legacy quantity-group type, latest accepted observation and
+decision provenance, and verification scope/completeness. It preserves every
+PR3 `holding_id`, catalog/location value, and current field. Unsupported headers
+or versions fail closed.
+
+PR3 schema-v1 holdings migrate only when every historical import's `row_count`
+equals its persisted holding count. The migration creates deterministic
+`pr3_backfill` observations with `legacy_derived` completeness and append-only
+`pr3_backfill_existing_holding` decisions. Only persisted comparison keys,
+quantity, collection, timestamps, and raw references are used; unavailable
+historical row values remain blank. Backfill is atomic and idempotent. An
+unbalanced or partially migrated state fails before publication.
 
 ## 10. Alternatives Considered
 
@@ -443,10 +456,10 @@ Immutable observations plus append-only decisions and a validated current
 holding snapshot provide the required auditability with less speculative
 machinery.
 
-## 11. PR5 Implementation Boundary
+## 11. PR5 Implemented Boundary
 
-PR5 should implement **Durable Inventory Observations and Holding
-Reconciliation**, limited to:
+PR5 implements **Durable Inventory Observations and Holding Reconciliation**,
+limited to:
 
 - a strict, versioned, privacy-filtered observation repository;
 - deterministic observation identity and exact-repeat behavior;
@@ -457,38 +470,33 @@ Reconciliation**, limited to:
   different-edition evidence, duplicates, and ambiguous candidates;
 - new holding creation only when evidence supports a distinct physical holding;
 - preservation of PR3 holding IDs and user/current fields;
-- deterministic backfill of PR3 imports when retained raw input is available,
-  with an explicit legacy-evidence marker rather than fabricated row content
-  when it is not;
+- deterministic legacy-derived backfill from persisted PR3 holding evidence,
+  with unavailable row content left blank and unbalanced state rejected;
 - partial/complete scope-aware non-observation outcomes without disposition;
 - atomic validation/publication and source-total balancing; and
 - fixture-driven tests for every physical and audit outcome.
 
-PR5 must not implement catalog matching or creation, canonical bibliographic
+PR5 does not implement catalog matching or creation, canonical bibliographic
 updates, durable locations or label aliases, reports, workbooks, CLI workflow,
 recursive discovery, Library Explorer, or Action Center.
 
 Catalog-to-inventory matching becomes the following implementation PR after
 physical reconciliation is stable. Inventory exception views must consume
 durable observation and decision outcomes rather than reconstructing them from
-mutated holdings.
+mutated holdings. PR6 catalog matching must consume the observation repository's
+explicit, versioned normalized fields (including normalized ISBN, title, and
+creator evidence); it must not interpret or depend on arbitrary keys in
+`raw_evidence_json`.
 
 ## 12. Deferred and Unresolved Questions
 
-The architectural entity boundary and ordering are settled. These implementation
-details remain deliberately open for PR5 evidence:
+The entity boundary and PR5 implementation are settled. These questions remain
+for later evidence or PR6:
 
-- exact observation schema and privacy allowlist;
-- occurrence identity for byte-identical rows in one export;
-- whether normalized reprocessing uses observation revisions or a separate
-  versioned projection;
-- candidate storage shape when several holdings are plausible;
-- the threshold for automatically accepting `confirmed_existing`;
-- how much evidence is sufficient for automatic `new_holding`;
-- whether a quantity group belongs in the holding repository or a separate
-  unresolved-group entity;
-- minimum migration fields needed by the PR3 holding repository;
-- exact backfill/compatibility policy for already accepted PR3 imports;
+- whether normalized reprocessing uses new observations or a separate versioned
+  projection;
+- whether candidate volume later justifies a normalized candidate repository;
+- whether quantity groups later become a separate entity;
 - whether reconciliation decisions are sufficient history or a narrow holding
   event repository is also required; and
 - the reviewed policy, if any, that permits `verified_missing` after a complete
@@ -497,7 +505,48 @@ details remain deliberately open for PR5 evidence:
 None of these questions permits destructive mutation or a guessed identity in
 the meantime.
 
-## 13. Acceptance Scenarios for the Design
+## 13. Implemented Identity, Outcomes, and Thresholds
+
+Observation identity is UUIDv5 over `inventory_import_id`, the source-row
+fingerprint, and a one-based occurrence discriminator for that fingerprint.
+`source_row_number` remains provenance only. Reordering rows in a later file
+creates new import-scoped observations but does not change holding identity.
+Identical rows in one import receive distinct observation IDs and the shared
+`indistinguishable_duplicate_rows` outcome; no copy ordinal becomes a holding
+identity.
+
+The implemented accepted outcomes are `new_holding_created`,
+`existing_holding_confirmed`, `existing_holding_reobserved`,
+`holding_evidence_updated`, `quantity_group_confirmed`, and
+`pr3_backfill_existing_holding`. Only `new_holding_created`,
+`existing_holding_reobserved`, and backfill are produced automatically in PR5;
+the other accepted codes are reserved for explicit superseding decisions.
+
+The implemented unresolved outcomes are
+`holding_identity_changed_requires_reconciliation`,
+`multiple_holding_candidates`, `indistinguishable_duplicate_rows`,
+`quantity_requires_review`, `edition_or_identity_ambiguity`,
+`insufficient_identity_evidence`, `manual_review_required`, and
+`possible_duplicate`. Each observation receives exactly one current terminal
+decision, and accepted plus unresolved counts must balance the import row count.
+
+Automatic reobservation requires exactly one fingerprint candidate in the same
+registered folder and no other physical candidate. Collection/location text is
+not identity. Automatic new-holding creation requires `copies = 1`, no credible
+candidate, no ISBN conflict, and either a valid normalized ISBN or normalized
+title plus creator. Title alone never suffices. A single non-exact candidate,
+cross-folder exact evidence, changed ISBN/title/creator, or multiple candidates
+is non-mutating. When no strong candidate exists, a same-folder title-only or
+creator-only overlap is a review guard, not an accepted match; it prevents an
+edited row with lost evidence from silently creating a duplicate holding.
+
+PR5 preserves audit context and provides only a non-mutating absence classifier:
+partial or unknown applicable scope returns `not_yet_audited`, outside scope
+returns `outside_audit_scope`, and completed applicable scope returns
+`possible_missing`. It never generates `verified_missing` or disposition.
+Scope-wide absence persistence remains deferred.
+
+## 14. Acceptance Scenarios for the Design
 
 - A repeated unchanged row becomes a new historical observation for a new
   import and confirms the same holding; an exact repeated file creates neither.

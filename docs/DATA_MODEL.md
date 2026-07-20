@@ -186,6 +186,32 @@ corrected ISBN can retain one holding while producing a separate catalog-link
 decision. See `INVENTORY_RECONCILIATION_DESIGN.md` for the closed physical,
 audit, and subsequent catalog outcome vocabularies.
 
+PR5 implements `data/inventory_observations.csv` at schema version 1. Its fields
+are `schema_version`, `inventory_observation_id`, `inventory_import_id`,
+`source_row_number`, `source_row_discriminator`, `parser_version`,
+`normalization_version`, `source_row_fingerprint`, privacy-safe
+`raw_evidence_json`, raw and normalized ISBN/title/creator/publisher evidence,
+`source_collection_label`, audit scope/completeness, raw and normalized copies
+and Libib-added date, `observed_at`, hash-addressed `source_reference`, diagnostic
+and unknown-column-name JSON, `observation_origin`, and
+`evidence_completeness`. Unknown column values, Libib notes, tags, reviews, and
+other non-allowlisted fields are not copied into durable raw evidence.
+
+PR5 implements `data/inventory_reconciliation_decisions.csv` at schema version
+1. It stores decision ID, observation ID, accepted holding ID, candidate holding
+IDs, closed outcome, basis, confidence, timestamp, reconciliation model version,
+superseded decision ID, automatic/manual/backfill origin, reason codes, and a
+compact explanation. Decisions are append-only. A new explicit decision may
+supersede exactly one current decision for the same observation; prior rows are
+never edited or deleted, branching is rejected, and cycles fail closed.
+
+PR5 upgrades `data/inventory_holdings.csv` from schema version 1 to version 2.
+Version 2 preserves all prior fields and IDs, and adds `folder_id`,
+`holding_state_type`, latest observation and decision IDs, verification scope,
+and verification completeness. Latest provenance must reference an accepted
+decision for that same holding and observation. Catalog and location IDs remain
+blank unless they already existed; PR5 never creates either identity.
+
 Fields:
 
 - `source_item_id`: stable internal identifier.

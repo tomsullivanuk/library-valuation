@@ -233,6 +233,14 @@ transaction recovery, migration compatibility, and source-total balancing.
 every holding effect has an auditable decision; and no ambiguous evidence
 creates, merges, removes, or mutates a holding.
 
+**Implemented contract:** Observation and decision repositories use schema
+version 1; holdings use schema version 2 with fail-closed PR3 compatibility.
+Observation IDs are import-scoped and deterministic; decisions are append-only
+with validated single-chain supersession; automatic holding changes are limited
+to exact same-folder reobservation and sufficiently identified new one-copy
+evidence. Unresolved rows persist without holding mutation. Audit absence is a
+non-mutating classifier only, and `verified_missing` remains deferred.
+
 ### PR6 — Catalog-to-Inventory Matching
 
 **Purpose:** Link inventory evidence to catalog items conservatively and

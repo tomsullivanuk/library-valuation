@@ -106,6 +106,23 @@ holdings are never regenerated from the newest export. See
 `INVENTORY_RECONCILIATION_DESIGN.md` for the outcome vocabulary, lifecycle,
 refresh rules, tentative repositories, and PR5 implementation boundary.
 
+PR5 implements that boundary in `valuation/libib_inventory.py`. Accepted rows
+now publish immutable schema-v1 `inventory_observations.csv` evidence and one
+current append-only schema-v1 reconciliation decision per observation alongside
+schema-v2 current holdings. Automatic holding mutation is limited to a unique
+exact fingerprint in the same registered folder; automatic new holding creation
+requires `copies = 1`, no credible existing candidate or conflict, and either a
+valid normalized ISBN or normalized title plus creator. Changed identifiers,
+multiple candidates, weak evidence, quantities other than one, and identical
+duplicate rows persist as non-mutating decisions. All five inventory CSVs stage,
+validate, and publish under the PR3 rollback boundary.
+
+PR3 holding schema v1 is read compatibly and migrated only when every import row
+balances to one persisted PR3 holding. Backfilled observations are explicitly
+`pr3_backfill` / `legacy_derived`; unavailable raw values remain blank rather
+than being invented. Holding IDs, blank catalog/location links, and current
+state survive schema-v2 migration. Catalog matching and creation remain PR6.
+
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic
 per-item ledger records sanitized execution state; and atomic per-item JSON

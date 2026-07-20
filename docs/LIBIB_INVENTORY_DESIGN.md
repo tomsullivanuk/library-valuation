@@ -432,6 +432,16 @@ match, overwrite evidence, or append a second holding. New books without those
 signals may still create first-pass holdings. Full reconciliation and immutable
 row-level source-observation history remain PR4 responsibilities.
 
+**PR5 implementation:** Every accepted row now persists first as an immutable
+schema-v1 Inventory Observation. Append-only schema-v1 decisions relate those
+observations to schema-v2 current holdings. The PR3 changed-row fail-before-write
+guard is replaced by durable unresolved outcomes: changed evidence is accepted
+as history but does not mutate or duplicate a holding. Exact same-folder
+fingerprints may refresh an existing holding; safe new rows may create one
+holding; quantities other than one and indistinguishable duplicate rows remain
+reviewable. PR3 holding IDs migrate without change through explicit balanced,
+legacy-derived backfill. Catalog reconciliation remains PR6.
+
 ### Inventory Location
 
 **Purpose:** Represent a stable, project-owned physical place independently of
