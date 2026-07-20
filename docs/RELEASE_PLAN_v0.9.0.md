@@ -325,8 +325,9 @@ data requires a separate design decision.
 7. **PR7 — Full summary and reviewer-artifact regeneration.** Completed:
    deterministically materialized eBay CSV/XLSX, generated and reconciled the
    multi-source summary, workbook, and HTML report locally.
-8. **PR8 — Final documentation and release readiness.** Finalize release notes,
-   operational instructions, limitations, validation, and artifact audits.
+8. **PR8 — Final documentation and release readiness.** Completed: finalized
+   release notes, operational instructions, limitations, validation, privacy,
+   credential, and artifact audits.
 
 Each PR remains reviewable and uses fixture/mocked tests; only explicitly scoped
 validation PRs contact production.

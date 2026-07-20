@@ -82,6 +82,8 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   no retries or failures occurred.
 - [x] Materialize full eBay CSV/XLSX and regenerate/reconcile the multi-source
   summary, workbook, and HTML report from ignored artifacts.
+- [x] Complete release documentation, privacy and artifact audits, and the
+  v0.9.0 release gate.
 
 ## v0.10.0 Libib Physical Inventory Integration
 

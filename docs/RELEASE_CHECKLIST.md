@@ -1,5 +1,58 @@
 # Release Checklist
 
+## v0.9.0
+
+Pre-release checks:
+
+- [x] Run `.venv/bin/python -m pytest` and confirm all 302 tests pass.
+- [x] Run `python3 -m compileall valuation library_pipeline.py tests`.
+- [x] Run `git diff --check`.
+- [x] Confirm CLI help for full-library collection, checkpoint materialization,
+  multi-source summarization, reviewer workbook, and reviewer report.
+- [x] Confirm the bounded interruption/resume validation and full 3,014-book
+  production baseline completed and are documented.
+- [x] Confirm checkpoint integrity and deterministic multi-source,
+  workbook, and HTML reconciliation.
+- [x] Confirm AbeBooks remains the authoritative core-range source and eBay
+  remains supplemental active-listing evidence.
+- [x] Confirm valuation, recommendation, confidence, Research Assessment, and
+  monthly-import semantics are unchanged.
+- [x] Confirm non-appraisal language and known evidence limitations are clear.
+- [x] Confirm internal documentation links resolve.
+
+Privacy and artifact checks:
+
+- [x] Confirm all eBay seller fields are blank and notes contain no seller
+  identity.
+- [x] Confirm no credentials, OAuth tokens, authorization/response headers, or
+  raw API payloads are tracked or staged.
+- [x] Confirm `.env`, checkpoints, observation parts, and generated CSV, XLSX,
+  workbook, and HTML artifacts remain ignored and untracked.
+
+Release hygiene:
+
+- [x] Confirm `CHANGELOG.md` includes v0.9.0.
+- [x] Confirm `docs/RELEASE_NOTES_v0.9.0.md` is ready for the GitHub Release.
+- [x] Confirm `docs/RELEASE_READINESS_v0.9.0.md` records final scope, evidence,
+  privacy controls, limitations, and the release gate.
+- [x] Confirm README, architecture, roadmap, backlog, Market Intelligence,
+  baseline, reconciliation, and release plan are consistent.
+- [ ] Confirm the working tree is clean after the final release commit.
+- [ ] Create annotated tag `v0.9.0` at the final release commit.
+- [ ] Push `main` and the tag.
+- [ ] Publish the GitHub Release from `docs/RELEASE_NOTES_v0.9.0.md`.
+- [ ] Verify the published release is not a draft or prerelease and is marked
+  latest.
+
+Known follow-up:
+
+- v0.10.0 adds Libib physical-inventory integration.
+- v0.11.0 adds the Library Explorer and Action Center.
+- v0.12.0 adds automated monthly refresh orchestration and a reviewed durable
+  freshness model.
+- Sold/completed evidence, shipping-inclusive prices, currency conversion, and
+  automated eBay match confidence remain deferred.
+
 ## v0.6.0
 
 Pre-release checks:

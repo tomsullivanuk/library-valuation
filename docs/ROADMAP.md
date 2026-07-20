@@ -431,8 +431,9 @@ privacy validation passed. PR7 then materialized the ignored combined outputs
 and reconciled the multi-source summary, reviewer workbook, and HTML report.
 
 PR7 completed that materialization and reconciliation without changing
-valuation or matching semantics. Final v0.9.0 release documentation and audits
-remain.
+valuation or matching semantics. PR8 completed the release documentation,
+privacy and artifact audits, and release gate. v0.9.0 is ready for publication;
+v0.10.0 is the next planned release.
 
 ## v0.10.0: Libib Physical Inventory Integration
 

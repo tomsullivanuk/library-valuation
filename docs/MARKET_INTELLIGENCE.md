@@ -875,6 +875,16 @@ abbreviation/markup, incomplete marketplace titles, and genuinely questionable
 edition/volume matches. Price extremes and disagreements remain visible and
 separate; neither diagnostic changed evidence semantics.
 
+### v0.9.0 release boundary
+
+The release boundary is the production-guarded, resumable full-library eBay
+baseline plus deterministic local materialization and source-aware reviewer
+artifacts. AbeBooks remains authoritative for core ranges, confidence, and
+recommendations; eBay remains supplemental active-listing evidence. Checkpoints
+and generated outputs remain ignored and non-durable. The release introduces no
+appraisal claim and no valuation, recommendation, confidence, Research
+Assessment, or monthly-import semantic change.
+
 ## Non-Goals
 
 This document does not define or implement:

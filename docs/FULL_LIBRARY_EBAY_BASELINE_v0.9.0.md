@@ -129,7 +129,7 @@ ignored, untracked, local, and non-durable. It must not be committed. Credential
 tokens, headers, raw responses, observation parts, and later generated
 CSV/XLSX/workbook/report artifacts also remain uncommitted.
 
-## Remaining Work Before Release
+## Release Completion
 
 PR7 deterministically materialized combined eBay observation CSV/XLSX files
 from the validated parts, combined them with full AbeBooks observations, built
@@ -139,7 +139,7 @@ outlier behavior. All generated outputs remain ignored and untracked. See
 `docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md` for the completed
 reconciliation.
 
-Final release documentation, privacy checks, and artifact audits follow after
+Final release documentation, privacy checks, and artifact audits passed after
 that reconciliation. Sold/completed listings, shipping-inclusive pricing,
 currency conversion, automatic match-confidence rules, Libib integration, the
 Library Explorer, and monthly refresh orchestration remain deferred.

@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.9.0 - 2026-07-19
+
+Release focus: Full-Library eBay Baseline.
+
+Added:
+
+- A production-guarded, resumable full-library eBay collection command with a
+  versioned manifest, per-book ledger, immutable observation parts, atomic
+  checkpoints, bounded retries, and safe interruption recovery.
+- A network-free materialization command for validated checkpoint parts and a
+  complete 3,014-book multi-source summary, reviewer workbook, and HTML report.
+- Production validation records for a bounded interruption/resume exercise and
+  the full-library baseline.
+
+Changed:
+
+- Full-library eBay evidence can now be collected once and deterministically
+  regenerated without repeating Browse API requests.
+- Operational summaries expose progress, retry, token, and stopping metadata
+  without persisting credentials, tokens, headers, or raw responses.
+
+Validated:
+
+- The production baseline completed 3,014 ISBN-13 searches, producing 8,293
+  listings across 2,881 books and 133 no-results rows, with no retries,
+  rate-limit events, or terminal failures.
+- All 8,426 eBay observation rows had blank seller fields; no notes contained
+  seller identity. Checkpoint integrity and generated-artifact reconciliation
+  passed.
+
+Unchanged:
+
+- AbeBooks remains the authoritative source for core market ranges, confidence,
+  and recommendations. eBay remains supplemental active-listing evidence.
+- Valuation, recommendation, Research Assessment, and monthly import semantics
+  are unchanged.
+
+Known limitations:
+
+- Active asking prices are not sold/completed evidence, appraisals, fair market
+  value, realized prices, or expected proceeds.
+- Shipping is excluded, currency is not converted, eBay match confidence remains
+  `unknown`, and lower-overlap or price-extreme listings require human review.
+- Checkpoints and generated observations, summaries, workbooks, and reports are
+  ignored local artifacts rather than durable market history.
+
 ## v0.8.0 - 2026-07-19
 
 Release focus: Production eBay Validation & Reviewer Integration.

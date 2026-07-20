@@ -2,10 +2,10 @@
 
 ## Status
 
-**In progress; artifact reconciliation complete.** PR7 deterministically
-materialized the full eBay checkpoint and reconciled the multi-source summary,
-reviewer workbook, and HTML report. Final release documentation and artifact
-audits remain before tagging v0.9.0.
+**Ready for release.** PR7 deterministically materialized the full eBay
+checkpoint and reconciled the multi-source summary, reviewer workbook, and HTML
+report. The final documentation, test, privacy, credential, and artifact gates
+have passed. The release commit may be tagged as v0.9.0.
 
 ## PR5 Bounded Production Resume Validation
 
@@ -86,9 +86,21 @@ caffeinate -dimsu .venv/bin/python library_pipeline.py \
 
 The resume invocation used the identical command and did not use `--restart`.
 
-## Remaining Release Gates
+## Final Release Gate
 
-- Complete final privacy, credential, test, documentation, and release audits.
+- All 302 tests pass.
+- `compileall` passes for `valuation`, `library_pipeline.py`, and `tests`.
+- CLI help passes for collection, checkpoint materialization, multi-source
+  summarization, reviewer workbook, and reviewer report commands.
+- Documentation, internal-link, version-consistency, privacy, credential, and
+  generated-artifact audits pass.
+- `.env`, the full checkpoint, observation parts, and all generated CSV, XLSX,
+  workbook, and HTML artifacts remain ignored and untracked.
+- No seller identities, credentials, OAuth tokens, authorization/response
+  headers, or raw API payloads are committed.
+- AbeBooks remains the authoritative core-range source. No valuation,
+  recommendation, confidence, Research Assessment, or monthly-import semantics
+  changed.
 
 The evidence remains supplemental active-listing asking-price evidence, not an
 appraisal, fair-market-value estimate, realized-sale estimate, or expected
