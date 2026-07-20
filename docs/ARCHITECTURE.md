@@ -52,6 +52,17 @@ position remains provenance only. The `collection` field remains source
 location evidence and `added` remains Libib-addition evidence, not acquisition
 date.
 
+PR3 should place operational Libib exports under one audit-area directory per
+area below `input/libib/`, normally preserving Libib's original filename. It
+should support an explicit file and one explicitly selected audit-area directory;
+recursive all-folder discovery is a later workflow. A tentative
+`inventory_import_folders` registry protects each relative folder path with its
+confirmed exact collection label. This registry is operational metadata, not
+inventory, source evidence, import identity, or physical-location identity.
+Folder/collection mismatches emit `collection_label_changed_or_misfiled` and
+require manual confirmation. Import identity remains file hash plus
+`inventory_import_id`, never filename, mtime, folder name, or `folder_id`.
+
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic
 per-item ledger records sanitized execution state; and atomic per-item JSON

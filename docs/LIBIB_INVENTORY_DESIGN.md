@@ -38,11 +38,86 @@ not imply that arbitrary files or a proprietary backup format are supported.
 PR2 must identify formats, encodings, delimiters, column names, and export
 variants from representative files before support is declared.
 
-The future workflow should accept an explicit path. Convenience discovery may
-search a dedicated `input/libib/` directory and select only an unambiguous
-supported candidate under a documented rule. Discovery must fail on ambiguity;
-it must not choose a file based on an unexplained filesystem order. Explicit
-input always wins.
+The workflow should accept an explicit file path and, in PR3, one explicitly
+selected audit-area directory. The project convention is:
+
+```text
+input/
+└── libib/
+    ├── living-room-bookshelf-near-office/
+    ├── study/
+    ├── basement-storage/
+    └── ...
+```
+
+Each child directory is one operational audit area. Original Libib filenames,
+such as `library_20260720_013144.csv`, should normally remain unchanged. A later
+workflow may recursively import all registered audit-area directories, but
+recursive discovery is not part of PR3 and must not be implemented implicitly.
+Discovery must always fail on ambiguity rather than selecting a file by
+unexplained filesystem order. Explicit file input wins.
+
+### Operational import-folder policy
+
+Folder names are workflow labels, Libib `collection` values are source
+evidence, and neither is permanent inventory or location identity.
+Project-owned `location_id` remains the durable physical-location identity. An
+importer must preserve folder and source labels separately and must never
+silently overwrite either one with the other.
+
+PR3 should evaluate a small durable operational-metadata repository named
+`inventory_import_folders` (tentative file name
+`data/inventory_import_folders.csv`). It is a safety registry for audit-area
+workflow, not inventory, catalog, holding, location, or source-item data.
+
+Tentative fields:
+
+- `folder_id`: stable project-owned registration identity;
+- `folder_path`: normalized path relative to `input/libib/`;
+- `expected_collection_label`: exact confirmed Libib label;
+- `first_imported_at`;
+- `last_imported_at`; and
+- `notes`.
+
+The schema, filename, path-normalization rules, and history treatment remain
+tentative until PR3. Folder path is mutable operational metadata, not import
+identity or `location_id`.
+
+On the first successful import from a new audit-area folder, register the
+folder and preserve the single observed Libib collection label exactly as
+`expected_collection_label`. For example:
+
+```text
+folder_path: living-room-bookshelf-near-office
+expected_collection_label: Living Room Bookshelf near office
+```
+
+Registration happens only after structural parsing succeeds. If a file has no
+single usable collection label, registration requires review rather than an
+invented expectation.
+
+On a subsequent import, exact comparison with the registered label permits the
+workflow to continue. A different label must not create a new location, update
+the registration, or remap holdings automatically. It produces
+`collection_label_changed_or_misfiled` with the registered collection, observed
+collection, relative folder path, and a recommendation to verify whether the
+Libib collection was intentionally renamed or the export was saved in the
+wrong audit-area folder.
+
+An intentional rename requires manual confirmation. Confirmation may update
+the folder's expected label while immutable import/source evidence preserves
+the former label. A later location-alias decision may map both labels to the
+same `location_id`; automatic remapping is prohibited.
+
+Renaming an audit-area folder also requires manual confirmation. The confirmed
+operation updates `folder_path` while preserving `folder_id`; an unrecognized
+path must not be joined to a registration merely because its collection label
+or a file hash matches. Previous paths may be retained in notes or a future
+registration-history design if PR3 evidence justifies it.
+
+Explicit files outside the registered `input/libib/` convention remain
+parseable, but they do not silently create a folder registration. The caller
+must provide or confirm their operational audit-area context.
 
 ### Hashing, repeat detection, and provenance
 
@@ -51,6 +126,14 @@ should be a deterministic hash of relative member names and member hashes, not
 archive timestamps or discovery order. The durable import record owns a
 project-generated `inventory_import_id`; a source filename or Libib identifier
 does not.
+
+Import history and exact-repeat detection are keyed by content hash and
+project-owned `inventory_import_id`, never by filename, modification timestamp,
+folder name, or `folder_id`. Copying the same bytes under another filename does
+not create a new import. A different file with the same confirmed collection
+label does create a new import because its content hash differs. A known hash
+encountered in another registered folder remains a duplicate and may also
+produce a misplaced-file review condition; it never becomes a second import.
 
 An exact `(source_type, file_hash, parser_contract)` repeat is a no-op or a
 reported already-imported result. It must not create a second import, source
@@ -608,6 +691,20 @@ The exact same content and parser contract returns the existing import result.
 It performs no duplicate writes. A forced validation may recompute diagnostics
 without changing durable identity.
 
+### Operational folder acceptance scenarios
+
+| Scenario | Required outcome |
+| --- | --- |
+| First import from a new folder | After a successful parse, create one folder registration and preserve the observed collection label exactly; create the content-hash-keyed Inventory Import under the PR3 transaction policy. |
+| Second import with identical collection label | Continue normally, create a new import only when the content hash is new, and update operational `last_imported_at` after success. |
+| Same export copied under a different filename | Detect the existing file hash and return the existing import result; filename does not create identity. |
+| Different export with the same collection | Accept as a new Inventory Import because the hash differs; retain the existing folder registration. |
+| Collection renamed in Libib | Emit `collection_label_changed_or_misfiled`; require manual confirmation before updating the expected label or creating any alias mapping. |
+| Export saved into the wrong folder | Emit `collection_label_changed_or_misfiled` with both labels and the folder path; do not create a location or alter registration automatically. |
+| Duplicate-file detection | Use the exact source hash regardless of filename, modification time, or folder; do not create duplicate imports or source items. |
+| User renames an audit-area folder | Treat the new path as unregistered until manually confirmed; then update the existing registration's path without changing `folder_id`, import identities, holdings, or `location_id`. |
+| Future location alias mapping | Permit old and new confirmed Libib labels to map to the same durable `location_id`; keep folder registration, source-label evidence, and location aliases separate and prohibit automatic remapping. |
+
 ### New full export
 
 Create a new immutable import and source-item observations. Reconcile each row
@@ -686,6 +783,10 @@ policy.
 | Canonical catalog identity | Settled: `catalog_item_id`; Libib evidence cannot replace it. |
 | Stable physical-copy identity | Settled: project-owned `holding_id`. |
 | Principal source families | Settled: Amazon Import, Libib Import, and Manual Entry. Barcode scan is an input mechanism; other origins use provenance within Libib or Manual Entry. Existing Amazon structures do not change in v0.10.0. |
+| Operational Libib input layout | Settled: one audit-area directory below `input/libib/`; preserve original export filenames. Explicit file and one-directory imports precede later recursive all-folder import. |
+| Import-folder registration | Settled concept, tentative schema: `inventory_import_folders` is operational safety metadata keyed by `folder_id`, separate from imports, source evidence, inventory, and locations. |
+| Folder/collection mismatch | Settled: emit `collection_label_changed_or_misfiled`; never auto-create a location, update the expected label, or remap an alias. |
+| Import identity | Settled: source file hash plus `inventory_import_id`, never filename, mtime, folder name, or folder registration. |
 | Physical location identity | Settled: project-owned `location_id`; Libib labels are source evidence and never identity. |
 | Location repository | Recommended tentative `data/inventory_locations.csv`; one current location per holding, optional hierarchy, broad locations valid. |
 | Source-label mapping | Capability required; separate `data/inventory_location_aliases.csv` remains tentative pending PR2 evidence. Unmapped/ambiguous labels require review. |

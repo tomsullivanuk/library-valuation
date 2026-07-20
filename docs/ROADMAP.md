@@ -451,6 +451,10 @@ The shared import direction is limited to Amazon Import, Libib Import, and
 Manual Entry; barcode scanning is an input mechanism. Stable `location_id`
 values represent project-owned physical locations independently of Libib labels,
 with current believed holding location and verification context in v0.10.0.
+Operational exports live under registered audit-area folders in `input/libib/`.
+Folder names and Libib collection labels remain separate evidence; mismatches
+require review. PR3 supports explicit-file and one-directory import, while
+recursive all-folder discovery remains a later workflow.
 
 Approved implementation sequence:
 

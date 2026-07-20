@@ -105,6 +105,11 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 - [ ] Add stable project-owned inventory locations, optional hierarchy, current
   holding `location_id`, verification context, and conservative Libib-label
   mapping/review behavior.
+- [ ] Register operational audit-area folders below `input/libib/`, preserve
+  exact expected collection labels, and route rename/misfile mismatches to
+  `collection_label_changed_or_misfiled` review.
+- [ ] Keep import identity hash/project-ID based; support explicit-file and
+  one-directory import before later recursive all-folder discovery.
 - [ ] Generate inventory exception/audit views and a reviewer artifact.
 - [ ] Validate exact-repeat, newer-full-export, partial-batch, and interrupted
   import behavior without inferring disposition from absence.

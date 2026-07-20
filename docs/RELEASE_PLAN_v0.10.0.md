@@ -173,15 +173,19 @@ copy identity.
 **Major deliverables:** Durable inventory imports, source items, and holdings;
 atomic staged writes; exact-file idempotency; quantity expansion policy;
 audit-scope and completeness provenance; durable inventory-location repository;
-tentative alias repository evaluation; repository validation and migrations or
-explicit compatibility gates.
+tentative alias repository evaluation; operational audit-area folder registration
+under `input/libib/`; explicit-file and one-directory import boundaries;
+collection-label mismatch review; repository validation and migrations or
+explicit compatibility gates. Recursive all-folder discovery remains deferred.
 
 **Exclusions:** Fuzzy catalog matching, exception workbook, and disposition
 inference from absence.
 
 **Tests or validation:** Identity stability, repeat import, interrupted write,
 duplicate prevention, quantity, location rename, holding move, label mapping,
-unmapped-label review, user-field preservation, and schema-version tests.
+unmapped-label review, first/subsequent folder import, renamed/misfiled export,
+folder rename, hash-versus-filename identity, user-field preservation, and
+schema-version tests.
 
 **Exit criteria:** The same accepted evidence cannot create duplicate imports or
 holdings, and verified/user-maintained holding fields survive reconciliation.
@@ -287,6 +291,18 @@ ready to tag.
   Entry as the three principal source families; barcode scanning and acquisition
   origins do not create additional top-level families.
 - Exact-file imports are detected and do not duplicate durable records.
+- Libib files normally retain their original filename under one registered
+  audit-area directory below `input/libib/`; folder names remain operational
+  labels and never become import or location identity.
+- First import registers the audit-area folder only after successful parsing and
+  preserves the observed collection label exactly.
+- A subsequent folder/collection mismatch produces
+  `collection_label_changed_or_misfiled` with both labels, path, and review
+  guidance; it does not create a location or remap an alias automatically.
+- File hash and `inventory_import_id` determine import history. Filename,
+  modification timestamp, folder name, and `folder_id` do not.
+- Renaming a folder can preserve `folder_id` only after manual confirmation; an
+  unrecognized path is not automatically joined to a registration.
 - Import provenance includes a project ID, content hash, source type, parser and
   schema versions, import time, row counts, and completeness classification.
 - Every accepted source row is retained or has an explicit rejection diagnostic.
