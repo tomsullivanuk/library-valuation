@@ -145,7 +145,7 @@ unresolved changed-row candidate. PR3 returns
 changes for that import. It neither appends a second active holding nor mutates
 the prior one. These comparison keys are a conservative duplicate guard, not a
 catalog match or accepted holding reconciliation; immutable row observations
-and full reconciliation remain PR4 work.
+and full reconciliation remain PR5 implementation work under the PR4 design.
 
 ### Source Item
 
@@ -162,6 +162,29 @@ values and separately normalizes validated ISBN strings, ISO publication/added
 dates, creator display text, publisher text, collection label, and copies. The
 Libib `added` date records addition to Libib and is not acquisition evidence.
 `collection` remains `source_collection_label`, not `location_id`.
+
+For physical inventory, PR4 refines this general Source Item into a durable
+**Inventory Observation**. An observation is one immutable, privacy-filtered
+row-level assertion owned by an `inventory_import_id`. It preserves exact source
+evidence and the accepted normalized projection under versioned contracts. It
+does not own a mutable `holding_id` or `catalog_item_id`; append-preserving
+reconciliation decisions connect it to candidate or accepted holdings.
+
+Inventory Observation is historical evidence, while Inventory Holding remains
+current project belief. Many observations may support one holding; one grouped
+observation may remain unresolved against several possible copies; and an
+observation may remain unmatched without creating either identity. The
+tentative repository is `data/inventory_observations.csv`, with exact fields
+deferred to PR5. A tentative
+`data/inventory_reconciliation_decisions.csv` preserves outcome, candidates,
+confidence, rule version, decision state, reviewer/supersession provenance, and
+proposed or accepted holding effects.
+
+Physical reconciliation must settle or preserve ambiguity about the holding
+before catalog reconciliation may link or create bibliographic identity. A
+corrected ISBN can retain one holding while producing a separate catalog-link
+decision. See `INVENTORY_RECONCILIATION_DESIGN.md` for the closed physical,
+audit, and subsequent catalog outcome vocabularies.
 
 Fields:
 

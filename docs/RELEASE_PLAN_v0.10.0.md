@@ -190,7 +190,50 @@ schema-version tests.
 **Exit criteria:** The same accepted evidence cannot create duplicate imports or
 holdings, and verified/user-maintained holding fields survive reconciliation.
 
-### PR4 — Catalog-to-Inventory Matching
+### PR4 — Inventory Observation and Reconciliation Design
+
+**Purpose:** Settle the durable evidence/current-belief boundary and physical
+reconciliation workflow before implementation.
+
+**Major deliverables:** Inventory Observation recommendation and lifecycle;
+holding lifecycle; immutable evidence rules; append-preserving reconciliation
+decision concept; closed outcome taxonomy; physical-before-catalog pipeline;
+tentative repositories; alternatives; and explicit PR5 boundary.
+
+**Exclusions:** Repository, reconciliation, matching, importer, CLI, report, or
+review-workbook implementation.
+
+**Tests or validation:** Documentation links, terminology and contradiction
+checks, full suite, and confirmation that no production behavior changed.
+
+**Exit criteria:** Observation existence, holding evolution, reconciliation
+ordering/outcomes, and PR5 implementation scope are unambiguous.
+
+### PR5 — Durable Inventory Observations and Holding Reconciliation
+
+**Purpose:** Preserve immutable row-level evidence and reconcile it
+conservatively to current physical holdings.
+
+**Major deliverables:** Versioned observation repository; deterministic
+observation identity; append-only decisions; physical candidate generation;
+closed outcomes; exact high-confidence existing-holding acceptance; conservative
+changed/duplicate/edition/quantity review; scope-aware non-observation behavior;
+atomic publication; source-total balancing; and compatible PR3 holding migration
+only where required.
+
+**Exclusions:** Catalog matching or creation, canonical metadata changes,
+locations/aliases, reports, workbooks, recursive discovery, and CLI workflow.
+
+**Tests or validation:** Observation immutability/idempotency, unchanged and
+changed rows, ISBN corrections, candidate ambiguity, duplicate copies, quantity
+groups, new holdings, partial/complete audits, non-mutation on unresolved cases,
+transaction recovery, migration compatibility, and source-total balancing.
+
+**Exit criteria:** Every accepted import row persists as immutable evidence;
+every holding effect has an auditable decision; and no ambiguous evidence
+creates, merges, removes, or mutates a holding.
+
+### PR6 — Catalog-to-Inventory Matching
 
 **Purpose:** Link inventory evidence to catalog items conservatively and
 explainably.
@@ -199,7 +242,7 @@ explainably.
 confidence, count, rule version, and evidence snapshot; manual confirmation and
 supersession behavior; automatic creation of a new catalog identity from strong,
 unambiguous no-match evidence, followed by holding linkage without requiring an
-acquisition. PR7 validates this behavior end to end.
+acquisition. PR9 validates this behavior end to end.
 
 **Exclusions:** Title-only automatic matches, canonical metadata updates, and
 presentation redesign.
@@ -213,7 +256,7 @@ evidence non-creation tests.
 every accepted link or new identity is auditable and can be superseded without
 deleting history.
 
-### PR5 — Inventory Exceptions and Audit Views
+### PR7 — Inventory Exceptions and Audit Views
 
 **Purpose:** Derive complete, deterministic queues for inventory discrepancies
 and follow-up.
@@ -233,7 +276,7 @@ scope behavior, including non-invalidation across scopes.
 **Exit criteria:** Every unmatched or ambiguous row appears in a review view and
 absence-based exceptions carry the correct completeness caveat.
 
-### PR6 — Inventory Reviewer Artifact
+### PR8 — Inventory Reviewer Artifact
 
 **Purpose:** Present holdings, matches, provenance, and exceptions in a usable
 generated review workbook or equivalent artifact.
@@ -249,7 +292,7 @@ checks where practical, privacy inspection, and visual acceptance testing.
 **Exit criteria:** A user can understand what is believed, observed, unresolved,
 and stale without treating the artifact as the durable repository.
 
-### PR7 — End-to-End Import Workflow and Validation
+### PR9 — End-to-End Import Workflow and Validation
 
 **Purpose:** Connect parse, persist, match, reconcile, and generate steps in a
 safe user-invoked workflow.
@@ -268,7 +311,7 @@ privacy tests.
 **Exit criteria:** Accepted imports are atomic and repeatable, failures preserve
 prior durable state, and all reconciliation outcomes balance to source totals.
 
-### PR8 — Documentation and Release Readiness
+### PR10 — Documentation and Release Readiness
 
 **Purpose:** Finalize user guidance and prove the release boundary.
 
@@ -372,5 +415,5 @@ rather than optimistic mutation.
   implemented contracts, not before.
 - Add operational instructions only when the workflow exists.
 - Add release notes, changelog, schema/migration guidance, recovery procedure,
-  fixture provenance, privacy audit, and exact acceptance results in PR8.
+  fixture provenance, privacy audit, and exact acceptance results in PR10.
 - Preserve historical release documents and do not rewrite v0.9.0 evidence.

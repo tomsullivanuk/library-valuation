@@ -93,7 +93,18 @@ new fingerprint that shares an ISBN or normalized title-plus-creator with a
 prior holding returns `holding_identity_changed_requires_reconciliation`.
 Nothing from that import is published: the existing holding stays active and no
 second holding is appended. This is ambiguity detection, not matching; full
-reconciliation and immutable row-level observation history remain PR4 work.
+reconciliation and immutable row-level observation history remain outside PR3.
+
+The PR4 reconciliation design settles that missing boundary. A durable
+Inventory Observation preserves each accepted row-level assertion immutably;
+Inventory Holding remains the mutable current-belief snapshot; and an
+append-preserving reconciliation decision explains every accepted or unresolved
+observation-to-holding interpretation. Physical reconciliation precedes catalog
+matching because copy continuity and bibliographic identity are independent.
+Observations never receive authoritative mutable holding/catalog links, and
+holdings are never regenerated from the newest export. See
+`INVENTORY_RECONCILIATION_DESIGN.md` for the outcome vocabulary, lifecycle,
+refresh rules, tentative repositories, and PR5 implementation boundary.
 
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic

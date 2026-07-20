@@ -461,14 +461,20 @@ Approved implementation sequence:
 1. Libib Physical Inventory Design and Release Plan.
 2. Libib Export Profiling and Parser.
 3. Durable Inventory Import and Physical-Item State.
-4. Catalog-to-Inventory Matching.
-5. Inventory Exceptions and Audit Views.
-6. Inventory Reviewer Artifact.
-7. End-to-End Import Workflow and Validation.
-8. Documentation and Release Readiness.
+4. Inventory Observation and Reconciliation Design.
+5. Durable Inventory Observations and Holding Reconciliation.
+6. Catalog-to-Inventory Matching.
+7. Inventory Exceptions and Audit Views.
+8. Inventory Reviewer Artifact.
+9. End-to-End Import Workflow and Validation.
+10. Documentation and Release Readiness.
 
-See `RELEASE_PLAN_v0.10.0.md` and `LIBIB_INVENTORY_DESIGN.md`. Production
-schemas remain tentative until representative exports are profiled.
+PR4 settles that immutable Inventory Observations preserve historical source
+assertions, Inventory Holdings preserve current belief, and append-preserving
+reconciliation decisions explain their relationship. Physical reconciliation
+precedes catalog matching. PR5 implements only that evidence-to-holding layer;
+catalog matching moves to PR6. See `RELEASE_PLAN_v0.10.0.md`,
+`LIBIB_INVENTORY_DESIGN.md`, and `INVENTORY_RECONCILIATION_DESIGN.md`.
 
 ## v0.11.0: Library Explorer and Action Center
 
