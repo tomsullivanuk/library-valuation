@@ -41,6 +41,17 @@ Renaming a location or moving a holding does not change catalog or holding
 identity. See `LIBIB_INVENTORY_DESIGN.md` for the tentative
 PR1 contract; production schemas remain deferred to implementation PRs.
 
+PR2 adds a pure Libib CSV parser in `valuation/libib.py`. It accepts an explicit
+path, reads UTF-8 CSV into immutable in-memory records, preserves every source
+field, and emits structured diagnostics alongside conservative normalized
+ISBN, date, creator, publisher, collection-label, and copies values. It performs
+no durable write, discovery, matching, catalog creation, holding creation,
+location mapping, reconciliation, artifact generation, or CLI orchestration.
+The observed export contains no stable Libib item/copy identifier, so row
+position remains provenance only. The `collection` field remains source
+location evidence and `added` remains Libib-addition evidence, not acquisition
+date.
+
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic
 per-item ledger records sanitized execution state; and atomic per-item JSON

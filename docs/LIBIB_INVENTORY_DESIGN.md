@@ -102,6 +102,93 @@ ignored after recovery.
 - whether manually edited ISBN/title/author values can be distinguished; and
 - whether sets and multi-volume records have machine-readable structure.
 
+### PR2 observed Libib CSV profile
+
+PR2 profiled the untouched `library_20260720_013144.csv` export (SHA-256
+`0dab102fd1c99d0bf3cac1b87211853dacf20fa79468167fa2d6875936dccef6`).
+The file contains 30 book records. The committed fixtures are synthetic,
+privacy-safe reductions of its structure; the user's raw export is not copied
+into the repository.
+
+Observed byte and CSV characteristics:
+
+- UTF-8 text without a byte-order mark;
+- LF newlines;
+- comma delimiter;
+- double-quote quoting with CSV escaping;
+- one header plus 30 records, each with exactly 30 fields;
+- quoted commas occur in normal text fields; no embedded record newlines were
+  present in this sample;
+- non-ASCII text is present and decodes cleanly as UTF-8; and
+- blank values are represented by empty CSV fields, not placeholder strings.
+
+Observed columns, in order:
+
+```text
+item_type,title,creators,first_name,last_name,collection,ean_isbn13,
+upc_isbn10,description,publisher,publish_date,group,tags,notes,price,
+length,number_of_discs,number_of_players,age_group,ensemble,aspect_ratio,
+esrb,rating,review,review_date,status,began,completed,added,copies
+```
+
+The PR2 parser requires the fields needed for source identity evidence and the
+approved normalization contract: `item_type`, `title`, `creators`,
+`first_name`, `last_name`, `collection`, `ean_isbn13`, `upc_isbn10`,
+`publisher`, `publish_date`, `added`, and `copies`. The other observed columns
+are optional. Missing optional columns and empty values are accepted. Unknown
+future columns are preserved in `raw_values` and diagnosed rather than dropped.
+
+Observed value semantics and coverage:
+
+- All 30 `item_type` values are `book`.
+- All 30 ISBN-13 values are 13-character strings with valid checksums.
+- All 30 ISBN-10 values are 10-character strings with valid checksums, including
+  leading-zero cases; every pair converts to the supplied ISBN-13 with no
+  conflict.
+- All 29 non-empty `publish_date` values use `YYYY-MM-DD`. This is bibliographic
+  publication-date evidence, not an acquisition date.
+- All 30 `added` values use `YYYY-MM-DD` and share the export's observed add
+  date. `added` means added to Libib; it must not be interpreted as acquired.
+- All 30 `copies` values are the string `1`. The sample provides no evidence
+  about quantities greater than one or how Libib represents separately
+  identified copies.
+- No duplicate full rows, titles, ISBN-10 values, or ISBN-13 values occur. The
+  export therefore does not resolve how duplicate books or copies are emitted.
+- `collection` is populated on every row but has one label in this sample. It is
+  retained as `source_collection_label`; the sample cannot establish whether it
+  is a physical location, logical catalog, ownership group, or audit scope.
+- `creators` contains the fullest displayed attribution. `first_name` and
+  `last_name` occur within `creators` on all rows and appear to identify a
+  primary creator, while `creators` can contain punctuation and additional
+  names. PR2 preserves and whitespace-normalizes `creators`, and separately
+  constructs `primary_author_display` as `first_name last_name`. It does not
+  split `creators` into a contributor list because delimiter semantics are not
+  proven.
+- `publisher` is populated on 29 of 30 rows and is preserved verbatim plus a
+  whitespace-normalized value.
+- The export exposes no obvious stable Libib row, item, copy, or barcode ID.
+  Row number is source position only and is not a durable identity.
+- The export contains no explicit full/partial completeness flag, audit-scope
+  type, export timestamp, or audit-completion marker. The populated `collection`
+  label cannot safely substitute for those fields.
+
+The earlier `library_20260718_115853.csv` was opened/resaved through Excel and is
+not a supported-format fixture. It demonstrates real corruption: all 25
+ISBN-13 cells became scientific notation, 10 ISBN-10 cells became nine-digit
+values consistent with lost leading zeroes, and 49 non-empty publication/added
+dates became locale-style slash dates. The parser reports these conditions and
+does not silently accept the damaged values.
+
+A zero-diagnostic parse establishes only that the CSV structure and implemented
+normalization checks succeeded. It does not make Libib bibliographic metadata
+canonical, prove that an ISBN identifies the intended edition, or establish
+bibliographic authority.
+
+PR2 does not settle export completeness, quantity greater than one, duplicate
+copy representation, collection/location meaning, grouped/set behavior, or
+stable source identity. Those remain explicit PR3 inputs or require another
+representative Libib export.
+
 ## 2. Entity Model
 
 ### Naming decision

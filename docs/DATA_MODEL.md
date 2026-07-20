@@ -91,6 +91,14 @@ For Amazon, this corresponds to one order-history line item after privacy
 filtering. Libib and Manual Entry may receive data through barcode scanning, but
 scanning is an input mechanism rather than a durable source family.
 
+The v0.10.0 PR2 Libib profile found no obvious stable row, item, copy, or
+barcode identifier in the observed 30-column export. Libib source row number is
+therefore provenance only, not durable identity. The parser preserves all raw
+values and separately normalizes validated ISBN strings, ISO publication/added
+dates, creator display text, publisher text, collection label, and copies. The
+Libib `added` date records addition to Libib and is not acquisition evidence.
+`collection` remains `source_collection_label`, not `location_id`.
+
 Fields:
 
 - `source_item_id`: stable internal identifier.

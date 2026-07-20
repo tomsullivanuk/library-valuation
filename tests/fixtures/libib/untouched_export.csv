@@ -1,0 +1,4 @@
+item_type,title,creators,first_name,last_name,collection,ean_isbn13,upc_isbn10,description,publisher,publish_date,group,tags,notes,price,length,number_of_discs,number_of_players,age_group,ensemble,aspect_ratio,esrb,rating,review,review_date,status,began,completed,added,copies
+book,Example Physics,"Curie, Marie",Marie,Curie,Study,9780306406157,0306406152,"A synthetic fixture, not a real library record.",Example Press,1980-01-15,,,,,,,,,,,,,,,,,,2026-07-19,1
+book,Leading Zero Example,Ada Lovelace,Ada,Lovelace,Basement Storage,9780198786221,0198786220,,University Press,2017-02-10,,,,,,,,,,,,,,,,,,2026-07-19,2
+book,ISBN Derivation Example,Grace Hopper,Grace,Hopper,Unmapped Catalog Label,,0306406152,,Example Publisher,,,,,,,,,,,,,,,unknown,,,,2026-07-19,unknown
