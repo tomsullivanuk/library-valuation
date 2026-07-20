@@ -20,8 +20,26 @@ resumable full-library eBay baseline, Libib physical-inventory context, a shared
 presentation model serving Library Explorer and Action Center, and incremental
 monthly orchestration. Detailed listing artifacts can remain generated, but
 safe resume and later refresh will require deliberately scoped collection state
-and provenance. v0.9.0 will define only its minimum checkpoint state; it must not
+and provenance. v0.9.0 defined only its minimum checkpoint state and did not
 prematurely finalize the longer-term durable schema.
+
+The v0.10.0 design treats Libib as physical-inventory evidence, not catalog
+authority. `catalog_item_id` remains the intellectual/catalog key and
+project-owned `holding_id` identifies one physical copy. Durable inventory
+imports and source items preserve provenance and unmatched evidence; versioned
+match records explain links to catalog items; holdings preserve current belief
+and user-maintained audit/disposition state. Libib metadata cannot silently
+overwrite canonical catalog fields, and absence in a later export cannot by
+itself establish disposal. Strong, unambiguous Libib evidence may create a new
+catalog item and holding without an acquisition; weak or conflicting evidence
+requires review. Inventory imports own declared audit scope and completeness,
+so partial, location-specific, filtered, and progressive audits cannot mark
+unexamined catalog items missing or invalidate holdings confirmed in another
+scope. Project-owned `location_id` values identify physical places; Libib
+catalog/location labels remain source evidence until conservatively mapped.
+Renaming a location or moving a holding does not change catalog or holding
+identity. See `LIBIB_INVENTORY_DESIGN.md` for the tentative
+PR1 contract; production schemas remain deferred to implementation PRs.
 
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic
@@ -557,8 +575,12 @@ Decision Engine
       +-- Family Retention Lists
 ```
 
-Future book sources may include Amazon exports, manual intake sheets, barcode
-scans, estate inventories, dealer-provided lists, or other catalog exports.
+The shared book-source architecture should use three principal families: Amazon
+Import, Libib Import, and Manual Entry. Barcode scanning is an input mechanism
+for Libib or Manual Entry, not a durable family. Estate inventories, donations,
+inherited books, dealer purchases, and similar origins normally use Libib or
+Manual Entry with explicit provenance. v0.10.0 does not migrate or alter the
+implemented historical Amazon structures.
 
 Future enrichment and valuation sources may include Open Library, Library of
 Congress, OCLC/WorldCat, AbeBooks, eBay completed sales, Bookfinder, Amazon

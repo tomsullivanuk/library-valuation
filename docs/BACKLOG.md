@@ -87,10 +87,28 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ## v0.10.0 Libib Physical Inventory Integration
 
-- [ ] Design a CSV/batch import boundary and tentative inventory concepts.
-- [ ] Preserve physical items separately from catalog identity.
-- [ ] Match inventory with provenance, confidence, duplicates, unmatched items,
-  location, presence, and audit context.
+- [ ] Profile representative Libib export formats, columns, identifiers,
+  quantity/location semantics, privacy surface, and completeness signals.
+- [ ] Add durable inventory import, source-item, holding, match, and
+  inventory-specific review state under explicit schema versions.
+- [ ] Preserve stable `holding_id` values and independently represent duplicate
+  physical copies.
+- [ ] Implement conservative catalog matching with unmatched and ambiguous
+  preservation; never auto-match title-only evidence at high confidence.
+- [ ] Create catalog identities and holdings for confidently identified
+  Libib-only books without requiring or fabricating acquisition records.
+- [ ] Preserve progressive audit scope/completeness and distinguish confirmed,
+  not-yet-audited, outside-scope, and completed-scope-not-found items.
+- [ ] Align the shared import model around Amazon Import, Libib Import, and
+  Manual Entry; treat barcode scanning and acquisition origins as mechanisms or
+  provenance rather than top-level source families.
+- [ ] Add stable project-owned inventory locations, optional hierarchy, current
+  holding `location_id`, verification context, and conservative Libib-label
+  mapping/review behavior.
+- [ ] Generate inventory exception/audit views and a reviewer artifact.
+- [ ] Validate exact-repeat, newer-full-export, partial-batch, and interrupted
+  import behavior without inferring disposition from absence.
+- [ ] Follow the reviewed sequence in `RELEASE_PLAN_v0.10.0.md`.
 
 ## v0.11.0 Library Explorer and Action Center
 

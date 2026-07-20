@@ -32,7 +32,7 @@ Source Item --------+
 Acquisition    Catalog Item ---- Bibliographic Work
       |              |
       v              v
-Owned Copy / Inventory Holding
+Inventory Holding ----> Inventory Location
                      |
                      v
               Research Assessment
@@ -58,17 +58,15 @@ A `Source Import` represents one ingestion event from an external source.
 
 Examples:
 
-- Amazon order-history CSV export.
-- Future barcode scan batch.
-- Future manual intake sheet.
-- Future dealer or estate inventory.
-- Future library-management export.
+- Amazon Import from an order-history CSV or ZIP.
+- Libib Import from a supported inventory export.
+- Manual Entry from a project-owned intake workflow.
 
 Fields:
 
 - `source_import_id`: stable internal identifier.
-- `source_type`: source family, such as `amazon_orders`, `manual_intake`,
-  `barcode_scan`, or `dealer_inventory`.
+- `source_type`: principal source family: Amazon Import, Libib Import, or Manual
+  Entry; implementation codes remain schema-specific.
 - `source_name`: human-readable source label.
 - `source_file_name`: original file name, when available.
 - `source_file_hash`: content hash for reproducibility.
@@ -90,8 +88,8 @@ Data classification:
 A `Source Item` is one raw or lightly normalized row from a source import.
 
 For Amazon, this corresponds to one order-history line item after privacy
-filtering. Future sources may contribute rows from barcode scans, inventories,
-or manual intake sheets.
+filtering. Libib and Manual Entry may receive data through barcode scanning, but
+scanning is an input mechanism rather than a durable source family.
 
 Fields:
 
@@ -151,9 +149,9 @@ Data classification:
 - Derived: acquisition grouping may be derived from source items.
 - Regenerated: source-derived acquisitions may be regenerated from imports.
 
-### Owned Copy / Inventory Holding
+### Inventory Holding
 
-An `Owned Copy` or `Inventory Holding` records the current believed inventory
+An `Inventory Holding` records the current believed inventory
 for a catalog item.
 
 This entity separates historical acquisition facts from present disposition
@@ -172,7 +170,7 @@ Fields:
 - `inventory_status`: owned, retained, sold, donated, given_away, missing,
   discarded, pending_review, unknown.
 - `condition_current`: current observed condition.
-- `location`: shelf, room, box, collection, or storage location.
+- `location_id`: current believed project-owned physical location.
 - `last_verified_at`: date or timestamp when the holding was last confirmed.
 - `verified_by`: user or process that verified the holding.
 - `notes`: user-maintained inventory or disposition notes.
@@ -183,10 +181,63 @@ Data classification:
 - Derived: initial holdings may be generated from acquisitions and source
   quantity.
 - User-maintained: `quantity_current`, `inventory_status`,
-  `condition_current`, `location`, `last_verified_at`, `verified_by`, and
+  `condition_current`, `location_id`, `last_verified_at`, `verified_by`, and
   `notes`.
 - Regenerated: proposed initial holdings may be regenerated from acquisitions,
   but verified holdings and disposition updates must not be overwritten.
+
+For v0.10.0, `Inventory Holding` is the preferred name and `holding_id` is the
+project-owned identity of one physical copy. `inventory_item_id` is not added as
+a synonym. Normal holdings should use one row per copy so identical copies can
+be tracked independently. Libib identifiers remain source evidence; tentative
+inventory-import, source-item, match, and review fields are defined in
+`LIBIB_INVENTORY_DESIGN.md` pending representative export profiling.
+
+An Inventory Holding does not require an Acquisition. A confidently identified
+Libib-only book may receive a new `catalog_item_id` and holding while
+`acquisition_id`, acquisition origin, and acquisition date remain unknown. This
+does not authorize inventing an acquisition. Strong Libib metadata may initialize
+a genuinely new catalog item with source provenance; weak or conflicting
+evidence requires review, and Libib data cannot silently overwrite an existing
+catalog item.
+
+For progressive physical audits, scope and completeness belong primarily to the
+Inventory Import, with row-level scope/location evidence retained on Inventory
+Source Items. Audit coverage is contextual: no Libib match defaults to
+`not_yet_audited` or `outside_audit_scope`, while `verified_missing` requires an
+explicit completed applicable scope. A partial import cannot invalidate a
+holding confirmed by another scope.
+
+### Inventory Location
+
+An `Inventory Location` is a durable project-owned physical place. Its
+`location_id` is independent of a Libib catalog/location label. Names may change
+without changing the ID, and moving a holding changes the holding's current
+`location_id` without changing `holding_id` or `catalog_item_id`.
+
+Tentative durable repository: `data/inventory_locations.csv`.
+
+Tentative fields:
+
+- `location_id`
+- `location_name`
+- `parent_location_id`
+- `location_type`
+- `location_status`
+- `notes`
+- `created_at`
+- `updated_at`
+
+Hierarchy is optional and may represent area, room, bookcase, shelf, or box.
+Broad locations such as `Study` or `Basement Storage` are valid. Current believed
+location should carry `last_verified_at` or equivalent audit context. A general
+movement-history table is deferred unless PR2 or implementation evidence shows
+it is required.
+
+Original Libib location/catalog labels remain Source Item evidence. A tentative
+`data/inventory_location_aliases.csv` may map several confirmed source labels to
+one `location_id`, but unknown, ambiguous, or logical labels require review and
+must not create durable locations automatically.
 
 ### Catalog Item
 
@@ -542,10 +593,13 @@ Core relationships:
 - One `Source Item` may produce one or more `Acquisitions`.
 - One `Acquisition` links to one `Catalog Item`.
 - One `Catalog Item` may have many `Acquisitions`.
-- One `Acquisition` may initialize one or more `Owned Copy / Inventory Holding`
+- One `Acquisition` may initialize one or more `Inventory Holding`
   records.
-- One `Owned Copy / Inventory Holding` links to one `Catalog Item`.
-- One `Catalog Item` may have many `Owned Copy / Inventory Holding` records.
+- One `Inventory Holding` links to one `Catalog Item`; its `Acquisition` link is
+  optional, and it references zero or one current `Inventory Location`.
+- One `Inventory Location` may contain many `Inventory Holding` records and may
+  have one parent location.
+- One `Catalog Item` may have many `Inventory Holding` records.
 - One `Catalog Item` may link to one `Bibliographic Work`.
 - One `Bibliographic Work` may group many `Catalog Items`.
 - One `Catalog Item` may have many `Bibliographic Source Records`.
@@ -554,10 +608,10 @@ Core relationships:
 - One `Catalog Item` may have many `Market Observations`.
 - One `Valuation Estimate` may use many `Market Observations`.
 - One `Catalog Item` may have many historical `Valuation Estimates`.
-- One `Owned Copy / Inventory Holding` may have many historical `Valuation
+- One `Inventory Holding` may have many historical `Valuation
   Estimates`.
 - One `Catalog Item` may have many proposed or historical `Decisions`.
-- One `Owned Copy / Inventory Holding` may have many proposed or historical
+- One `Inventory Holding` may have many proposed or historical
   `Decisions`.
 - One `Generated Artifact` may include many records from many entities.
 
@@ -956,19 +1010,19 @@ heuristics to prioritize research before enough market evidence exists.
 
 ## Future Data Sources Beyond Amazon
 
-Amazon is only the first source importer. The model is intentionally source
-neutral.
+The shared book-source architecture has three principal families: Amazon
+Import, Libib Import, and Manual Entry. This direction does not migrate or alter
+historical Amazon structures in v0.10.0.
 
 Future sources can be added by creating new `Source Import` and `Source Item`
 records, then resolving them into existing or new `Catalog Items`.
 
-Examples:
-
-- barcode scans can provide ISBNs and location data;
-- manual intake sheets can provide title, author, shelf, and condition;
-- estate inventories can provide box numbers and appraiser notes;
-- dealer lists can provide proposed groupings or offers;
-- library exports can provide existing classifications and subject headings.
+Barcode scanning is an input mechanism for Libib or Manual Entry, not a durable
+source family. Estate inventory, donations, inherited books, dealer purchases,
+and similar origins normally enter through Libib or Manual Entry with appropriate
+acquisition/provenance fields. Their business origin does not require another
+top-level import type. Other library exports require an explicit future decision
+rather than unbounded proliferation of source families.
 
 The import layer should preserve source evidence while the resolution layer
 decides how records map into the canonical catalog and current holdings. This

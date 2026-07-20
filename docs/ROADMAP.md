@@ -437,12 +437,34 @@ v0.10.0 is the next planned release.
 
 ## v0.10.0: Libib Physical Inventory Integration
 
-Use Libib CSV/batch exports as a separate physical-inventory and location layer,
-without treating them as durable intellectual/catalog identity. Planned design
-work includes physical presence, shelf/location, audit status and date,
-duplicate copies, unmatched items, ISBN/title/author match provenance,
-confidence, and manual review. Potential durable concepts include imports,
-physical items, and catalog-to-inventory matches; their schemas are not final.
+Use Libib CSV/batch exports as a separate physical-inventory and location layer
+without treating them as durable intellectual/catalog identity. Use `holding_id`
+as the stable project-owned physical-copy identity. Libib
+identifiers and metadata are matching evidence and must not replace
+`catalog_item_id` or canonical bibliographic metadata. Preserve unmatched and
+ambiguous rows for review, and do not infer disposition from absence.
+Strong, unambiguous evidence may create a new catalog item and holding for a
+non-Amazon book without fabricating acquisition history. Progressive audit
+imports preserve partial, location-specific, filtered, full, or unknown scope;
+unmatched catalog items default to not yet audited rather than missing.
+The shared import direction is limited to Amazon Import, Libib Import, and
+Manual Entry; barcode scanning is an input mechanism. Stable `location_id`
+values represent project-owned physical locations independently of Libib labels,
+with current believed holding location and verification context in v0.10.0.
+
+Approved implementation sequence:
+
+1. Libib Physical Inventory Design and Release Plan.
+2. Libib Export Profiling and Parser.
+3. Durable Inventory Import and Physical-Item State.
+4. Catalog-to-Inventory Matching.
+5. Inventory Exceptions and Audit Views.
+6. Inventory Reviewer Artifact.
+7. End-to-End Import Workflow and Validation.
+8. Documentation and Release Readiness.
+
+See `RELEASE_PLAN_v0.10.0.md` and `LIBIB_INVENTORY_DESIGN.md`. Production
+schemas remain tentative until representative exports are profiled.
 
 ## v0.11.0: Library Explorer and Action Center
 
