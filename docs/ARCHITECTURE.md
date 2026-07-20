@@ -52,16 +52,48 @@ position remains provenance only. The `collection` field remains source
 location evidence and `added` remains Libib-addition evidence, not acquisition
 date.
 
-PR3 should place operational Libib exports under one audit-area directory per
-area below `input/libib/`, normally preserving Libib's original filename. It
-should support an explicit file and one explicitly selected audit-area directory;
-recursive all-folder discovery is a later workflow. A tentative
-`inventory_import_folders` registry protects each relative folder path with its
-confirmed exact collection label. This registry is operational metadata, not
-inventory, source evidence, import identity, or physical-location identity.
-Folder/collection mismatches emit `collection_label_changed_or_misfiled` and
-require manual confirmation. Import identity remains file hash plus
-`inventory_import_id`, never filename, mtime, folder name, or `folder_id`.
+PR3 adds `valuation/libib_inventory.py` above the pure parser. It accepts an
+explicit CSV or exactly one CSV directly inside one explicitly selected audit
+area below `input/libib/`; it never traverses recursively. It writes three
+strict, versioned durable repositories: `inventory_imports.csv`,
+`inventory_import_folders.csv`, and `inventory_holdings.csv`. All proposed rows
+are validated and staged before same-directory atomic file replacement, with
+in-process rollback if publication fails.
+
+The folder registry protects each relative audit-area path with its confirmed
+exact collection label. It is operational metadata, not inventory, source
+evidence, import identity, or physical-location identity. Folder/collection
+mismatches return `collection_label_changed_or_misfiled` without durable
+mutation and require manual confirmation. Import identity is the source byte
+hash plus project-owned `inventory_import_id`, never filename, mtime, folder
+name, or `folder_id`. Exact duplicate content returns the existing import and
+does not update holdings or folder timestamps.
+
+PR3 keeps four audit concepts separate. `folder_path` is operational filesystem
+organization; `source_collection_label` is exact immutable Libib evidence;
+`audit_scope` is normalized, nonblank caller-declared descriptive context; and
+`audit_completeness` is only `complete_scope`, `partial_scope`, or `unknown`.
+Both audit fields default to `unknown`, and neither is inferred from the export.
+
+Because the profiled export has no stable copy key, first-pass holding identity
+uses UUIDv5 over the stable folder registration ID and a fingerprint of
+identity-bearing row evidence. The fingerprint excludes row position,
+filename, timestamps, collection label, Libib `added`, and `copies`. This keeps
+IDs stable across row reordering and operational renames while acknowledging
+that material bibliographic edits cannot be automatically reconciled in PR3.
+Indistinguishable duplicate rows are rejected for review rather than assigned
+order-dependent identities. An explicit file outside the registered input tree
+uses the import ID as its one-import identity scope. Catalog and location IDs
+remain blank; quantities greater than one remain one unresolved holding row
+with `copies > 1` rather than speculative copy expansion.
+
+Holdings retain normalized title, creator, and ISBN comparison keys solely for
+the PR3 changed-row guard. On a later import from the same registered folder, a
+new fingerprint that shares an ISBN or normalized title-plus-creator with a
+prior holding returns `holding_identity_changed_requires_reconciliation`.
+Nothing from that import is published: the existing holding stays active and no
+second holding is appended. This is ambiguity detection, not matching; full
+reconciliation and immutable row-level observation history remain PR4 work.
 
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic

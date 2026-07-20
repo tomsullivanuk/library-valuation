@@ -306,15 +306,25 @@ import rather than editing evidence.
 **Regeneration:** Source items can be reproduced from retained raw input when
 available, but the accepted import identity and observation time persist.
 
-**Tentative fields:** `inventory_import_id`, `source_type`, `source_name`,
-`source_file_name`, `source_file_hash`, `source_exported_at`, `imported_at`,
-`parser_version`, `schema_version`, `audit_scope_type`, `audit_scope_key`,
-`audit_scope_description`, `audit_scope_completeness`, `audit_completed_at`,
-`source_row_count`, `accepted_row_count`, `rejected_row_count`,
-`supersedes_import_id`, `notes`.
+**PR3 implemented fields:** `schema_version`, `inventory_import_id`,
+`source_file_name`, `source_file_hash`, `source_collection_label`, `folder_id`,
+`folder_path`, `audit_scope`, `audit_completeness`, `imported_at`,
+`parser_version`, and `row_count`. `audit_scope` is normalized, nonblank
+caller-declared descriptive context and may name a room, shelf area, storage
+area, or `unknown`. `audit_completeness` alone accepts `complete_scope`,
+`partial_scope`, and `unknown`. Both default to `unknown`. More detailed scope
+keys, completion timestamps, rejected counts, supersession, and notes remain
+later compatible extensions rather than inferred data.
 
-**Schema implication:** Likely a new versioned inventory repository, not a
-silent widening of the Amazon-specific `data/import_manifest.csv`.
+`folder_path`, `source_collection_label`, `audit_scope`, and
+`audit_completeness` are deliberately independent. They represent operational
+filesystem organization, exact immutable source evidence, caller-declared area
+coverage, and coverage status respectively; the importer never silently copies
+one into another.
+
+**Schema implication:** PR3 implements a separate versioned
+`data/inventory_imports.csv`; it does not widen the Amazon-specific
+`data/import_manifest.csv`.
 
 ### Inventory Source Item
 
@@ -351,6 +361,13 @@ original accepted values remain auditable.
 Without it, unmatched evidence, changed rows, and match provenance cannot be
 preserved reliably.
 
+PR3 does not yet materialize that full source-item table. It preserves the
+accepted input hash, exact import-level collection evidence, deterministic row
+fingerprints, and hash-addressed raw source references while the original input
+remains authoritative. PR4 matching should add append-preserving row-level
+observations before it records catalog links; a holding row must not become a
+substitute for immutable source evidence.
+
 ### Inventory Holding
 
 **Purpose:** Represent one believed physical copy independently of catalog and
@@ -373,17 +390,47 @@ be superseded through match history. Disposition changes must be explicit.
 **Regeneration:** Holdings are durable, not wholesale regenerated. Reconciliation
 may link a new observation to an existing holding or propose a new holding.
 
-**Tentative fields:** `holding_id`, `catalog_item_id`, `created_from_source_item_id`,
-`acquisition_id`, `inventory_status`, `location_id`, `condition_current`,
-`location_confidence`, `location_verified_at`, `last_observed_import_id`,
-`last_observed_at`, `last_audited_at`, `audit_status`, `disposition_type`,
-`disposed_at`, `state_source`, `user_confirmed_at`, `notes`, `created_at`,
-`updated_at`.
+**PR3 repository:** `data/inventory_holdings.csv`.
+
+**PR3 implemented fields:** `schema_version`, `holding_id`, nullable
+`catalog_item_id`, `inventory_import_id`, `source_collection_label`,
+`source_row_fingerprint`, derived `source_title_key`, `source_creator_key`, and
+`source_isbn_key`, nullable `current_location_id`, `copies`, `inventory_status`,
+`last_verified_at`, and `raw_source_reference`. Catalog and location references
+begin blank. Acquisition linkage, condition, disposition, user confirmation,
+and richer observation history remain later extensions.
 
 **Schema implication:** New durable repository. One row per copy is preferred;
 no `quantity_current` is needed for normal holdings because multiplicity is
 represented by rows. A temporary unresolved grouped source item may carry
 quantity until copy expansion is safe.
+
+**PR3 identity decision:** The observed export provides no stable copy key, so
+PR3 calculates a SHA-256 fingerprint from identity-bearing raw row fields and a
+UUIDv5 `holding_id` from that fingerprint plus the stable operational
+`folder_id`. It excludes row order, filename, timestamps, folder text,
+collection label, Libib `added`, and `copies`. This makes the identity set stable
+when rows reorder and when an operational path or source label is manually
+renamed without claiming that changed bibliographic evidence is the same copy.
+An explicit file outside the registered input tree uses its import ID as the
+identity scope and therefore makes no cross-export continuity claim.
+
+Identical fingerprints within one export are ambiguous because Libib exposes no
+copy discriminator. PR3 stops before durable mutation instead of allocating
+order-dependent IDs. Likewise, `copies > 1` remains one unresolved holding row
+with the observed quantity; copy expansion and cross-import reconciliation
+require later evidence. These are conservative implementation limits, not
+bibliographic or ownership conclusions.
+
+**PR3 changed-row guard:** For later evidence from the same registered folder,
+a previously unseen row fingerprint is compared only with persisted normalized
+ISBN and title-plus-creator keys. Sharing either signal with an existing holding
+means the row may be an edited observation of that holding. The importer returns
+`holding_identity_changed_requires_reconciliation` and publishes no part of the
+new import, leaving the prior holding unchanged and active. It does not assert a
+match, overwrite evidence, or append a second holding. New books without those
+signals may still create first-pass holdings. Full reconciliation and immutable
+row-level source-observation history remain PR4 responsibilities.
 
 ### Inventory Location
 
@@ -690,6 +737,20 @@ is `unverified` or a review task, not sold/removed.
 The exact same content and parser contract returns the existing import result.
 It performs no duplicate writes. A forced validation may recompute diagnostics
 without changing durable identity.
+
+PR3 implements this as a global uniqueness check on the SHA-256 hash of the
+source bytes. The check happens before parsing or folder registration. A file
+copied or renamed without byte changes returns `duplicate` with the existing
+`inventory_import_id`; it does not create holdings or update folder timestamps.
+
+### PR3 durable publication boundary
+
+PR3 loads and strictly validates repository headers, schema version 1, unique
+IDs and hashes, quantities, audit values, and cross-repository references before
+mutation. It renders and stages all three CSVs in their destination filesystem,
+then uses same-directory atomic replacement. An in-process publication failure
+rolls already replaced files back to their prior bytes. Unknown schemas and
+malformed state fail closed; automatic repository upgrades are not attempted.
 
 ### Operational folder acceptance scenarios
 
