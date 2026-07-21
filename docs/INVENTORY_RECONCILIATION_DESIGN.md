@@ -535,10 +535,15 @@ registered folder and no other physical candidate. Collection/location text is
 not identity. Automatic new-holding creation requires `copies = 1`, no credible
 candidate, no ISBN conflict, and either a valid normalized ISBN or normalized
 title plus creator. Title alone never suffices. A single non-exact candidate,
-cross-folder exact evidence, changed ISBN/title/creator, or multiple candidates
-is non-mutating. When no strong candidate exists, a same-folder title-only or
+cross-folder exact evidence, changed title/creator with inconclusive identifiers,
+or multiple candidates is non-mutating. When no strong candidate exists, a same-folder title-only or
 creator-only overlap is a review guard, not an accepted match; it prevents an
-edited row with lost evidence from silently creating a duplicate holding.
+edited row with lost evidence from silently creating a duplicate holding. The
+guard does not apply between two rows that each carry valid, nonconflicting,
+different ISBN-13 identities: that identifier difference is strong evidence of
+distinct bibliographic items and permits distinct holdings. Exact fingerprint
+or ISBN continuity remains eligible, while same-ISBN multiplicity, missing or
+inconclusive ISBN evidence, and conflicting identifiers remain review outcomes.
 
 PR5 preserves audit context and provides only a non-mutating absence classifier:
 partial or unknown applicable scope returns `not_yet_audited`, outside scope

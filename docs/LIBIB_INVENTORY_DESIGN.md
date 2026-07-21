@@ -442,6 +442,13 @@ holding; quantities other than one and indistinguishable duplicate rows remain
 reviewable. PR3 holding IDs migrate without change through explicit balanced,
 legacy-derived backfill. Catalog reconciliation remains PR6.
 
+The implemented weak-overlap guard is subordinate to distinct valid ISBN
+evidence. If both rows carry valid, nonconflicting, different ISBN-13 identities,
+shared title-only or creator-only text does not block a distinct holding. Exact
+fingerprint or ISBN continuity still generates a physical candidate; same-ISBN
+copy multiplicity, missing/inconclusive identifiers, conflicts, grouped records,
+quantities, and indistinguishable copies remain reviewable.
+
 ### Inventory Location
 
 **Purpose:** Represent a stable, project-owned physical place independently of

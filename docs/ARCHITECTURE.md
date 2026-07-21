@@ -117,6 +117,14 @@ multiple candidates, weak evidence, quantities other than one, and identical
 duplicate rows persist as non-mutating decisions. All five inventory CSVs stage,
 validate, and publish under the PR3 rollback boundary.
 
+Real-state PR6 validation refined the PR5 weak-overlap guard. When both an
+incoming observation and an existing holding carry valid, nonconflicting, and
+different ISBN-13 identities, shared title-only or creator-only text is not a
+physical-continuity candidate and does not block a distinct holding. Exact
+fingerprint or ISBN continuity remains a candidate; same-ISBN multiplicity,
+blank/inconclusive ISBN evidence, conflicting identifiers, quantities, grouped
+records, and indistinguishable copies remain reviewable.
+
 PR3 holding schema v1 is read compatibly and migrated only when every import row
 balances to one persisted PR3 holding. Backfilled observations are explicitly
 `pr3_backfill` / `legacy_derived`; unavailable raw values remain blank rather

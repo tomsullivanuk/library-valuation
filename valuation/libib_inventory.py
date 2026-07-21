@@ -19,7 +19,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
-from valuation.libib import LibibDiagnostic, LibibSourceRecord, parse_libib_csv
+from valuation.libib import (
+    LibibDiagnostic,
+    LibibSourceRecord,
+    is_valid_isbn10,
+    is_valid_isbn13,
+    isbn10_to_isbn13,
+    parse_libib_csv,
+)
 
 
 PARSER_VERSION = "libib_csv_v1"
@@ -891,6 +898,20 @@ def _reconcile_observations(
             decisions.append(decision)
             continue
 
+        if _has_identity_conflict(observation):
+            decisions.append(
+                _decision_row(
+                    observation,
+                    outcome="edition_or_identity_ambiguity",
+                    basis="conflicting_source_identifiers",
+                    confidence="low",
+                    timestamp=decision_timestamp,
+                    reason_codes=("isbn_conflict",),
+                    explanation="Conflicting identifier evidence prevents holding creation.",
+                )
+            )
+            continue
+
         candidates = _holding_candidates(observation, holdings)
         candidate_ids = tuple(candidate["holding_id"] for candidate in candidates)
         exact = [
@@ -989,20 +1010,6 @@ def _reconcile_observations(
             )
             continue
 
-        if _has_identity_conflict(observation):
-            decisions.append(
-                _decision_row(
-                    observation,
-                    outcome="edition_or_identity_ambiguity",
-                    basis="conflicting_source_identifiers",
-                    confidence="low",
-                    timestamp=decision_timestamp,
-                    reason_codes=("isbn_conflict",),
-                    explanation="Conflicting identifier evidence prevents holding creation.",
-                )
-            )
-            continue
-
         if not _sufficient_new_holding_evidence(observation):
             decisions.append(
                 _decision_row(
@@ -1069,6 +1076,7 @@ def _holding_candidates(
             and creator_key
             and holding["source_title_key"] == title_key
             and holding["source_creator_key"] == creator_key
+            and not _has_distinct_valid_isbn_evidence(observation, holding)
         )
         if exact or isbn_match or title_creator_match:
             candidates.append(holding)
@@ -1094,7 +1102,10 @@ def _weak_holding_candidates(
         creator_overlap = bool(
             creator_key and holding["source_creator_key"] == creator_key
         )
-        if title_overlap or creator_overlap:
+        if (
+            (title_overlap or creator_overlap)
+            and not _has_distinct_valid_isbn_evidence(observation, holding)
+        ):
             candidates.append(holding)
     return sorted(candidates, key=lambda row: row["holding_id"])
 
@@ -1581,6 +1592,32 @@ def _sufficient_new_holding_evidence(observation: Mapping[str, str]) -> bool:
 
 def _has_identity_conflict(observation: Mapping[str, str]) -> bool:
     return "isbn_conflict" in _parse_json_list(observation["diagnostic_codes_json"])
+
+
+def _has_distinct_valid_isbn_evidence(
+    observation: Mapping[str, str], holding: Mapping[str, str]
+) -> bool:
+    """Return true only when both sides carry valid, different ISBN identity."""
+
+    if _has_identity_conflict(observation):
+        return False
+    observation_isbn13 = _normalized_isbn13(
+        observation["normalized_isbn13"] or observation["normalized_isbn10"]
+    )
+    holding_isbn13 = _normalized_isbn13(holding["source_isbn_key"])
+    return bool(
+        observation_isbn13
+        and holding_isbn13
+        and observation_isbn13 != holding_isbn13
+    )
+
+
+def _normalized_isbn13(value: str) -> str:
+    if len(value) == 13 and is_valid_isbn13(value):
+        return value
+    if len(value) == 10 and is_valid_isbn10(value):
+        return isbn10_to_isbn13(value)
+    return ""
 
 
 def _observation_isbn_key(observation: Mapping[str, str]) -> str:

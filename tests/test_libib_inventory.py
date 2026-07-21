@@ -262,7 +262,6 @@ def test_blank_descriptive_audit_scope_is_rejected(tmp_path):
     [
         ("title", "Example Physics", "Example Physics, corrected title"),
         ("creators", "Curie, Marie", "Curie, Marie S."),
-        ("ean_isbn13", "9780306406157", "9780198786221"),
     ],
 )
 def test_changed_identity_row_is_preserved_without_holding_mutation(
@@ -277,8 +276,6 @@ def test_changed_identity_row_is_preserved_without_holding_mutation(
     rows = list(csv.DictReader(export.open(newline="", encoding="utf-8")))
     assert rows[0][field] == old
     rows[0][field] = new
-    if field == "ean_isbn13":
-        rows[0]["upc_isbn10"] = "0198786220"
     with changed.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
         writer.writeheader()
@@ -298,6 +295,32 @@ def test_changed_identity_row_is_preserved_without_holding_mutation(
     assert len(state["imports"]) == 2
     assert len(state["observations"]) == 4
     assert len(state["holdings"]) == 1
+
+
+def test_later_distinct_valid_isbn_creates_separate_holding_without_mutating_prior(
+    tmp_path,
+):
+    libib_root, audit_area, export = setup_audit_area(tmp_path)
+    data_dir = tmp_path / "data"
+    import_libib_inventory(
+        export, data_dir=data_dir, libib_input_dir=libib_root, now=lambda: NOW
+    )
+    first_holding = dict(all_repository_rows(data_dir)["holdings"][0])
+    rows = list(csv.DictReader(export.open(newline="", encoding="utf-8")))
+    rows[0]["ean_isbn13"] = "9780198786221"
+    rows[0]["upc_isbn10"] = "0198786220"
+    changed = audit_area / "changed-isbn.csv"
+    write_inventory_rows(changed, rows)
+    export.unlink()
+
+    result = import_libib_inventory(
+        changed, data_dir=data_dir, libib_input_dir=libib_root
+    )
+    holdings = all_repository_rows(data_dir)["holdings"]
+
+    assert result.holdings_created == 1
+    assert len(holdings) == 2
+    assert next(row for row in holdings if row["holding_id"] == first_holding["holding_id"]) == first_holding
 
 
 def test_holdings_have_stable_project_ids_and_blank_catalog_and_location(tmp_path):
@@ -464,6 +487,160 @@ def write_single_row_export(path: Path) -> None:
     lines = (FIXTURES / "study_export.csv").read_text(encoding="utf-8").splitlines()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines[:2]) + "\n", encoding="utf-8")
+
+
+def fixture_row(**changes) -> dict[str, str]:
+    with FIXTURES.joinpath("study_export.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        row = next(csv.DictReader(handle))
+    row.update(changes)
+    return row
+
+
+def write_inventory_rows(path: Path, rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def test_same_creator_with_distinct_valid_isbns_creates_distinct_holdings(tmp_path):
+    export = tmp_path / "same-creator.csv"
+    rows = [
+        fixture_row(title="First Synthetic Work"),
+        fixture_row(
+            title="Second Synthetic Work",
+            ean_isbn13="9780198786221",
+            upc_isbn10="0198786220",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {"new_holding_created": 2}
+    assert len(all_repository_rows(tmp_path / "data")["holdings"]) == 2
+
+
+def test_overlapping_titles_with_distinct_valid_isbns_create_distinct_holdings(tmp_path):
+    export = tmp_path / "overlapping-titles.csv"
+    rows = [
+        fixture_row(title="Evolution"),
+        fixture_row(
+            title="Evolution, Third Edition",
+            creators="Other, Author",
+            first_name="Author",
+            last_name="Other",
+            ean_isbn13="9780198786221",
+            upc_isbn10="0198786220",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {"new_holding_created": 2}
+
+
+def test_different_editions_with_distinct_valid_isbns_bypass_weak_overlap(tmp_path):
+    export = tmp_path / "editions.csv"
+    rows = [
+        fixture_row(title="Synthetic Treatise, Second Edition"),
+        fixture_row(
+            title="Synthetic Treatise, Third Edition",
+            ean_isbn13="9780198786221",
+            upc_isbn10="0198786220",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {"new_holding_created": 2}
+
+
+def test_title_only_overlap_without_valid_isbn_remains_conservative(tmp_path):
+    export = tmp_path / "title-only-overlap.csv"
+    rows = [
+        fixture_row(title="Shared Synthetic Title"),
+        fixture_row(
+            title="Shared Synthetic Title",
+            creators="Other, Author",
+            first_name="Author",
+            last_name="Other",
+            ean_isbn13="",
+            upc_isbn10="",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {
+        "edition_or_identity_ambiguity": 1,
+        "new_holding_created": 1,
+    }
+    assert len(all_repository_rows(tmp_path / "data")["holdings"]) == 1
+
+
+def test_creator_only_overlap_without_valid_isbn_remains_conservative(tmp_path):
+    export = tmp_path / "creator-only-overlap.csv"
+    rows = [
+        fixture_row(title="First Synthetic Title"),
+        fixture_row(
+            title="Second Synthetic Title",
+            ean_isbn13="",
+            upc_isbn10="",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {
+        "edition_or_identity_ambiguity": 1,
+        "new_holding_created": 1,
+    }
+
+
+def test_conflicting_valid_isbn_evidence_remains_unresolved(tmp_path):
+    export = tmp_path / "conflicting-isbn.csv"
+    write_inventory_rows(
+        export,
+        [fixture_row(ean_isbn13="9780306406157", upc_isbn10="0198786220")],
+    )
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert dict(result.outcome_counts) == {"edition_or_identity_ambiguity": 1}
+    decision = all_repository_rows(tmp_path / "data")["decisions"][0]
+    assert decision["decision_basis"] == "conflicting_source_identifiers"
+    assert all_repository_rows(tmp_path / "data")["holdings"] == []
+
+
+def test_same_isbn_copy_ambiguity_does_not_create_a_second_holding(tmp_path):
+    export = tmp_path / "same-isbn.csv"
+    rows = [
+        fixture_row(title="First Presentation"),
+        fixture_row(
+            title="Second Presentation",
+            creators="Other, Author",
+            first_name="Author",
+            last_name="Other",
+        ),
+    ]
+    write_inventory_rows(export, rows)
+
+    result = import_libib_inventory(export, data_dir=tmp_path / "data", now=lambda: NOW)
+
+    assert result.holdings_created == 1
+    assert dict(result.outcome_counts) == {
+        "holding_identity_changed_requires_reconciliation": 1,
+        "new_holding_created": 1,
+    }
+    assert len(all_repository_rows(tmp_path / "data")["holdings"]) == 1
 
 
 def downgrade_holdings_to_pr3_and_remove_pr5_evidence(data_dir: Path) -> list[str]:
