@@ -143,6 +143,25 @@ extracted export directories. On macOS, successful and expected failed monthly
 updates show a desktop notification when run from an interactive terminal and
 `osascript` is available.
 
+Preview one approved Libib audit through the complete inventory workflow:
+
+```bash
+python3 library_pipeline.py update-inventory \
+  --source input/libib/study/library_20260720_013144.csv \
+  --audit-scope "Study" \
+  --audit-completeness partial_scope
+```
+
+Preview is the default. It runs against temporary copies of `data/`, leaves
+durable repositories unchanged, and generates
+`output/inventory_audit_summary.csv` and
+`output/inventory_review_workbook.xlsx`. After reviewing the summary and queues,
+repeat the same command with `--publish` to authorize durable publication.
+The source must be inside an explicit audit-area folder below
+`--libib-input-dir` (default `input/libib`); the command never discovers files
+recursively. Libib inventory can create a catalog identity and holding when the
+approved evidence is sufficient, but it never creates acquisition history.
+
 This writes:
 
 - `book_purchases.csv` / `book_purchases.xlsx`: one row per Amazon book line item

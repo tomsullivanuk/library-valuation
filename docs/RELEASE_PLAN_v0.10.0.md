@@ -354,6 +354,17 @@ privacy tests.
 **Exit criteria:** Accepted imports are atomic and repeatable, failures preserve
 prior durable state, and all reconciliation outcomes balance to source totals.
 
+**Implemented contract:** `update-inventory` accepts one explicit Libib file or
+one selected audit-area directory. It defaults to a full preview against
+temporary repository copies and requires `--publish` for durable mutation. The
+workflow reuses the PR2–PR8 parser, repositories, reconciliation functions, and
+presentation model; it adds no identity rules. Publication has an outer rollback
+boundary across catalog items and all six mutable inventory repositories, while
+the acquisition repository remains read-only. Audit artifacts are staged and
+published only after validated processing. Exact content-hash repeats are
+idempotent, completion output is machine-readable JSON, and Libib creates no
+acquisition history.
+
 ### PR10 — Documentation and Release Readiness
 
 **Purpose:** Finalize user guidance and prove the release boundary.

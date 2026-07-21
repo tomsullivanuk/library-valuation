@@ -780,6 +780,25 @@ Only explicit allowlisted columns are projected. In particular,
 excluded. Optional Research Assessment and generated market-summary inputs add
 presence flags only; they do not recalculate either subsystem.
 
+### v0.10.0 end-to-end Libib workflow boundary
+
+PR9 adds `update-inventory` as the sole user-facing orchestration path across
+the existing Libib parser, durable import and observation publication, physical
+reconciliation, catalog reconciliation, and PR7/PR8 audit presentation. The
+command adds no matching or reconciliation rules. Preview is the default and
+runs against temporary repository copies; `--publish` is the explicit durable
+authorization boundary.
+
+Publication snapshots the seven mutable repositories (`catalog_items.csv` and
+the six inventory import, folder, observation, physical-decision, holding, and
+catalog-decision repositories) before invoking existing components. A failure
+in import, either reconciliation stage, validation, or artifact generation
+restores their prior bytes. The two generated audit artifacts are staged and
+published only after the proposed durable state and presentation validate.
+Exact file repeats continue to use the existing content hash and create no new
+durable identities or decisions. `acquisitions.csv` is validated and counted,
+but never written by this workflow.
+
 ## Testing Expectations
 
 Tests should protect the parts of the system that are most likely to corrupt

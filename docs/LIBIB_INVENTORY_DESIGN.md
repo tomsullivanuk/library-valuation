@@ -907,6 +907,26 @@ that no items are present rather than displaying an unexplained blank grid.
 Workbook edits are never imported, and the artifact cannot confirm matches,
 create locations or acquisitions, or change audit state.
 
+### Implemented PR9 operational workflow
+
+`python3 library_pipeline.py update-inventory` composes the approved PR2–PR8
+components without changing their rules. It requires an explicit file or a
+single-file audit-area directory, a declared `input/libib/` root, durable data
+and generated-output directories, and caller-declared audit scope and
+completeness. Recursive discovery and authorization inferred from file presence
+remain prohibited.
+
+The default preview copies the current repositories to a temporary workspace,
+runs import, observation publication, physical reconciliation, catalog
+reconciliation, and artifact generation there, and publishes only the generated
+summary and workbook. `--publish` is required to alter durable state. The
+workflow restores every affected repository if a later stage fails, including
+an artifact-generation failure. Exact hash repeats reuse the existing import
+and produce no duplicate observations, holdings, decisions, catalog identities,
+or acquisitions. The completion JSON distinguishes preview from publication,
+new input from a repeat, proposed changes from actual durable changes, and
+reports physical, catalog, acquisition, queue, and artifact counts.
+
 ## 7. Contract for v0.11.0 and v0.12.0
 
 Version 0.10.0 must provide v0.11.0 Library Explorer and Action Center with
@@ -916,10 +936,10 @@ not build those presentation or action layers.
 
 It must provide v0.12.0 monthly refresh with idempotent import boundaries,
 content fingerprints, scope/completeness, stable holding reconciliation,
-versioned matching, atomic writes, and machine-readable summaries. It does not
-combine Libib, Amazon, market collection, or artifact generation into one
-orchestrator and does not define cross-source refresh scheduling or freshness
-policy.
+versioned matching, atomic writes, and machine-readable summaries. PR9 combines
+the Libib inventory stages and its generated review artifacts only; it does not
+combine Libib with Amazon or market collection and does not define cross-source
+refresh scheduling or freshness policy.
 
 ## 8. Open Questions and Decision Log
 

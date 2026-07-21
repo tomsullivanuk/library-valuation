@@ -76,6 +76,7 @@ from valuation.market_observation_coverage import (
     MARKET_OBSERVATION_COVERAGE_FIELDNAMES,
     build_market_observation_coverage_rows,
 )
+from valuation.inventory_workflow import InventoryWorkflowError, update_inventory
 from valuation.market_evidence_summary import (
     MARKET_EVIDENCE_SUMMARY_FIELDNAMES,
     aggregate_market_evidence,
@@ -2288,6 +2289,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     update_parser.add_argument("--delay", type=float, default=0.25)
 
+    inventory_parser = subparsers.add_parser(
+        "update-inventory",
+        help="Preview or explicitly publish one approved Libib audit export",
+    )
+    inventory_parser.add_argument("--source", required=True, type=Path)
+    inventory_parser.add_argument("--libib-input-dir", type=Path, default=Path("input/libib"))
+    inventory_parser.add_argument("--data-dir", type=Path, default=Path("data"))
+    inventory_parser.add_argument("--output-dir", type=Path, default=Path("output"))
+    inventory_parser.add_argument("--audit-scope", default="unknown")
+    inventory_parser.add_argument(
+        "--audit-completeness",
+        choices=("complete_scope", "partial_scope", "unknown"),
+        default="unknown",
+    )
+    inventory_parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Explicitly publish durable repository changes; default is preview",
+    )
+
     market_sample_parser = subparsers.add_parser("generate-market-validation-sample")
     market_sample_parser.add_argument("--output-dir", type=Path, default=Path("output"))
     market_sample_parser.add_argument("--data-dir", type=Path, default=Path("data"))
@@ -2495,6 +2516,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(format_update_summary(summary, args.output_dir))
             send_macos_notification("Library update complete")
+            return 0
+        if args.command == "update-inventory":
+            try:
+                summary = update_inventory(
+                    args.source,
+                    libib_input_dir=args.libib_input_dir,
+                    data_dir=args.data_dir,
+                    output_dir=args.output_dir,
+                    audit_scope=args.audit_scope,
+                    audit_completeness=args.audit_completeness,
+                    publish=args.publish,
+                )
+            except (InventoryWorkflowError, ValueError) as error:
+                raise UserFacingError(str(error)) from None
+            print(json.dumps(summary.as_dict(), indent=2, sort_keys=True))
             return 0
         if args.command == "generate-market-validation-sample":
             count = generate_market_validation_sample(
