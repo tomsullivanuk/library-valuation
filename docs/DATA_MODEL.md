@@ -212,6 +212,26 @@ and verification completeness. Latest provenance must reference an accepted
 decision for that same holding and observation. Catalog and location IDs remain
 blank unless they already existed; PR5 never creates either identity.
 
+PR6 adds `data/inventory_catalog_reconciliation_decisions.csv` at schema
+version 1. It is append-only and stores
+`inventory_catalog_reconciliation_decision_id`, `holding_id`, the supporting
+`inventory_observation_id`, accepted `catalog_item_id`, candidate catalog IDs
+and their status snapshot as JSON lists, closed outcome, decision basis,
+confidence, reason codes, explanation, timestamp, reconciliation model version,
+origin, and `supersedes_decision_id`. One terminal decision may exist per
+processed holding. Supersession must remain within one holding; branching,
+self-reference, missing references, and cycles fail closed.
+
+`inventory_holdings.csv` remains schema version 2. Its existing
+`catalog_item_id` becomes the efficient current accepted link, while candidate
+history stays in catalog decisions. The fixed nine-column `catalog_items.csv`
+header remains unchanged. New Libib-only rows initialize its ISBN, title,
+author, publisher, source fingerprint, and confidence fields; publication year
+is blank because PR5 observations do not expose publication date as a dedicated
+normalized field and PR6 may not parse arbitrary `raw_evidence_json` keys.
+Decision-to-observation provenance supplies the durable Libib source trail.
+No acquisition row is created.
+
 Fields:
 
 - `source_item_id`: stable internal identifier.

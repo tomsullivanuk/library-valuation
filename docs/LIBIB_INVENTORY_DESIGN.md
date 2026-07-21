@@ -694,11 +694,12 @@ The normal resolution flow is:
 3. create or link the physical holding to that catalog item; and
 4. link an acquisition only when independent acquisition evidence exists.
 
-Automatic catalog creation is part of **PR4**, with full workflow acceptance in
-PR7. A valid unique ISBN is the clearest initial qualifying case; PR4 must define
-and test the exact threshold. Weak title/author evidence, conflicting
-identifiers, grouped records, or uncertain editions remain unmatched and enter
-manual review before catalog creation.
+The original PR1 numbering assigned automatic catalog creation to **PR4** and
+full workflow acceptance to PR7. That numbering is superseded: PR6 now
+implements the exact threshold and PR9 performs end-to-end acceptance. A valid
+unique ISBN is the clearest qualifying case. Weak title/author evidence,
+conflicting identifiers, grouped records, or uncertain editions remain
+unmatched and enter manual review before catalog creation.
 
 For a new catalog item, allowlisted Libib fields may initialize bibliographic
 metadata with Libib provenance and source confidence because no existing record
@@ -840,6 +841,32 @@ state; recovery either completes the staged transaction once or discards it
 safely. The exact mechanism is a PR3 implementation decision and must be tested
 with injected failures.
 
+### Implemented PR6 catalog reconciliation
+
+PR6 implements the catalog boundary in `valuation/libib_catalog.py`. The
+append-only schema-v1 repository is
+`data/inventory_catalog_reconciliation_decisions.csv`; holdings remain schema
+version 2 and the existing catalog header is unchanged. Every processed holding
+must have accepted physical identity and an explicit supporting observation.
+
+Automatic existing linkage requires either one eligible exact valid ISBN
+candidate with no strong conflict across both title and creator evidence, or one exact normalized
+title-plus-creator candidate corroborated by publisher. Title-only,
+creator-only, duplicate, conflicting, edition-ambiguous, or ineligible candidates
+remain unresolved. Existing catalog metadata is not mutated. New catalog
+creation requires a one-copy accepted holding, valid direct/derived ISBN-13,
+title, creator, no conflict, and no credible candidate. It creates a catalog
+identity and holding link but no acquisition; Libib `added` is never used as an
+acquisition date.
+
+The current catalog schema has no durable status field. Existing rows therefore
+default to active, while an explicit caller-supplied status projection can mark
+`excluded`, `merged`, or `invalid` candidates ineligible; evaluated status is
+preserved in the decision. Publication date is also not a dedicated PR5
+observation field, so PR6 leaves a new row's `publication_year` blank rather
+than depending on arbitrary privacy-safe raw JSON. A later explicit normalized
+projection may add that corroboration without rewriting observations.
+
 ## 7. Contract for v0.11.0 and v0.12.0
 
 Version 0.10.0 must provide v0.11.0 Library Explorer and Action Center with
@@ -869,7 +896,7 @@ policy.
 | Location repository | Recommended tentative `data/inventory_locations.csv`; one current location per holding, optional hierarchy, broad locations valid. |
 | Source-label mapping | Capability required; separate `data/inventory_location_aliases.csv` remains tentative pending PR2 evidence. Unmapped/ambiguous labels require review. |
 | Movement history | Settled for v0.10.0: current believed location plus verification context; general event table deferred unless evidence requires it. |
-| Libib-only catalog creation | Settled: strong, unambiguous no-match evidence may create a new catalog item in PR4; weak/conflicting evidence requires review. |
+| Libib-only catalog creation | Implemented in PR6 (older “PR4 catalog matching” references use superseded numbering): a valid direct/derived ISBN plus title, creator, one-copy accepted holding, and no conflict/candidate may create one item; weak/conflicting evidence requires review. |
 | Acquisition-free holding | Settled: allowed; acquisition origin/date remain unknown and no record is fabricated. |
 | Source items durable in v0.10.0 | Settled: yes, to preserve unmatched/change/match evidence. |
 | Current state versus event history | Settled for now: durable current holding plus immutable imports/source items/matches; general event table deferred unless implementation evidence requires it. |

@@ -376,8 +376,10 @@ import, including unmatched and unresolved rows.
   reference, raw source reference, observation/schema/parser/privacy versions;
 - exact source evidence: collection label, raw title/creators/ISBNs/publisher,
   raw copies, source dates, and allowlisted row values;
-- accepted normalized projection: normalized ISBNs, title/creator keys,
-  publication date, copies, and source-row fingerprint;
+- accepted normalized projection: normalized ISBNs, title/creator keys, copies,
+  Libib-added date, and source-row fingerprint. Publication date remains only in
+  the privacy-safe evidence object in schema version 1 and is therefore not a
+  PR6 matching input;
 - audit context snapshot: folder registration reference, descriptive scope,
   completeness, and observation/import time; and
 - grouping flags: grouped quantity, duplicate occurrence, unsupported or
@@ -504,6 +506,44 @@ for later evidence or PR6:
 
 None of these questions permits destructive mutation or a guessed identity in
 the meantime.
+
+## 12A. PR6 Implemented Catalog Reconciliation
+
+PR6 adds schema-v1 append-only
+`data/inventory_catalog_reconciliation_decisions.csv`. Catalog reconciliation
+accepts only holdings whose latest observation is backed by an accepted current
+physical decision. Candidate generation reads explicit normalized ISBN, title,
+creator, publisher, copies, diagnostic, and provenance columns; it never reads
+arbitrary values from `raw_evidence_json`.
+
+The automatic cascade is: unique valid ISBN-13 (including explicitly detectable
+ISBN-10 derivation), then exact normalized title plus creator with exact
+publisher corroboration. Title-only and creator-only candidates are always
+review-only. For a unique exact ISBN, ordinary subtitle truncation, contributor
+list differences, or missing/unknown creator text are not conflicts; automatic
+linking is blocked only when both independently available title and creator
+evidence strongly disagree. Multiple ISBN/title candidates, conflicting dual
+ISBNs, strong title-and-creator conflict, and excluded/merged/invalid status
+projections do not change holdings. The historical catalog currently has no status column, so its
+rows default to active unless a caller supplies an explicit closed status
+projection; the statuses actually evaluated are snapshotted in the decision.
+
+A no-candidate observation may create a catalog item only with a valid ISBN-13
+(direct or derived), nonblank title and creator, `copies = 1`, no ISBN conflict,
+and an accepted physical holding. The catalog row is initialized from explicit
+Libib fields without overwriting existing canonical rows. PR5 did not promote
+publication date into a dedicated observation column, so the new catalog row
+leaves `publication_year` blank rather than inspecting raw-evidence JSON. The
+holding link, new catalog row, and decision publish atomically. No acquisition
+or acquisition date is created.
+
+Relinking is never automatic. A different supported catalog candidate produces
+`catalog_relink_requires_review` and preserves the current link. A later manual
+decision may explicitly supersede the prior decision, update the holding, and
+retain both decision rows. A newer accepted physical observation also produces
+a new catalog decision that explicitly supersedes the prior observation's
+decision; rerunning against the same observation is idempotent. Catalog items
+are not merged, deleted, or refreshed.
 
 ## 13. Implemented Identity, Outcomes, and Thresholds
 

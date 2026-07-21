@@ -264,6 +264,17 @@ evidence non-creation tests.
 every accepted link or new identity is auditable and can be superseded without
 deleting history.
 
+**Implemented contract:** Catalog reconciliation decisions use schema version
+1 and are append-only; holdings remain schema version 2 and the historical
+nine-column catalog header remains unchanged. Unique valid ISBN matches and
+publisher-corroborated title-plus-creator matches may link automatically.
+Strong no-candidate ISBN/title/creator evidence may initialize one catalog item
+and link its accepted physical holding without creating an acquisition. Title-
+or creator-only, duplicate, conflicting, ineligible, edition-ambiguous, and
+relink evidence remains reviewable and non-mutating. Catalog items, decisions,
+and holding links publish atomically. PR7 remains generated exception/audit
+views; it does not need a sequence change.
+
 ### PR7 — Inventory Exceptions and Audit Views
 
 **Purpose:** Derive complete, deterministic queues for inventory discrepancies

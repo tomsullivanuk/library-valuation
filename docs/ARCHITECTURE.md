@@ -129,7 +129,28 @@ PR3 holding schema v1 is read compatibly and migrated only when every import row
 balances to one persisted PR3 holding. Backfilled observations are explicitly
 `pr3_backfill` / `legacy_derived`; unavailable raw values remain blank rather
 than being invented. Holding IDs, blank catalog/location links, and current
-state survive schema-v2 migration. Catalog matching and creation remain PR6.
+state survive schema-v2 migration. Catalog matching and creation were deferred
+to PR6.
+
+PR6 implements catalog reconciliation in `valuation/libib_catalog.py` without
+collapsing physical identity, catalog identity, or acquisition history. It reads
+only explicit versioned observation columns, requires an accepted current
+physical-reconciliation decision, and writes schema-v1 append-only
+`inventory_catalog_reconciliation_decisions.csv`. A unique valid ISBN match may
+link an eligible catalog item; title plus creator requires matching publisher
+for automatic acceptance. Title-only, creator-only, conflicting, duplicate, or
+ineligible candidates remain review outcomes. Strong no-candidate evidence may
+initialize a catalog item only when a valid ISBN, title, creator, and one-copy
+holding agree. Existing catalog metadata is never overwritten, and Libib-added
+dates never become acquisition dates.
+
+The existing fixed-header `catalog_items.csv` contract remains unchanged and
+`inventory_holdings.csv` remains schema version 2. Catalog rows have no durable
+status column today, so current rows default to active; callers may supply an
+explicit closed status projection (`active`, `excluded`, `merged`, or `invalid`)
+and every candidate status used is snapshotted in the decision. Catalog rows,
+catalog decisions, and holding links validate and publish under one staged
+rollback boundary. No acquisition repository participates in the write set.
 
 The v0.9.0 checkpoint layer is an isolated filesystem boundary under an ignored
 run directory. An immutable manifest identifies compatible work; a deterministic
