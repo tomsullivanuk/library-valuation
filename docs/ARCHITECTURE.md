@@ -766,6 +766,15 @@ are not imported. PR8 may refine reviewer usability, definitions, and visual
 acceptance, but must reuse this presentation model rather than introduce
 parallel reconciliation semantics.
 
+PR8 keeps that boundary while presenting collector-facing information first.
+Review sheets lead with a generated suggested next step, title, author, and
+human-readable issue context; stable IDs and technical provenance remain
+visible to the right. These suggestions are display hints, not editable
+workflow state. Empty queues show an explanatory message without adding a row
+to the generated presentation model. All sheets remain visible, formula-free,
+filterable, and reproducible; workbook package timestamps are fixed so identical
+inputs produce byte-identical XLSX files across runs.
+
 Only explicit allowlisted columns are projected. In particular,
 `raw_evidence_json`, unknown source columns, and arbitrary raw-evidence keys are
 excluded. Optional Research Assessment and generated market-summary inputs add

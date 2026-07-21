@@ -45,47 +45,58 @@ WORKBOOK_SHEETS = [
     "Summary",
     "Physical Review",
     "Catalog Review",
-    "Audit Coverage",
-    "Location Review",
     "Newly Discovered",
+    "Location Review",
+    "Audit Coverage",
     "Reconciled Holdings",
     "Import Detail",
     "Decision Detail",
 ]
 
+EMPTY_SHEET_MESSAGES = {
+    "Physical Review": "No physical identity review items.",
+    "Catalog Review": "No catalog identity review items.",
+    "Newly Discovered": "No newly discovered books.",
+    "Location Review": "No holdings require location review.",
+    "Audit Coverage": "No holdings are available for audit coverage review.",
+    "Reconciled Holdings": "No fully reconciled holdings yet.",
+    "Import Detail": "No accepted inventory imports.",
+    "Decision Detail": "No inventory reconciliation decisions.",
+}
+
 SUMMARY_FIELDS = ["section", "metric", "value", "denominator", "definition"]
 PHYSICAL_REVIEW_FIELDS = [
-    "inventory_observation_id", "candidate_holding_ids", "source_title",
+    "reviewer_guidance", "inventory_observation_id", "candidate_holding_ids", "source_title",
     "source_creator", "normalized_isbn13", "normalized_isbn10",
     "source_collection_label", "audit_scope", "audit_completeness", "copies",
     "outcome", "confidence", "reason_codes", "explanation",
     "inventory_import_id", "observed_at",
 ]
 CATALOG_REVIEW_FIELDS = [
-    "holding_id", "current_catalog_item_id", "candidate_catalog_item_ids",
+    "reviewer_guidance", "holding_id", "current_catalog_item_id", "candidate_catalog_item_ids",
     "candidate_catalog_statuses", "source_title", "source_creator",
     "normalized_isbn13", "normalized_isbn10", "catalog_title", "catalog_author",
     "outcome", "review_classification", "confidence", "reason_codes",
     "explanation", "latest_inventory_observation_id",
 ]
 AUDIT_COVERAGE_FIELDS = [
-    "holding_id", "catalog_item_id", "title", "author", "audit_scope",
+    "reviewer_guidance", "holding_id", "catalog_item_id", "title", "author", "audit_scope",
     "audit_completeness", "latest_verification_date", "source_collection_label",
     "current_physical_status", "audit_outcome", "explanation",
 ]
 LOCATION_REVIEW_FIELDS = [
-    "holding_id", "catalog_item_id", "title", "source_collection_label",
+    "reviewer_guidance", "holding_id", "catalog_item_id", "title", "source_collection_label",
     "folder_path", "audit_scope", "current_location_id",
     "location_review_status", "last_verification_date",
 ]
 NEWLY_DISCOVERED_FIELDS = [
-    "catalog_item_id", "holding_id", "isbn13", "title", "author", "publisher",
+    "reviewer_guidance", "catalog_item_id", "holding_id", "isbn13", "title", "author", "publisher",
     "source_collection_label", "catalog_reconciliation_outcome",
     "acquisition_status", "acquisition_count", "metadata_enrichment_status",
     "research_assessment_presence", "market_evidence_presence",
 ]
 RECONCILED_FIELDS = [
-    "holding_id", "catalog_item_id", "title", "author", "isbn13",
+    "reviewer_guidance", "holding_id", "catalog_item_id", "title", "author", "isbn13",
     "physical_outcome", "catalog_outcome", "audit_scope", "audit_completeness",
     "source_collection_label", "last_verified_at", "acquisition_status",
 ]
@@ -102,6 +113,91 @@ DECISION_DETAIL_FIELDS = [
     "supersedes_decision_id", "is_current",
 ]
 
+WORKBOOK_COLUMNS = {
+    "Summary": [
+        ("section", "Area"), ("metric", "Measure"), ("value", "Current Count"),
+        ("denominator", "Relevant Total"), ("definition", "What This Means"),
+    ],
+    "Physical Review": [
+        ("reviewer_guidance", "Suggested Next Step"), ("source_title", "Book Title"),
+        ("source_creator", "Author / Creator"), ("normalized_isbn13", "ISBN-13"),
+        ("normalized_isbn10", "ISBN-10"), ("copies", "Reported Copies"),
+        ("outcome", "Why It Needs Review"), ("explanation", "Explanation"),
+        ("reason_codes", "Reason Codes"), ("confidence", "Confidence"),
+        ("source_collection_label", "Libib Collection"), ("audit_scope", "Audit Area"),
+        ("audit_completeness", "Audit Completeness"), ("observed_at", "Observed At"),
+        ("candidate_holding_ids", "Candidate Holding IDs"),
+        ("inventory_observation_id", "Observation ID"), ("inventory_import_id", "Import ID"),
+    ],
+    "Catalog Review": [
+        ("reviewer_guidance", "Suggested Next Step"), ("source_title", "Source Title"),
+        ("source_creator", "Source Author / Creator"), ("normalized_isbn13", "ISBN-13"),
+        ("normalized_isbn10", "ISBN-10"), ("outcome", "Why It Needs Review"),
+        ("review_classification", "Review Classification"), ("explanation", "Explanation"),
+        ("reason_codes", "Reason Codes"), ("confidence", "Confidence"),
+        ("catalog_title", "Current Catalog Title"), ("catalog_author", "Current Catalog Author"),
+        ("candidate_catalog_item_ids", "Candidate Catalog IDs"),
+        ("candidate_catalog_statuses", "Candidate Statuses"),
+        ("current_catalog_item_id", "Current Catalog ID"), ("holding_id", "Holding ID"),
+        ("latest_inventory_observation_id", "Observation ID"),
+    ],
+    "Newly Discovered": [
+        ("reviewer_guidance", "Suggested Next Step"), ("title", "Book Title"),
+        ("author", "Author"), ("publisher", "Publisher"), ("isbn13", "ISBN-13"),
+        ("source_collection_label", "Libib Collection"), ("acquisition_status", "Acquisition Context"),
+        ("metadata_enrichment_status", "Metadata Status"),
+        ("research_assessment_presence", "Research Assessment"),
+        ("market_evidence_presence", "Market Evidence"),
+        ("catalog_reconciliation_outcome", "Catalog Outcome"),
+        ("acquisition_count", "Acquisition Rows"), ("catalog_item_id", "Catalog ID"),
+        ("holding_id", "Holding ID"),
+    ],
+    "Location Review": [
+        ("reviewer_guidance", "Suggested Next Step"), ("title", "Book Title"),
+        ("location_review_status", "Why It Needs Review"),
+        ("source_collection_label", "Libib Collection"), ("folder_path", "Audit Folder"),
+        ("audit_scope", "Audit Area"), ("last_verification_date", "Last Verified"),
+        ("current_location_id", "Current Location ID"), ("catalog_item_id", "Catalog ID"),
+        ("holding_id", "Holding ID"),
+    ],
+    "Audit Coverage": [
+        ("reviewer_guidance", "Suggested Next Step"), ("title", "Book Title"),
+        ("author", "Author"), ("audit_outcome", "Audit Status"),
+        ("audit_scope", "Audit Area"), ("audit_completeness", "Audit Completeness"),
+        ("latest_verification_date", "Last Verified"),
+        ("source_collection_label", "Libib Collection"),
+        ("current_physical_status", "Physical Status"), ("explanation", "Explanation"),
+        ("catalog_item_id", "Catalog ID"), ("holding_id", "Holding ID"),
+    ],
+    "Reconciled Holdings": [
+        ("reviewer_guidance", "Status"), ("title", "Book Title"), ("author", "Author"),
+        ("isbn13", "ISBN-13"), ("source_collection_label", "Libib Collection"),
+        ("audit_scope", "Audit Area"), ("audit_completeness", "Audit Completeness"),
+        ("last_verified_at", "Last Verified"), ("acquisition_status", "Acquisition Context"),
+        ("physical_outcome", "Physical Outcome"), ("catalog_outcome", "Catalog Outcome"),
+        ("catalog_item_id", "Catalog ID"), ("holding_id", "Holding ID"),
+    ],
+    "Import Detail": [
+        ("source_file_name", "Source File"), ("source_collection_label", "Libib Collection"),
+        ("folder_path", "Audit Folder"), ("audit_scope", "Audit Area"),
+        ("audit_completeness", "Audit Completeness"), ("imported_at", "Imported At"),
+        ("row_count", "Source Rows"), ("parser_version", "Parser Version"),
+        ("source_file_hash", "Source File Hash"), ("folder_id", "Folder ID"),
+        ("inventory_import_id", "Import ID"),
+    ],
+    "Decision Detail": [
+        ("decision_type", "Decision Type"), ("outcome", "Outcome"),
+        ("explanation", "Explanation"), ("reason_codes", "Reason Codes"),
+        ("confidence", "Confidence"), ("decision_basis", "Decision Basis"),
+        ("decision_timestamp", "Decision Time"), ("decision_origin", "Decision Origin"),
+        ("is_current", "Current Decision"), ("candidate_ids", "Candidate IDs"),
+        ("candidate_statuses", "Candidate Statuses"), ("model_version", "Model Version"),
+        ("catalog_item_id", "Catalog ID"), ("holding_id", "Holding ID"),
+        ("inventory_observation_id", "Observation ID"), ("decision_id", "Decision ID"),
+        ("supersedes_decision_id", "Supersedes Decision ID"),
+    ],
+}
+
 
 @dataclass(frozen=True)
 class InventoryAuditPresentation:
@@ -116,16 +212,20 @@ class InventoryAuditPresentation:
     decision_detail: list[dict[str, str]]
 
     def workbook_sheets(self) -> list[tuple[str, list[str], list[dict[str, str]]]]:
+        rows_by_sheet = {
+            "Summary": _summary_display_rows(self.summary),
+            "Physical Review": self.physical_review,
+            "Catalog Review": self.catalog_review,
+            "Newly Discovered": self.newly_discovered,
+            "Location Review": self.location_review,
+            "Audit Coverage": self.audit_coverage,
+            "Reconciled Holdings": self.reconciled_holdings,
+            "Import Detail": self.import_detail,
+            "Decision Detail": self.decision_detail,
+        }
         return [
-            ("Summary", SUMMARY_FIELDS, self.summary),
-            ("Physical Review", PHYSICAL_REVIEW_FIELDS, self.physical_review),
-            ("Catalog Review", CATALOG_REVIEW_FIELDS, self.catalog_review),
-            ("Audit Coverage", AUDIT_COVERAGE_FIELDS, self.audit_coverage),
-            ("Location Review", LOCATION_REVIEW_FIELDS, self.location_review),
-            ("Newly Discovered", NEWLY_DISCOVERED_FIELDS, self.newly_discovered),
-            ("Reconciled Holdings", RECONCILED_FIELDS, self.reconciled_holdings),
-            ("Import Detail", IMPORT_DETAIL_FIELDS, self.import_detail),
-            ("Decision Detail", DECISION_DETAIL_FIELDS, self.decision_detail),
+            (name, [label for _, label in WORKBOOK_COLUMNS[name]], _workbook_rows(rows_by_sheet[name], WORKBOOK_COLUMNS[name]))
+            for name in WORKBOOK_SHEETS
         ]
 
 
@@ -273,7 +373,11 @@ def write_inventory_audit_artifacts(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     _write_csv(output_dir / "inventory_audit_summary.csv", SUMMARY_FIELDS, presentation.summary)
-    write_workbook(output_dir / "inventory_review_workbook.xlsx", presentation.workbook_sheets())
+    write_workbook(
+        output_dir / "inventory_review_workbook.xlsx",
+        presentation.workbook_sheets(),
+        empty_messages=EMPTY_SHEET_MESSAGES,
+    )
     return presentation
 
 
@@ -284,6 +388,7 @@ def _physical_review_rows(current, observations_by_id):
             continue
         observation = observations_by_id[observation_id]
         rows.append({
+            "reviewer_guidance": _physical_guidance(decision["outcome"]),
             "inventory_observation_id": observation_id,
             "candidate_holding_ids": _display_json_list(decision["candidate_holding_ids_json"]),
             "source_title": observation["raw_title"],
@@ -321,6 +426,7 @@ def _catalog_review_rows(holdings, current, observations_by_id, catalog_by_id, c
             continue
         catalog_item = catalog_by_id.get(holding["catalog_item_id"], {})
         rows.append({
+            "reviewer_guidance": _catalog_guidance(decision["outcome"] if decision else "catalog_decision_missing"),
             "holding_id": holding_id,
             "current_catalog_item_id": holding["catalog_item_id"],
             "candidate_catalog_item_ids": _display_json_list(decision["candidate_catalog_item_ids_json"]) if decision else "",
@@ -345,6 +451,7 @@ def _audit_rows(holdings, observations_by_id, catalog_by_id):
         catalog = catalog_by_id.get(holding["catalog_item_id"], {})
         outcome = holding["inventory_status"]
         rows.append({
+            "reviewer_guidance": _audit_guidance(outcome),
             "holding_id": holding["holding_id"], "catalog_item_id": holding["catalog_item_id"],
             "title": catalog.get("title", observation["raw_title"]),
             "author": catalog.get("author", observation["raw_creators"]),
@@ -375,6 +482,7 @@ def _location_rows(holdings, observations_by_id, imports_by_id, folders_by_id, c
             statuses.append("confirmed_location_missing")
         catalog = catalog_by_id.get(holding["catalog_item_id"], {})
         rows.append({
+            "reviewer_guidance": _location_guidance(statuses),
             "holding_id": holding["holding_id"], "catalog_item_id": holding["catalog_item_id"],
             "title": catalog.get("title", observation["raw_title"]),
             "source_collection_label": observation["source_collection_label"],
@@ -397,6 +505,10 @@ def _newly_discovered_rows(holdings, current, observations_by_id, catalog_by_id,
         observation = observations_by_id[decision["inventory_observation_id"]]
         acquisition_count = len(acquisitions_by_catalog.get(catalog_id, []))
         rows.append({
+            "reviewer_guidance": _newly_discovered_guidance(
+                _acquisition_status(acquisition_count, acquisitions_available),
+                "metadata_enrichment_needed" if not catalog["publisher"] or not catalog["publication_year"] else "core_metadata_present",
+            ),
             "catalog_item_id": catalog_id, "holding_id": holding["holding_id"],
             "isbn13": catalog["isbn13"], "title": catalog["title"], "author": catalog["author"],
             "publisher": catalog["publisher"], "source_collection_label": observation["source_collection_label"],
@@ -425,6 +537,7 @@ def _reconciled_rows(holdings, current_physical, current_catalog, observations_b
         catalog = catalog_by_id[holding["catalog_item_id"]]
         count = len(acquisitions_by_catalog.get(holding["catalog_item_id"], []))
         rows.append({
+            "reviewer_guidance": "No action — reconciled",
             "holding_id": holding["holding_id"], "catalog_item_id": holding["catalog_item_id"],
             "title": catalog["title"], "author": catalog["author"], "isbn13": catalog["isbn13"],
             "physical_outcome": physical["outcome"], "catalog_outcome": catalog_decision["outcome"],
@@ -584,6 +697,107 @@ def _audit_explanation(outcome: str) -> str:
         "possible_missing": "Current durable state already records a completed-scope missing-review condition.",
         "verified_missing": "Current durable state already contains an explicitly approved verified-missing outcome.",
     }.get(outcome, "Current durable physical status is displayed without reinterpretation.")
+
+
+def _physical_guidance(outcome: str) -> str:
+    if outcome == "quantity_requires_review":
+        return "Review reported quantity"
+    if outcome in {"indistinguishable_duplicate_rows", "possible_duplicate", "multiple_holding_candidates"}:
+        return "Check for duplicate physical copies"
+    if outcome == "insufficient_identity_evidence":
+        return "Add identifying evidence"
+    return "Confirm physical identity"
+
+
+def _catalog_guidance(outcome: str) -> str:
+    if outcome == "physical_identity_unresolved":
+        return "Resolve physical identity first"
+    if outcome == "catalog_candidate_ineligible":
+        return "Review catalog eligibility"
+    if outcome == "catalog_decision_missing":
+        return "Run or review catalog reconciliation"
+    return "Confirm catalog match"
+
+
+def _audit_guidance(outcome: str) -> str:
+    return {
+        "verified_present": "No action — confirmed present",
+        "not_yet_audited": "Await a future applicable audit",
+        "outside_audit_scope": "No action — outside this audit",
+        "possible_missing": "Review possible missing book",
+        "verified_missing": "Review approved missing status",
+    }.get(outcome, "Review physical status")
+
+
+def _location_guidance(statuses: Iterable[str]) -> str:
+    statuses = set(statuses)
+    if "folder_collection_mismatch" in statuses:
+        return "Check folder and collection label"
+    if "source_label_unmapped" in statuses:
+        return "Assign a durable location later"
+    if "confirmed_location_missing" in statuses:
+        return "Add location evidence"
+    return "No action — location recorded"
+
+
+def _newly_discovered_guidance(acquisition_status: str, metadata_status: str) -> str:
+    if acquisition_status == "no_acquisition_history" and metadata_status == "metadata_enrichment_needed":
+        return "Review metadata; acquisition history unknown"
+    if acquisition_status == "no_acquisition_history":
+        return "No acquisition history — book is still owned"
+    if metadata_status == "metadata_enrichment_needed":
+        return "Review bibliographic metadata"
+    return "Review newly discovered book"
+
+
+def _workbook_rows(
+    rows: Iterable[Mapping[str, str]], columns: Iterable[tuple[str, str]]
+) -> list[dict[str, str]]:
+    columns = list(columns)
+    return [
+        {label: row.get(source, "") for source, label in columns}
+        for row in rows
+    ]
+
+
+def _summary_display_rows(rows: Iterable[Mapping[str, str]]) -> list[dict[str, str]]:
+    labels = {
+        "generated_output_note": "How to use this workbook",
+        "accepted_inventory_imports": "Accepted Libib imports",
+        "observations": "Source rows preserved",
+        "current_holdings": "Books currently represented",
+        "physically_resolved_holdings": "Physical identities confirmed",
+        "physically_unresolved_observations": "Physical identity issues",
+        "catalog_linked_holdings": "Books linked to the catalog",
+        "catalog_reconciliation_eligible_holdings": "Books ready for catalog review",
+        "catalog_unresolved_holdings": "Catalog identity issues",
+        "existing_catalog_links": "Links to existing catalog books",
+        "libib_created_catalog_items": "New books discovered through Libib",
+        "holdings_without_acquisition_history": "Owned books with no acquisition history",
+        "verified_present_holdings": "Books confirmed present",
+        "not_yet_audited_holdings": "Books awaiting audit",
+        "outside_audit_scope_holdings": "Books outside the current audit area",
+        "possible_missing_holdings": "Books that may be missing",
+        "location_unmapped_holdings": "Books needing a durable location",
+        "folder_collection_mismatches": "Folder and collection mismatches",
+        "quantity_review_cases": "Quantity issues",
+        "duplicate_review_cases": "Possible duplicate-copy issues",
+        "successfully_reconciled_holdings": "Fully reconciled books",
+    }
+    sections = {
+        "State": "Inventory overview", "Physical": "Physical identity",
+        "Catalog": "Catalog identity", "Acquisition": "Acquisition context",
+        "Audit": "Audit coverage", "Location": "Location",
+        "Review": "Needs attention", "Control": "Confirmed results", "": "About",
+    }
+    return [
+        {
+            **dict(row),
+            "section": sections.get(row.get("section", ""), row.get("section", "")),
+            "metric": labels.get(row.get("metric", ""), row.get("metric", "")),
+        }
+        for row in rows
+    ]
 
 
 def _write_csv(path: Path, fieldnames: list[str], rows: Iterable[Mapping[str, str]]) -> None:

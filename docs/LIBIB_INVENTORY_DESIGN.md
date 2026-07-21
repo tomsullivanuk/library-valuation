@@ -891,6 +891,22 @@ columns, and arbitrary source keys. Libib-created provenance is reconstructed
 through the accepted catalog decision, holding, supporting observation, and
 import rather than by altering the historical catalog schema.
 
+### PR8 reviewer-workbook philosophy
+
+The workbook is organized for a collector reviewing issues: Summary, Physical
+Review, Catalog Review, Newly Discovered, Location Review, Audit Coverage,
+Reconciled Holdings, Import Detail, and Decision Detail. Reviewer-facing facts
+and concise generated guidance appear first, while stable IDs, candidates, and
+technical provenance remain available at the right edge for traceability.
+
+Guidance such as `Review reported quantity`, `Confirm catalog match`, `Assign a
+durable location later`, `No acquisition history — book is still owned`, and
+`Await a future applicable audit` is presentation text only. It is not a
+decision, recommendation engine, or durable workflow field. Empty sheets state
+that no items are present rather than displaying an unexplained blank grid.
+Workbook edits are never imported, and the artifact cannot confirm matches,
+create locations or acquisitions, or change audit state.
+
 ## 7. Contract for v0.11.0 and v0.12.0
 
 Version 0.10.0 must provide v0.11.0 Library Explorer and Action Center with

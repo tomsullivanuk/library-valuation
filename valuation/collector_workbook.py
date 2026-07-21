@@ -245,20 +245,34 @@ def gap_category(categories: list[str]) -> str:
     return categories[0] if categories else "Metadata Gap"
 
 
-def write_workbook(output_path: Path, sheets: list[tuple[str, list[str], list[dict[str, str]]]]) -> None:
+def write_workbook(
+    output_path: Path,
+    sheets: list[tuple[str, list[str], list[dict[str, str]]]],
+    *,
+    empty_messages: Mapping[str, str] | None = None,
+) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    empty_messages = empty_messages or {}
     with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", content_types_xml(len(sheets)))
-        archive.writestr("_rels/.rels", ROOT_RELS_XML)
-        archive.writestr("docProps/app.xml", APP_XML)
-        archive.writestr("docProps/core.xml", CORE_XML)
-        archive.writestr("xl/workbook.xml", workbook_xml([sheet[0] for sheet in sheets]))
-        archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels_xml(len(sheets)))
-        archive.writestr("xl/styles.xml", STYLES_XML)
-        for index, (_, fieldnames, rows) in enumerate(sheets, start=1):
-            archive.writestr(
+        _write_archive_text(archive, "[Content_Types].xml", content_types_xml(len(sheets)))
+        _write_archive_text(archive, "_rels/.rels", ROOT_RELS_XML)
+        _write_archive_text(archive, "docProps/app.xml", APP_XML)
+        _write_archive_text(archive, "docProps/core.xml", CORE_XML)
+        _write_archive_text(archive, "xl/workbook.xml", workbook_xml([sheet[0] for sheet in sheets]))
+        _write_archive_text(archive, "xl/_rels/workbook.xml.rels", workbook_rels_xml(len(sheets)))
+        _write_archive_text(archive, "xl/styles.xml", STYLES_XML)
+        for index, (sheet_name, fieldnames, rows) in enumerate(sheets, start=1):
+            _write_archive_text(
+                archive,
                 f"xl/worksheets/sheet{index}.xml",
-                sheet_xml(fieldnames, rows, selected=index == 1, wrap_fields=wrapped_text_fields(fieldnames)),
+                sheet_xml(
+                    fieldnames,
+                    rows,
+                    selected=index == 1,
+                    wrap_fields=wrapped_text_fields(fieldnames),
+                    empty_message=empty_messages.get(sheet_name, ""),
+                    summary=sheet_name == "Summary",
+                ),
             )
 
 
@@ -267,8 +281,11 @@ def sheet_xml(
     rows: list[dict[str, str]],
     selected: bool = False,
     wrap_fields: set[str] | None = None,
+    empty_message: str = "",
+    summary: bool = False,
 ) -> str:
-    row_count = len(rows) + 1
+    has_empty_message = not rows and bool(empty_message)
+    row_count = len(rows) + 1 + int(has_empty_message)
     col_count = max(len(fieldnames), 1)
     dimension = f"A1:{excel_col(col_count)}{row_count}"
     widths = column_widths(fieldnames, rows)
@@ -277,29 +294,40 @@ def sheet_xml(
         for index, width in enumerate(widths, start=1)
     )
     tab_selected = ' tabSelected="1"' if selected else ""
-    body = [row_xml(1, fieldnames, style="1")]
+    body = [row_xml(1, fieldnames, style="1", row_height=24)]
+    if has_empty_message:
+        body.append(row_xml(2, [empty_message] + [""] * (col_count - 1), style="4", row_height=34))
     for index, row in enumerate(rows, start=2):
+        style = "5" if index % 2 == 0 else None
+        if summary and row.get("Area") and (index == 2 or rows[index - 3].get("Area") != row.get("Area")):
+            style = "7"
+        row_height = 48 if summary and index == 2 else 34 if summary else 22
         body.append(
             row_xml(
                 index,
                 [row.get(field, "") for field in fieldnames],
+                style=style,
                 fieldnames=fieldnames,
                 wrap_fields=wrap_fields,
+                row_height=row_height,
             )
         )
+    merge = f'<mergeCells count="1"><mergeCell ref="A2:{excel_col(col_count)}2"/></mergeCells>' if has_empty_message else ""
+    filter_end = len(rows) + 1 if rows else 1
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
         'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
         f'<dimension ref="{dimension}"/>'
-        f'<sheetViews><sheetView{tab_selected} workbookViewId="0">'
+        f'<sheetViews><sheetView{tab_selected} showGridLines="0" workbookViewId="0">'
         '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
         '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>'
         '</sheetView></sheetViews>'
         '<sheetFormatPr defaultRowHeight="15"/>'
         f"<cols>{cols}</cols>"
         f"<sheetData>{''.join(body)}</sheetData>"
-        f'<autoFilter ref="{dimension}"/>'
+        f"{merge}"
+        f'<autoFilter ref="A1:{excel_col(col_count)}{filter_end}"/>'
         "</worksheet>"
     )
 
@@ -310,19 +338,28 @@ def row_xml(
     style: str | None = None,
     fieldnames: list[str] | None = None,
     wrap_fields: set[str] | None = None,
+    row_height: int | None = None,
 ) -> str:
     cells = []
     for col_index, value in enumerate(values, start=1):
         cell_ref = f"{excel_col(col_index)}{row_index}"
         text = escape(xml_safe_text(value))
         cell_style = style
-        if not cell_style and fieldnames and wrap_fields and fieldnames[col_index - 1] in wrap_fields:
-            cell_style = "2"
-        if not cell_style and fieldnames and "isbn" in fieldnames[col_index - 1].lower():
-            cell_style = "3"
+        if fieldnames and wrap_fields and fieldnames[col_index - 1] in wrap_fields:
+            cell_style = "6" if cell_style == "5" else "2"
+        if fieldnames and "isbn" in fieldnames[col_index - 1].lower():
+            cell_style = "8" if cell_style == "5" else "3"
         style_attr = f' s="{cell_style}"' if cell_style else ""
         cells.append(f'<c r="{cell_ref}" t="inlineStr"{style_attr}><is><t>{text}</t></is></c>')
-    return f'<row r="{row_index}">{"".join(cells)}</row>'
+    height = f' ht="{row_height}" customHeight="1"' if row_height else ""
+    return f'<row r="{row_index}"{height}>{"".join(cells)}</row>'
+
+
+def _write_archive_text(archive: zipfile.ZipFile, name: str, text: str) -> None:
+    info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o600 << 16
+    archive.writestr(info, text)
 
 
 def wrapped_text_fields(fieldnames: list[str]) -> set[str]:
@@ -343,6 +380,9 @@ def wrapped_text_fields(fieldnames: list[str]) -> set[str]:
             "source_or_derivation",
             "example_values",
             "reviewer_guidance",
+            "Suggested Next Step",
+            "Explanation",
+            "What This Means",
         }
     }
 
@@ -453,10 +493,10 @@ CORE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 STYLES_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>
-  <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
-  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <fonts count="4"><font><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font><font><i/><color rgb="FF475569"/><sz val="11"/><name val="Aptos"/></font><font><b/><color rgb="FF1E3A5F"/><sz val="11"/><name val="Aptos"/></font></fonts>
+  <fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1E3A5F"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF1F5F9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F1FA"/><bgColor indexed="64"/></patternFill></fill></fills>
+  <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFCBD5E1"/></bottom><diagonal/></border></borders>
   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>
+  <cellXfs count="9"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/><xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf numFmtId="0" fontId="3" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="49" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1" applyNumberFormat="1"/></cellXfs>
   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>"""

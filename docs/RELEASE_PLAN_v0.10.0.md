@@ -324,6 +324,17 @@ checks where practical, privacy inspection, and visual acceptance testing.
 **Exit criteria:** A user can understand what is believed, observed, unresolved,
 and stale without treating the artifact as the durable repository.
 
+**Implemented contract:** PR8 retains the PR7 presentation model and business
+semantics while making the workbook collector-facing. Sheet order follows the
+review path from summary and identity exceptions through newly discovered,
+location, audit, reconciled, and technical provenance views. Suggested next
+steps, book descriptions, and explanations precede stable IDs. Empty sheets
+contain a concise generated message, all worksheets remain visible, and no
+formulas or editable workflow fields are introduced. Shared workbook styling
+adds readable headers, alternating rows, section emphasis, hidden gridlines,
+fixed package timestamps, and text-preserved ISBNs without changing durable
+state or reconciliation behavior.
+
 ### PR9 — End-to-End Import Workflow and Validation
 
 **Purpose:** Connect parse, persist, match, reconcile, and generate steps in a

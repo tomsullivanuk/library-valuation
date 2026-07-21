@@ -11,9 +11,11 @@ import pytest
 from valuation.inventory_audit import (
     CATALOG_REVIEW_FIELDS,
     DECISION_DETAIL_FIELDS,
+    EMPTY_SHEET_MESSAGES,
     GENERATED_NOTE,
     PHYSICAL_REVIEW_FIELDS,
     SUMMARY_FIELDS,
+    WORKBOOK_COLUMNS,
     WORKBOOK_SHEETS,
     build_inventory_audit_presentation,
     resolve_current_decisions,
@@ -101,10 +103,12 @@ def test_queues_preserve_current_durable_outcomes_and_allowlisted_fields(tmp_pat
 
     assert len(presentation.physical_review) == 1
     assert presentation.physical_review[0]["outcome"] == "quantity_requires_review"
+    assert presentation.physical_review[0]["reviewer_guidance"] == "Review reported quantity"
     assert presentation.physical_review[0]["reason_codes"] == "copies_not_one"
     assert len(presentation.newly_discovered) == 1
     assert presentation.newly_discovered[0]["acquisition_status"] == "no_acquisition_history"
     assert presentation.newly_discovered[0]["acquisition_count"] == "0"
+    assert "acquisition history" in presentation.newly_discovered[0]["reviewer_guidance"]
     assert len(presentation.reconciled_holdings) == 1
     assert presentation.catalog_review == []
     assert all("raw_evidence_json" not in row for rows in presentation.__dict__.values() for row in rows)
@@ -333,9 +337,10 @@ def test_artifacts_are_deterministic_structured_and_do_not_mutate_repositories(t
             assert 'state="frozen"' in xml
             assert "<autoFilter" in xml
             assert "raw_evidence_json" not in xml
-        assert xml_header_values(workbook.read("xl/worksheets/sheet1.xml")) == SUMMARY_FIELDS
-        assert xml_header_values(workbook.read("xl/worksheets/sheet2.xml")) == PHYSICAL_REVIEW_FIELDS
-        assert xml_header_values(workbook.read("xl/worksheets/sheet3.xml")) == CATALOG_REVIEW_FIELDS
+        assert xml_header_values(workbook.read("xl/worksheets/sheet1.xml")) == [label for _, label in WORKBOOK_COLUMNS["Summary"]]
+        assert xml_header_values(workbook.read("xl/worksheets/sheet2.xml")) == [label for _, label in WORKBOOK_COLUMNS["Physical Review"]]
+        assert xml_header_values(workbook.read("xl/worksheets/sheet3.xml")) == [label for _, label in WORKBOOK_COLUMNS["Catalog Review"]]
+        assert all("<f" not in workbook.read(f"xl/worksheets/sheet{index}.xml").decode("utf-8") for index in range(1, 10))
 
 
 def test_artifacts_reject_non_output_directory(tmp_path):
@@ -357,11 +362,64 @@ def test_shared_workbook_writer_text_formats_only_isbn_named_columns(tmp_path):
     )
     with zipfile.ZipFile(output) as workbook:
         xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
-    assert '<c r="A2" t="inlineStr" s="3"><is><t>0306406152</t>' in xml
-    assert '<c r="B2" t="inlineStr" s="3"><is><t>9780306406157</t>' in xml
+    assert '<c r="A2" t="inlineStr" s="8"><is><t>0306406152</t>' in xml
+    assert '<c r="B2" t="inlineStr" s="8"><is><t>9780306406157</t>' in xml
     for cell in ("C2", "D2", "E2"):
-        assert f'<c r="{cell}" t="inlineStr" s="3">' not in xml
-        assert f'<c r="{cell}" t="inlineStr">' in xml
+        assert f'<c r="{cell}" t="inlineStr" s="8">' not in xml
+        assert f'<c r="{cell}" t="inlineStr" s="5">' in xml
+
+
+def test_empty_workbook_has_professional_messages_visible_sheets_and_no_formulas(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "catalog_items.csv").write_bytes(
+        StrictCatalogRepository(data_dir / "catalog_items.csv").rendered_bytes([])
+    )
+    with (data_dir / "acquisitions.csv").open("w", newline="", encoding="utf-8") as handle:
+        csv.DictWriter(handle, fieldnames=ACQUISITION_FIELDNAMES).writeheader()
+    output_dir = tmp_path / "output"
+    write_inventory_audit_artifacts(data_dir=data_dir, output_dir=output_dir)
+
+    with zipfile.ZipFile(output_dir / "inventory_review_workbook.xlsx") as workbook:
+        workbook_xml = workbook.read("xl/workbook.xml").decode("utf-8")
+        assert workbook_sheet_names(workbook) == WORKBOOK_SHEETS
+        assert 'state="hidden"' not in workbook_xml
+        assert 'state="veryHidden"' not in workbook_xml
+        for index, sheet_name in enumerate(WORKBOOK_SHEETS[1:], start=2):
+            xml = workbook.read(f"xl/worksheets/sheet{index}.xml").decode("utf-8")
+            assert EMPTY_SHEET_MESSAGES[sheet_name] in xml
+            assert '<mergeCell ref="A2:' in xml
+            assert "<f" not in xml
+
+
+def test_workbook_places_reviewer_columns_before_technical_ids(tmp_path):
+    output_dir = tmp_path / "output"
+    write_inventory_audit_artifacts(data_dir=setup_state(tmp_path), output_dir=output_dir)
+    with zipfile.ZipFile(output_dir / "inventory_review_workbook.xlsx") as workbook:
+        physical = xml_header_values(workbook.read("xl/worksheets/sheet2.xml"))
+        newly = xml_header_values(workbook.read("xl/worksheets/sheet4.xml"))
+    assert physical[:3] == ["Suggested Next Step", "Book Title", "Author / Creator"]
+    assert physical[-3:] == ["Candidate Holding IDs", "Observation ID", "Import ID"]
+    assert newly[:3] == ["Suggested Next Step", "Book Title", "Author"]
+    assert newly[-2:] == ["Catalog ID", "Holding ID"]
+
+
+def test_summary_workbook_uses_collector_facing_metric_names(tmp_path):
+    output_dir = tmp_path / "output"
+    write_inventory_audit_artifacts(data_dir=setup_state(tmp_path), output_dir=output_dir)
+    with zipfile.ZipFile(output_dir / "inventory_review_workbook.xlsx") as workbook:
+        xml = workbook.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    assert "Physical identity issues" in xml
+    assert "Catalog identity issues" in xml
+    assert "New books discovered through Libib" in xml
+    assert "physically_unresolved_observations" not in xml
+
+
+def test_zip_metadata_is_fixed_for_deterministic_workbooks(tmp_path):
+    output_dir = tmp_path / "output"
+    write_inventory_audit_artifacts(data_dir=setup_state(tmp_path), output_dir=output_dir)
+    with zipfile.ZipFile(output_dir / "inventory_review_workbook.xlsx") as workbook:
+        assert {item.date_time for item in workbook.infolist()} == {(1980, 1, 1, 0, 0, 0)}
 
 
 def test_malformed_or_orphan_state_fails_before_artifact_generation(tmp_path):
