@@ -2,6 +2,10 @@
 
 ## v0.10.0 — Libib Physical Inventory Integration
 
+**Status:** Implementation and final acceptance are complete as of 2026-07-21.
+The release is ready for its final documentation commit, annotated tag, push,
+and GitHub Release.
+
 ## 1. Release Theme
 
 Add a durable, auditable physical-inventory layer from Libib exports without
@@ -384,6 +388,10 @@ notes, release-readiness report, changelog, operational and recovery guidance.
 **Tests or validation:** Full suite, compile check, link check, clean fixture
 run, artifact audit, privacy audit, and release checklist.
 
+**Completed:** Release notes, readiness evidence, changelog, checklist,
+operational/recovery guidance, roadmap status, and backlog status were aligned
+after the final deterministic 30-row acceptance preview.
+
 **Exit criteria:** Acceptance criteria below are evidenced, limitations are
 explicit, generated/private artifacts are uncommitted, and the repository is
 ready to tag.
@@ -452,29 +460,29 @@ ready to tag.
 - Existing tests and new inventory tests pass without valuation or market-model
   regressions.
 
-## 10. Risks and Unresolved Questions
+## 10. Remaining Risks and Deferred Questions
 
-PR1 settles the identity, authority, overwrite, audit-scope, review, new-catalog,
-and conservative-match boundaries. PR2 must resolve the actual Libib export
-variants and columns, stable identifier availability and scope, quantity and
-location semantics,
-tags/groups/collections, completeness signals, row order stability, encoding,
-and the privacy surface. The design must be revised if representative evidence
-contradicts its tentative fields or reconciliation assumptions.
+PR2 established the supported untouched CSV profile and confirmed that the
+export has no durable row/copy identifier. The implemented system therefore
+keeps ambiguous duplicate, quantity, set/multi-volume, changed-evidence, and
+catalog-candidate cases reviewable rather than manufacturing identity.
 
-Additional risks include source identifiers changing across exports, one row
-representing a set rather than a copy, quantity reductions lacking disposition
-meaning, duplicate catalog records creating false certainty, and manual Libib
-metadata diverging from bibliographic sources. All require visible exceptions
-rather than optimistic mutation.
+Durable location repositories and aliases, manual reconciliation editing,
+condition/disposition history, recursive discovery, and affirmative
+`verified_missing` automation remain deferred. Later work must retain the
+v0.10.0 identity, provenance, audit-scope, and non-acquisition boundaries.
 
 ## 11. Documentation and Release Readiness
 
-- Keep this plan and the design document current as PR2 evidence resolves open
-  questions; record material decisions in the design decision log.
-- Update `ARCHITECTURE.md` and `DATA_MODEL.md` when tentative repositories become
-  implemented contracts, not before.
-- Add operational instructions only when the workflow exists.
-- Add release notes, changelog, schema/migration guidance, recovery procedure,
-  fixture provenance, privacy audit, and exact acceptance results in PR10.
-- Preserve historical release documents and do not rewrite v0.9.0 evidence.
+- `README.md` documents preview-first operation and explicit publication.
+- `ARCHITECTURE.md`, `DATA_MODEL.md`, both inventory design documents, and this
+  plan describe the implemented repository and authority boundaries.
+- `RELEASE_NOTES_v0.10.0.md` provides user-facing operation, recovery, limits,
+  and acceptance evidence.
+- `RELEASE_READINESS_v0.10.0.md` records deterministic artifact hashes, privacy
+  controls, rollback evidence, and remaining release actions.
+- The final untouched 30-row preview produced 30 holdings, 22 existing catalog
+  links, 5 proposed catalog identities, 3 unresolved catalog cases, and 0
+  acquisitions. A second fresh preview produced identical completion output,
+  preview identities, CSV, and XLSX bytes; real durable hashes were unchanged.
+- Historical v0.9.0 release evidence remains unchanged.

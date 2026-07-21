@@ -87,33 +87,33 @@ Items move from this backlog into the Roadmap when they are selected for a relea
 
 ## v0.10.0 Libib Physical Inventory Integration
 
-- [ ] Profile representative Libib export formats, columns, identifiers,
+- [x] Profile representative Libib export formats, columns, identifiers,
   quantity/location semantics, privacy surface, and completeness signals.
-- [ ] Add durable inventory import, source-item, holding, match, and
+- [x] Add durable inventory import, observation, holding, match, and
   inventory-specific review state under explicit schema versions.
-- [ ] Preserve stable `holding_id` values and independently represent duplicate
-  physical copies.
-- [ ] Implement conservative catalog matching with unmatched and ambiguous
+- [x] Preserve stable `holding_id` values while routing indistinguishable or
+  unsupported duplicate-copy evidence to review rather than inventing identity.
+- [x] Implement conservative catalog matching with unmatched and ambiguous
   preservation; never auto-match title-only evidence at high confidence.
-- [ ] Create catalog identities and holdings for confidently identified
+- [x] Create catalog identities and holdings for confidently identified
   Libib-only books without requiring or fabricating acquisition records.
-- [ ] Preserve progressive audit scope/completeness and distinguish confirmed,
+- [x] Preserve progressive audit scope/completeness and distinguish confirmed,
   not-yet-audited, outside-scope, and completed-scope-not-found items.
-- [ ] Align the shared import model around Amazon Import, Libib Import, and
+- [x] Align the shared import model around Amazon Import, Libib Import, and
   Manual Entry; treat barcode scanning and acquisition origins as mechanisms or
   provenance rather than top-level source families.
-- [ ] Add stable project-owned inventory locations, optional hierarchy, current
-  holding `location_id`, verification context, and conservative Libib-label
-  mapping/review behavior.
-- [ ] Register operational audit-area folders below `input/libib/`, preserve
+- [ ] Add durable project-owned inventory locations, optional hierarchy, and
+  confirmed Libib-label alias mapping in a later release. v0.10.0 preserves
+  blank `current_location_id`, verification context, and reviewable labels.
+- [x] Register operational audit-area folders below `input/libib/`, preserve
   exact expected collection labels, and route rename/misfile mismatches to
   `collection_label_changed_or_misfiled` review.
-- [ ] Keep import identity hash/project-ID based; support explicit-file and
+- [x] Keep import identity hash/project-ID based; support explicit-file and
   one-directory import before later recursive all-folder discovery.
-- [ ] Generate inventory exception/audit views and a reviewer artifact.
-- [ ] Validate exact-repeat, newer-full-export, partial-batch, and interrupted
+- [x] Generate inventory exception/audit views and a reviewer artifact.
+- [x] Validate exact-repeat, changed-export, partial-batch, and interrupted
   import behavior without inferring disposition from absence.
-- [ ] Follow the reviewed sequence in `RELEASE_PLAN_v0.10.0.md`.
+- [x] Follow the reviewed sequence in `RELEASE_PLAN_v0.10.0.md`.
 
 ## v0.11.0 Library Explorer and Action Center
 

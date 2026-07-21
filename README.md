@@ -57,12 +57,16 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
 - `docs/RELEASE_PLAN_v0.9.0.md`: completed resumable full-library eBay release
   plan.
-- `docs/RELEASE_PLAN_v0.10.0.md`: Libib physical-inventory release boundary,
-  PR sequence, and acceptance contract.
-- `docs/LIBIB_INVENTORY_DESIGN.md`: tentative durable inventory entities,
-  copy semantics, matching, reconciliation, and idempotency design.
+- `docs/RELEASE_PLAN_v0.10.0.md`: completed Libib physical-inventory PR
+  sequence and acceptance contract.
+- `docs/LIBIB_INVENTORY_DESIGN.md`: approved and implemented inventory
+  entities, copy semantics, matching, reconciliation, and idempotency design.
 - `docs/RELEASE_READINESS_v0.9.0.md`: final v0.9.0 release gate and audit.
 - `docs/RELEASE_NOTES_v0.9.0.md`: user-facing v0.9.0 release summary.
+- `docs/RELEASE_NOTES_v0.10.0.md`: user-facing Libib inventory release summary
+  and operational/recovery guidance.
+- `docs/RELEASE_READINESS_v0.10.0.md`: final v0.10.0 acceptance, privacy,
+  rollback, determinism, and release gate.
 - `docs/FULL_LIBRARY_EBAY_BASELINE_v0.9.0.md`: completed production baseline,
   integrity, evidence-quality, and privacy results.
 - `docs/FULL_LIBRARY_MULTISOURCE_RECONCILIATION_v0.9.0.md`: deterministic

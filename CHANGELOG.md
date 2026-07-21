@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.10.0 - 2026-07-21
+
+Release focus: Libib Physical Inventory Integration.
+
+Added:
+
+- Conservative Libib CSV parsing, audit-area folder registration, immutable
+  observations, current holdings, and append-only physical and catalog decisions.
+- Physical-before-catalog reconciliation with guarded catalog creation for
+  strongly identified Libib-only books and explicit review outcomes for weak,
+  conflicting, duplicate, quantity, edition, and identity evidence.
+- Generated inventory exception/audit views and a deterministic nine-sheet
+  collector review workbook.
+- Preview-first `update-inventory` orchestration with explicit `--publish`,
+  workflow-level rollback, machine-readable summaries, and hash idempotency.
+
+Changed:
+
+- The catalog can represent confidently identified non-Amazon physical books
+  without requiring or fabricating acquisition history.
+- Imports preserve audit scope/completeness and Libib collection evidence, with
+  neutral absence semantics for partial audits.
+- Fresh previews use deterministic temporary identities and time, producing
+  byte-identical summaries and workbooks for identical source and durable state.
+
+Validated:
+
+- The untouched 30-row Libib audit produced 30 holdings, 22 existing catalog
+  links, 5 proposed catalog identities, 3 unresolved cases, and 0 acquisitions
+  in two identical previews.
+- Injected failures rolled back completely and real durable hashes were unchanged.
+
+Unchanged:
+
+- Amazon acquisition history, market evidence, Research Assessments, valuation
+  behavior, existing catalog metadata authority, and published identity semantics.
+
+Known limitations:
+
+- Durable locations and aliases, manual reconciliation editing, condition and
+  disposition workflows, recursive discovery, Library Explorer, Action Center,
+  and automated monthly cross-source refresh remain deferred.
+- The real 30-row audit was validated in preview but was not published.
+
 ## v0.9.0 - 2026-07-19
 
 Release focus: Full-Library eBay Baseline.

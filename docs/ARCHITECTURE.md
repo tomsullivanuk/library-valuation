@@ -762,8 +762,8 @@ The projection produces `output/inventory_audit_summary.csv` and one generated
 catalog review, audit coverage, location review, newly discovered, reconciled
 holdings, import detail, and decision detail sheets. These artifacts do not
 invoke import or matching code and never write beneath `data/`. Workbook edits
-are not imported. PR8 may refine reviewer usability, definitions, and visual
-acceptance, but must reuse this presentation model rather than introduce
+are not imported. PR8 refined reviewer usability, definitions, and visual
+acceptance while reusing this presentation model rather than introducing
 parallel reconciliation semantics.
 
 PR8 keeps that boundary while presenting collector-facing information first.

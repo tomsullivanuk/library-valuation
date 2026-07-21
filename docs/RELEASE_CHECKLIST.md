@@ -1,5 +1,46 @@
 # Release Checklist
 
+## v0.10.0
+
+Pre-release checks:
+
+- [x] Confirm 20 workflow, 160 combined inventory, and 462 full-suite tests pass.
+- [x] Run `.venv/bin/python -m compileall -q library_pipeline.py valuation tests`.
+- [x] Run `git diff --check` and Markdown-link validation.
+- [x] Confirm preview is the default and publication requires `--publish`.
+- [x] Confirm injected failures restore every affected durable repository.
+- [x] Confirm exact repeats create no duplicate durable identities or acquisitions.
+- [x] Confirm the untouched 30-row preview produces 30 holdings, 22 existing
+  links, 5 proposed identities, 3 unresolved cases, and 0 acquisitions.
+- [x] Confirm two fresh previews produce identical completion JSON, temporary
+  repository rows, summary CSV, and nine-sheet workbook.
+- [x] Confirm real durable repository hashes are unchanged by preview validation.
+
+Privacy and artifact checks:
+
+- [x] Confirm the real Libib export remains ignored and untracked.
+- [x] Confirm committed fixtures are synthetic, reduced, and privacy-safe.
+- [x] Confirm reviewer artifacts expose only allowlisted fields.
+- [x] Confirm no generated artifact, temporary repository, or real
+  `data/`, `input/`, or `output/` file is staged.
+
+Release hygiene:
+
+- [x] Confirm the changelog, release notes, and release-readiness record exist.
+- [x] Confirm current documentation agrees on behavior and deferred scope.
+- [ ] Confirm the working tree is clean after the final release commit.
+- [ ] Create annotated tag `v0.10.0` at the final release commit.
+- [ ] Push `main` and the tag.
+- [ ] Publish the GitHub Release from `docs/RELEASE_NOTES_v0.10.0.md`.
+- [ ] Verify the release is not a draft/prerelease and is marked latest.
+
+Known follow-up:
+
+- v0.11.0 adds Library Explorer and Action Center.
+- v0.12.0 adds reviewed monthly refresh and freshness orchestration.
+- Durable location mapping, manual reconciliation editing, condition, and
+  disposition workflows remain deferred.
+
 ## v0.9.0
 
 Pre-release checks:

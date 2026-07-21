@@ -432,8 +432,9 @@ and reconciled the multi-source summary, reviewer workbook, and HTML report.
 
 PR7 completed that materialization and reconciliation without changing
 valuation or matching semantics. PR8 completed the release documentation,
-privacy and artifact audits, and release gate. v0.9.0 is ready for publication;
-v0.10.0 is the next planned release.
+privacy and artifact audits, and release gate. v0.9.0 is released. v0.10.0
+implementation and acceptance are complete and the release is ready for its
+final commit, tag, push, and GitHub Release.
 
 ## v0.10.0: Libib Physical Inventory Integration
 
@@ -448,9 +449,9 @@ non-Amazon book without fabricating acquisition history. Progressive audit
 imports preserve partial, location-specific, filtered, full, or unknown scope;
 unmatched catalog items default to not yet audited rather than missing.
 The shared import direction is limited to Amazon Import, Libib Import, and
-Manual Entry; barcode scanning is an input mechanism. Stable `location_id`
-values represent project-owned physical locations independently of Libib labels,
-with current believed holding location and verification context in v0.10.0.
+Manual Entry; barcode scanning is an input mechanism. v0.10.0 reserves stable
+project-owned `location_id` references independently of Libib labels and stores
+verification context, while durable location creation and mapping remain deferred.
 Operational exports live under registered audit-area folders in `input/libib/`.
 Folder names and Libib collection labels remain separate evidence; mismatches
 require review. PR3 supports explicit-file and one-directory import, while
@@ -475,6 +476,12 @@ reconciliation decisions explain their relationship. Physical reconciliation
 precedes catalog matching. PR5 implements only that evidence-to-holding layer;
 catalog matching moves to PR6. See `RELEASE_PLAN_v0.10.0.md`,
 `LIBIB_INVENTORY_DESIGN.md`, and `INVENTORY_RECONCILIATION_DESIGN.md`.
+
+All ten v0.10.0 PRs are complete. The final untouched 30-row preview confirmed
+30 holdings, 22 existing catalog links, 5 proposed catalog identities, 3
+unresolved catalog cases, and 0 acquisitions. Two fresh previews produced
+identical IDs, completion output, CSV, and workbook bytes without modifying real
+durable state. v0.11.0 is the next planned product release.
 
 ## v0.11.0: Library Explorer and Action Center
 

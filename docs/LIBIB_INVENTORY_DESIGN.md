@@ -35,8 +35,8 @@ top-level import families by themselves.
 The importer may support a Libib CSV export and, if actual evidence justifies
 it, a directory or batch containing multiple related export files. “Batch” does
 not imply that arbitrary files or a proprietary backup format are supported.
-PR2 must identify formats, encodings, delimiters, column names, and export
-variants from representative files before support is declared.
+PR2 identified the supported untouched UTF-8 comma-delimited CSV contract and
+documented its columns and observed variants before support was declared.
 
 The workflow should accept an explicit file path and, in PR3, one explicitly
 selected audit-area directory. The project convention is:
@@ -150,8 +150,8 @@ for deliberate reprocessing.
 ### Privacy and raw files
 
 Libib exports may contain personal notes, tags, URLs, barcodes, location names,
-or account-specific fields. PR2 must inventory columns and classify each as
-retained, normalized, redacted, or rejected. Logs and generated artifacts use
+or account-specific fields. PR2 inventoried the observed columns and the parser
+classifies retained, normalized, redacted, and rejected evidence. Logs and generated artifacts use
 safe paths and must not echo raw rows. Tests use synthetic or deliberately
 sanitized fixtures.
 
@@ -482,8 +482,9 @@ valid durable locations. Parent references must be acyclic and may be blank.
 ### Source location labels and aliases
 
 The original Libib catalog/location label remains immutable on the Inventory
-Source Item, even after mapping. PR2 must determine whether that field is truly
-physical, logical, mixed, or differently used across exports.
+Observation, even after future mapping. PR2 confirmed only that this field is
+source collection/location evidence; physical, logical, or mixed meaning must
+remain unconfirmed until explicitly mapped.
 
 A tentative `data/inventory_location_aliases.csv` may map several normalized
 source labels to one `location_id`, with fields such as `source_family`,
@@ -627,14 +628,14 @@ These facts must remain distinct:
 | Disposition history | Explicitly confirmed exit or loss | Holding state plus append-preserving review/provenance |
 
 The current holding row is required in v0.10.0. A general inventory-event table
-is deferred unless PR2/PR3 proves that safe reconciliation or auditability cannot
-be achieved without it. Import/source-item and match history already preserve
+was deferred because PR2/PR3 implementation evidence did not require it.
+Import/observation and decision history already preserve
 source observations and link decisions; this avoids prematurely creating two
 overlapping histories.
 
-Likewise, v0.10.0 stores current believed `location_id` plus verification date
-or equivalent context. A general holding-movement or location-event history is
-deferred unless PR2 or implementation evidence shows it is necessary. Moving a
+Likewise, the v0.10.0 holding schema reserves current believed `location_id` and
+stores verification context, but no location repository or mapping workflow is
+implemented. A general holding-movement or location-event history is deferred. Moving a
 holding must still update timestamps/audit context without changing durable
 holding, catalog, or location identities.
 
@@ -696,7 +697,7 @@ The normal resolution flow is:
 
 The original PR1 numbering assigned automatic catalog creation to **PR4** and
 full workflow acceptance to PR7. That numbering is superseded: PR6 now
-implements the exact threshold and PR9 performs end-to-end acceptance. A valid
+implements the exact threshold and PR9 performed end-to-end acceptance. A valid
 unique ISBN is the clearest qualifying case. Weak title/author evidence,
 conflicting identifiers, grouped records, or uncertain editions remain
 unmatched and enter manual review before catalog creation.
