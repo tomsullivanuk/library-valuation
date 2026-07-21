@@ -747,6 +747,30 @@ source data. They must be reproducible from `input/`, `data/`, `cache/`,
 When generated files are committed, the reason should be clear: for example,
 sample outputs, reproducibility checkpoints, or user-facing deliverables.
 
+### v0.10.0 inventory audit presentation boundary
+
+PR7 implements `valuation/inventory_audit.py` as a source-neutral, read-only
+projection over the strict inventory, catalog, and acquisition repositories.
+It resolves current physical decisions per observation and current catalog
+decisions per holding exclusively through explicit append-only supersession
+links. Missing predecessors, branches, cycles, cross-entity supersession, or
+multiple current decisions fail closed; row order and timestamps never select
+the current decision.
+
+The projection produces `output/inventory_audit_summary.csv` and one generated
+`output/inventory_review_workbook.xlsx` containing summary, physical review,
+catalog review, audit coverage, location review, newly discovered, reconciled
+holdings, import detail, and decision detail sheets. These artifacts do not
+invoke import or matching code and never write beneath `data/`. Workbook edits
+are not imported. PR8 may refine reviewer usability, definitions, and visual
+acceptance, but must reuse this presentation model rather than introduce
+parallel reconciliation semantics.
+
+Only explicit allowlisted columns are projected. In particular,
+`raw_evidence_json`, unknown source columns, and arbitrary raw-evidence keys are
+excluded. Optional Research Assessment and generated market-summary inputs add
+presence flags only; they do not recalculate either subsystem.
+
 ## Testing Expectations
 
 Tests should protect the parts of the system that are most likely to corrupt

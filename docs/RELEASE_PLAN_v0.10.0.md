@@ -295,13 +295,26 @@ scope behavior, including non-invalidation across scopes.
 **Exit criteria:** Every unmatched or ambiguous row appears in a review view and
 absence-based exceptions carry the correct completeness caveat.
 
+**Implemented contract:** `valuation/inventory_audit.py` builds one generated,
+source-neutral presentation model and writes deterministic
+`output/inventory_audit_summary.csv` plus
+`output/inventory_review_workbook.xlsx`. Explicit supersession chains determine
+current decisions and malformed chains fail closed. The workbook contains
+Summary, Physical Review, Catalog Review, Audit Coverage, Location Review,
+Newly Discovered, Reconciled Holdings, Import Detail, and Decision Detail.
+Repository reads are allowlisted and validated; raw-evidence JSON is not
+exposed. Generation does not import, match, append decisions, or mutate catalog,
+holding, acquisition, or location state.
+
 ### PR8 — Inventory Reviewer Artifact
 
-**Purpose:** Present holdings, matches, provenance, and exceptions in a usable
-generated review workbook or equivalent artifact.
+**Purpose:** Complete reviewer usability, definitions, privacy inspection, and
+visual acceptance over the PR7 generated workbook and shared presentation
+model. PR8 must not create a second presentation model.
 
-**Major deliverables:** Summary, holdings, unmatched, ambiguous, audit, location,
-quantity, and data-quality views with a data dictionary and regeneration notes.
+**Major deliverables:** Reviewer acceptance refinements, a data dictionary and
+regeneration notes, plus focused visual or navigation improvements justified by
+PR7 artifact inspection. The core summary and detail sheets already exist.
 
 **Exclusions:** Reading edits back from the workbook and the v0.11.0 shared UI.
 

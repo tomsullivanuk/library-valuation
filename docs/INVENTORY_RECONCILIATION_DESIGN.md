@@ -612,3 +612,22 @@ Scope-wide absence persistence remains deferred.
   disposition rather than disappearing.
 - Every accepted current-belief change traces to immutable evidence and an
   append-preserving decision.
+
+## 15. PR7 Read-Only Audit Projection
+
+PR7 does not add a reconciliation stage. Its generated presentation model
+resolves exactly one current unsuperseded physical decision per observation and
+one current unsuperseded catalog decision per holding using explicit
+`supersedes_decision_id` chains. Historical rows remain visible in Decision
+Detail. A missing predecessor, branch, cycle, cross-entity link, or multiple
+current rows is repository corruption and stops artifact generation.
+
+Current unresolved outcomes populate Physical Review and Catalog Review without
+new candidate generation or recommendations. Accepted physical and catalog
+outcomes populate Reconciled Holdings as a positive control. Audit Coverage
+displays durable holding status and scope context; absence from partial or
+unknown scope remains neutral, and PR7 never creates `verified_missing`.
+
+Location and acquisition labels in these views are generated review
+classifications rather than reconciliation decisions. They never mutate a
+holding, create a location or acquisition, or become inputs to later runs.

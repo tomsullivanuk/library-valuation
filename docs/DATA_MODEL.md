@@ -1186,3 +1186,42 @@ The system should follow these rules when rebuilding outputs:
 
 These rules make the project reproducible while still allowing human judgment to
 remain durable.
+
+## Generated Inventory Audit Presentation Model (v0.10.0 PR7)
+
+The Inventory Audit Presentation is generated and non-durable. It joins the
+current unsuperseded physical decision, current unsuperseded catalog decision,
+latest supporting observation, holding, catalog item, import, folder
+registration, and acquisition-count context by stable IDs. Historical decisions
+remain available in Decision Detail but cannot drive current queue membership.
+
+The model distinguishes durable outcomes, generated review classifications,
+and display labels. Generated classifications include
+`source_label_unmapped`, `folder_collection_mismatch`,
+`confirmed_location_missing`, `location_context_available`,
+`catalog_decision_missing`, `metadata_enrichment_needed`, and
+`no_acquisition_history`; they never append a decision or change a holding.
+Location classifications compare immutable source collection evidence,
+registered folder expectation, caller-declared audit scope, and current
+`location_id` without mapping or creating a location. `verified_missing` is
+displayed only if already present in approved durable state.
+
+Acquisition context is `known_acquisition_history` for one acquisition row,
+`multiple_acquisitions` for more than one, and `no_acquisition_history` for
+none in a validated available repository. It is `acquisition_context_unknown`
+when that repository is unavailable; absence of the file is not silently
+treated as a zero count. Libib dates never become acquisition facts. Newly discovered books are
+identified by a current accepted `new_catalog_item_created` decision and joined
+through holding, latest observation, and import provenance. This avoids a
+catalog schema migration and does not depend on raw-evidence JSON.
+
+Summary denominators are explicit. Physical-resolution counts use current
+holdings; physical-exception counts use observations. Catalog eligibility means
+a holding has a current accepted physical decision for its latest observation.
+Therefore catalog-link rate is catalog-linked eligible holdings divided by
+catalog-reconciliation-eligible holdings, never all observations. Audit and
+location counts use current holdings. Quantity and duplicate review counts use
+observations. Zero denominators are emitted as zero rather than divided.
+The summary exposes the catalog-eligible denominator and the neutral
+`not_yet_audited` and `outside_audit_scope` counts directly rather than requiring
+reviewers to derive them from a rate or infer them from absence.

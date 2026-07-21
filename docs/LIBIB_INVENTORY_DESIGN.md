@@ -867,6 +867,30 @@ observation field, so PR6 leaves a new row's `publication_year` blank rather
 than depending on arbitrary privacy-safe raw JSON. A later explicit normalized
 projection may add that corroboration without rewriting observations.
 
+### Implemented PR7 inventory audit views
+
+PR7 projects durable PR3-PR6 state into the generated
+`inventory_audit_summary.csv` and `inventory_review_workbook.xlsx` artifacts.
+Queues cover current physical exceptions, current catalog exceptions, audit
+coverage, location evidence gaps, Libib-created catalog items without
+fabricated acquisitions, and successfully reconciled holdings. Current
+membership comes only from explicit unsuperseded decision chains; historical
+decisions remain provenance.
+
+Location review categories are presentation-only. A blank `location_id` plus a
+source label is `source_label_unmapped`; a registered folder expectation that
+differs from immutable source collection evidence is
+`folder_collection_mismatch`; blank evidence is
+`confirmed_location_missing`; and an existing location reference is
+`location_context_available`. No label is mapped, merged, or promoted to
+location identity.
+
+The privacy allowlist uses dedicated observation, decision, import, holding,
+catalog, and acquisition columns. It excludes `raw_evidence_json`, unknown
+columns, and arbitrary source keys. Libib-created provenance is reconstructed
+through the accepted catalog decision, holding, supporting observation, and
+import rather than by altering the historical catalog schema.
+
 ## 7. Contract for v0.11.0 and v0.12.0
 
 Version 0.10.0 must provide v0.11.0 Library Explorer and Action Center with
