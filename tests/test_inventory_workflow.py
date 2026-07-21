@@ -1,6 +1,7 @@
 import csv
 import json
 import shutil
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -68,6 +69,17 @@ def run(source, libib_root, data_dir, output_dir, *, publish=False):
     )
 
 
+def preview_with_default_clock(source, libib_root, data_dir, output_dir):
+    return update_inventory(
+        source,
+        libib_input_dir=libib_root,
+        data_dir=data_dir,
+        output_dir=output_dir,
+        audit_scope="Study",
+        audit_completeness="partial_scope",
+    )
+
+
 def test_preview_is_default_complete_and_does_not_mutate_durable_state(tmp_path):
     source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
     before = state_bytes(data_dir)
@@ -87,6 +99,40 @@ def test_preview_is_default_complete_and_does_not_mutate_durable_state(tmp_path)
     assert state_bytes(data_dir) == before
     assert (output_dir / "inventory_audit_summary.csv").exists()
     assert (output_dir / "inventory_review_workbook.xlsx").exists()
+
+
+def test_two_fresh_previews_have_identical_summaries_ids_and_artifacts(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    before = state_bytes(data_dir)
+    first = preview_with_default_clock(source, libib_root, data_dir, output_dir)
+    first_csv = (output_dir / "inventory_audit_summary.csv").read_bytes()
+    first_xlsx = (output_dir / "inventory_review_workbook.xlsx").read_bytes()
+
+    second = preview_with_default_clock(source, libib_root, data_dir, output_dir)
+
+    assert first.as_dict() == second.as_dict()
+    assert first.inventory_import_id == second.inventory_import_id
+    assert (output_dir / "inventory_audit_summary.csv").read_bytes() == first_csv
+    assert (output_dir / "inventory_review_workbook.xlsx").read_bytes() == first_xlsx
+    assert state_bytes(data_dir) == before
+
+
+def test_two_fresh_previews_create_identical_temporary_repository_rows(tmp_path, monkeypatch):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    captured = []
+    original = workflow.write_inventory_audit_artifacts
+
+    def capture_state(*, data_dir, output_dir, **kwargs):
+        captured.append({
+            name: (Path(data_dir) / name).read_bytes()
+            for name in workflow.DURABLE_REPOSITORY_NAMES
+        })
+        return original(data_dir=data_dir, output_dir=output_dir, **kwargs)
+
+    monkeypatch.setattr(workflow, "write_inventory_audit_artifacts", capture_state)
+    preview_with_default_clock(source, libib_root, data_dir, output_dir)
+    preview_with_default_clock(source, libib_root, data_dir, output_dir)
+    assert captured[0] == captured[1]
 
 
 def test_single_audit_area_directory_is_an_explicit_supported_input(tmp_path):
@@ -127,6 +173,23 @@ def test_identical_repeat_reuses_import_and_creates_no_durable_duplicates(tmp_pa
     assert (output_dir / "inventory_review_workbook.xlsx").read_bytes() == workbook_before
 
 
+def test_publication_keeps_existing_random_uuid4_identity_behavior(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    result = run(source, libib_root, data_dir, output_dir, publish=True)
+    assert uuid.UUID(result.inventory_import_id.removeprefix("LBI-")).version == 4
+    with (data_dir / "inventory_import_folders.csv").open(newline="", encoding="utf-8") as handle:
+        folder_id = next(csv.DictReader(handle))["folder_id"]
+    assert uuid.UUID(folder_id.removeprefix("LBF-")).version == 4
+    with (data_dir / "inventory_catalog_reconciliation_decisions.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        decisions = list(csv.DictReader(handle))
+    assert all(
+        uuid.UUID(row["inventory_catalog_reconciliation_decision_id"].removeprefix("ICD-")).version == 4
+        for row in decisions
+    )
+
+
 def test_repeat_completion_summary_and_artifacts_are_deterministic(tmp_path):
     source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
     run(source, libib_root, data_dir, output_dir, publish=True)
@@ -155,6 +218,47 @@ def test_changed_source_uses_existing_conservative_reconciliation_without_real_m
     assert result.repeat is False
     assert result.physical_unresolved >= 1
     assert state_bytes(data_dir) == before
+
+
+def test_changed_source_content_changes_preview_identity_against_same_state(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    before = state_bytes(data_dir)
+    first = run(source, libib_root, data_dir, output_dir)
+    rows = list(csv.DictReader(source.open(newline="", encoding="utf-8")))
+    rows[0]["title"] = "Example Physics Corrected"
+    changed = source.parent / "library_changed.csv"
+    with changed.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+
+    second = run(changed, libib_root, data_dir, output_dir)
+
+    assert second.inventory_import_id != first.inventory_import_id
+    assert state_bytes(data_dir) == before
+
+
+def test_materially_changed_durable_state_changes_preview_identity_and_remains_correct(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    first = run(source, libib_root, data_dir, output_dir)
+    repository = StrictCatalogRepository(data_dir / "catalog_items.csv")
+    rows = repository.load()
+    extra = catalog_row()
+    extra.update(
+        catalog_item_id="BK000099",
+        isbn13="9781402894626",
+        isbn10="1402894627",
+        title="Other Book",
+    )
+    repository.path.write_bytes(repository.rendered_bytes([*rows, extra]))
+    changed_state = state_bytes(data_dir)
+
+    second = run(source, libib_root, data_dir, output_dir)
+
+    assert second.inventory_import_id != first.inventory_import_id
+    assert second.catalog_existing_links == 1
+    assert second.source_rows == 2
+    assert state_bytes(data_dir) == changed_state
 
 
 @pytest.mark.parametrize("failure_stage", ["inventory", "catalog", "artifacts"])

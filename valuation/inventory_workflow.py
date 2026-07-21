@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
 import os
 import shutil
 import tempfile
+import uuid
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -39,6 +42,8 @@ DURABLE_REPOSITORY_NAMES = (
     "inventory_catalog_reconciliation_decisions.csv",
 )
 ARTIFACT_NAMES = ("inventory_audit_summary.csv", "inventory_review_workbook.xlsx")
+PREVIEW_IDENTITY_VERSION = "inventory_preview_identity_v1"
+_PREVIEW_NAMESPACE = uuid.UUID("3154cc32-a0a5-4f3d-9c44-60f77e738197")
 
 
 @dataclass(frozen=True)
@@ -98,6 +103,7 @@ def update_inventory(
     output_dir = Path(output_dir).resolve()
     _validate_destinations(source_file, libib_root, data_dir, output_dir)
     parsed = parse_libib_csv(source_file)
+    source_hash = _file_hash(source_file)
 
     durable_paths = [data_dir / name for name in DURABLE_REPOSITORY_NAMES]
     artifact_paths = [output_dir / name for name in ARTIFACT_NAMES]
@@ -113,6 +119,21 @@ def update_inventory(
         staged_output = temporary_root / "output"
         working_before = _snapshot([working_data / name for name in DURABLE_REPOSITORY_NAMES])
         acquisition_count_before = _acquisition_count(working_data / "acquisitions.csv")
+        if publish:
+            workflow_now = now
+            id_factory = None
+        else:
+            preview_seed = _preview_seed(
+                source_hash=source_hash,
+                source_file=source_file,
+                libib_root=libib_root,
+                data_dir=data_dir,
+                audit_scope=audit_scope,
+                audit_completeness=audit_completeness,
+            )
+            id_factory = _DeterministicUuidFactory(preview_seed)
+            preview_timestamp = _preview_timestamp(preview_seed)
+            workflow_now = now or (lambda: preview_timestamp)
 
         try:
             import_result = import_libib_inventory(
@@ -121,12 +142,17 @@ def update_inventory(
                 libib_input_dir=libib_root,
                 audit_scope=audit_scope,
                 audit_completeness=audit_completeness,
-                now=now,
+                now=workflow_now,
+                id_factory=id_factory,
             )
             if not import_result.accepted:
                 detail = import_result.diagnostics[0].message if import_result.diagnostics else import_result.status
                 raise InventoryWorkflowError(f"Libib import requires review: {detail}")
-            catalog_result = reconcile_inventory_catalog(data_dir=working_data, now=now)
+            catalog_result = reconcile_inventory_catalog(
+                data_dir=working_data,
+                now=workflow_now,
+                id_factory=id_factory,
+            )
             presentation = write_inventory_audit_artifacts(
                 data_dir=working_data,
                 output_dir=staged_output,
@@ -206,6 +232,52 @@ def _copy_repository_state(source: Path, destination: Path) -> None:
     for path in source.iterdir():
         if path.is_file():
             shutil.copy2(path, destination / path.name)
+
+
+class _DeterministicUuidFactory:
+    def __init__(self, seed: str):
+        self.seed = seed
+        self.counter = 0
+
+    def __call__(self) -> uuid.UUID:
+        self.counter += 1
+        return uuid.uuid5(_PREVIEW_NAMESPACE, f"{self.seed}:{self.counter}")
+
+
+def _preview_seed(
+    *, source_hash: str, source_file: Path, libib_root: Path, data_dir: Path,
+    audit_scope: str, audit_completeness: str,
+) -> str:
+    state = hashlib.sha256()
+    for name in sorted((*DURABLE_REPOSITORY_NAMES, "acquisitions.csv")):
+        path = data_dir / name
+        state.update(name.encode("utf-8"))
+        state.update(b"\0")
+        state.update(path.read_bytes() if path.exists() else b"<absent>")
+        state.update(b"\0")
+    context = {
+        "version": PREVIEW_IDENTITY_VERSION,
+        "source_file_hash": source_hash,
+        "durable_state_hash": state.hexdigest(),
+        "audit_area": source_file.parent.relative_to(libib_root).as_posix(),
+        "audit_scope": audit_scope,
+        "audit_completeness": audit_completeness,
+    }
+    canonical = json.dumps(context, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _preview_timestamp(seed: str) -> datetime:
+    base = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    return base + timedelta(seconds=int(seed[:12], 16) % (20 * 366 * 24 * 60 * 60))
+
+
+def _file_hash(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _snapshot(paths: list[Path]) -> dict[Path, bytes | None]:

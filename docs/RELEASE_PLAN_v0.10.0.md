@@ -365,6 +365,13 @@ published only after validated processing. Exact content-hash repeats are
 idempotent, completion output is machine-readable JSON, and Libib creates no
 acquisition history.
 
+Preview reproducibility is part of the implemented contract. A versioned seed
+derived from source content, relevant durable starting state, audit-area
+context, and declared scope/completeness supplies preview-only UUIDs and time.
+Identical previews therefore produce identical temporary repositories,
+completion summaries, CSVs, and workbooks. Changed source or durable state
+changes the seed. Published identity allocation remains unchanged.
+
 ### PR10 — Documentation and Release Readiness
 
 **Purpose:** Finalize user guidance and prove the release boundary.

@@ -17,6 +17,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
+from functools import partial
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
@@ -218,6 +219,7 @@ def reconcile_inventory_catalog(
     holding_ids: Iterable[str] | None = None,
     catalog_status_by_id: Mapping[str, str] | None = None,
     now: Callable[[], datetime] | None = None,
+    id_factory: Callable[[], uuid.UUID] | None = None,
 ) -> CatalogReconciliationResult:
     """Reconcile eligible current holdings to catalog identity atomically."""
 
@@ -282,6 +284,7 @@ def reconcile_inventory_catalog(
             catalog,
             status_by_id,
             timestamp,
+            id_factory=id_factory,
         )
         if prior_catalog_decision is not None:
             decision["supersedes_decision_id"] = prior_catalog_decision[
@@ -406,14 +409,17 @@ def _reconcile_one(
     catalog: list[dict[str, str]],
     statuses: Mapping[str, str],
     timestamp: str,
+    *,
+    id_factory: Callable[[], uuid.UUID] | None = None,
 ) -> tuple[dict[str, str], dict[str, str] | None]:
+    automatic_decision = partial(_automatic_decision, id_factory=id_factory)
     isbn10 = observation["normalized_isbn10"]
     isbn13 = observation["normalized_isbn13"]
     diagnostics = set(_parse_json_list(observation["diagnostic_codes_json"]))
     if "isbn_conflict" in diagnostics or (
         isbn10 and isbn13 and isbn10_to_isbn13(isbn10) != isbn13
     ):
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, (), statuses, "conflicting_isbn_evidence",
             "conflicting_normalized_isbn", "low", ("isbn_conflict",),
             "Valid ISBN evidence conflicts; catalog identity requires review.", timestamp,
@@ -425,13 +431,13 @@ def _reconcile_one(
     all_ids = tuple(row["catalog_item_id"] for row in candidates)
 
     if len(eligible) > 1:
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, all_ids, statuses, "multiple_catalog_candidates",
             method, "low", ("multiple_catalog_candidates",),
             "Multiple active catalog records are plausible; no catalog link was selected.", timestamp,
         ), None
     if not eligible and ineligible:
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, all_ids, statuses, "catalog_candidate_ineligible",
             method, "low", ("excluded_merged_or_invalid_candidate",),
             "Only ineligible catalog candidates were found; no link was changed.", timestamp,
@@ -440,7 +446,7 @@ def _reconcile_one(
         candidate = eligible[0]
         candidate_id = candidate["catalog_item_id"]
         if _catalog_isbn_conflict(candidate):
-            return _automatic_decision(
+            return automatic_decision(
                 holding, observation, all_ids, statuses,
                 "conflicting_isbn_evidence", method, "low",
                 ("catalog_candidate_isbn_conflict",),
@@ -454,33 +460,33 @@ def _reconcile_one(
             outcome = "edition_or_catalog_identity_ambiguity"
             if holding["catalog_item_id"] and holding["catalog_item_id"] != candidate_id:
                 outcome = "catalog_relink_requires_review"
-            return _automatic_decision(
+            return automatic_decision(
                 holding, observation, all_ids, statuses, outcome, method, "low",
                 ("conflicting_title_creator_evidence",),
                 "Strong catalog evidence conflicts with title or creator evidence; the current link is unchanged.",
                 timestamp,
             ), None
         if not (strong_isbn or corroborated_title_creator):
-            return _automatic_decision(
+            return automatic_decision(
                 holding, observation, all_ids, statuses, "catalog_candidate_requires_review",
                 method, "medium", ("insufficient_automatic_corroboration",),
                 "A catalog candidate exists but does not meet the automatic-link threshold.", timestamp,
             ), None
         if holding["catalog_item_id"] and holding["catalog_item_id"] != candidate_id:
-            return _automatic_decision(
+            return automatic_decision(
                 holding, observation, all_ids, statuses, "catalog_relink_requires_review",
                 method, "medium", ("existing_catalog_link_differs",),
                 "Evidence points to another catalog item; explicit supersession is required.", timestamp,
             ), None
         outcome = "existing_catalog_item_linked" if not holding["catalog_item_id"] else "existing_catalog_item_confirmed"
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, all_ids, statuses, outcome, method, "high" if strong_isbn else "medium",
             (method,), "A unique eligible catalog item met the automatic-link threshold.", timestamp,
             accepted_catalog_item_id=candidate_id,
         ), None
 
     if holding["catalog_item_id"]:
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, (), statuses, "catalog_link_unchanged",
             "prior_accepted_catalog_link", "high", ("no_conflicting_candidate",),
             "No conflicting candidate was found; the existing catalog link remains unchanged.", timestamp,
@@ -488,7 +494,7 @@ def _reconcile_one(
         ), None
 
     if _grouped_or_multivolume(observation):
-        return _automatic_decision(
+        return automatic_decision(
             holding, observation, (), statuses, "edition_or_catalog_identity_ambiguity",
             "grouped_or_multivolume_title_evidence", "low",
             ("grouped_or_multivolume_evidence",),
@@ -499,7 +505,7 @@ def _reconcile_one(
     if _strong_new_catalog_evidence(observation):
         catalog_item_id = _next_catalog_item_id(catalog)
         new_item = _new_catalog_item(catalog_item_id, observation)
-        decision = _automatic_decision(
+        decision = automatic_decision(
             holding, observation, (catalog_item_id,), {**statuses, catalog_item_id: "active"},
             "new_catalog_item_created", "unique_valid_isbn_no_candidate", "high",
             ("libib_discovered_catalog_identity", "no_acquisition_created"),
@@ -513,7 +519,7 @@ def _reconcile_one(
     reason = "missing_valid_isbn"
     if not title or not creator:
         reason = "insufficient_title_creator_evidence"
-    return _automatic_decision(
+    return automatic_decision(
         holding, observation, (), statuses, "insufficient_catalog_evidence",
         "no_automatic_candidate", "low", (reason,),
         "Evidence does not support an automatic catalog link or new catalog identity.", timestamp,
@@ -626,6 +632,7 @@ def _automatic_decision(
     statuses: Mapping[str, str], outcome: str, basis: str, confidence: str,
     reason_codes: Iterable[str], explanation: str, timestamp: str,
     accepted_catalog_item_id: str = "",
+    id_factory: Callable[[], uuid.UUID] | None = None,
 ) -> dict[str, str]:
     candidate_ids = tuple(sorted(set(candidates)))
     return _decision_row(
@@ -634,6 +641,7 @@ def _automatic_decision(
         statuses=tuple(f"{item}:{statuses.get(item, 'active') or 'active'}" for item in candidate_ids),
         outcome=outcome, basis=basis, confidence=confidence, reason_codes=tuple(reason_codes),
         explanation=explanation, timestamp=timestamp, origin="automatic",
+        id_factory=id_factory,
     )
 
 
@@ -642,10 +650,11 @@ def _decision_row(
     candidates: Iterable[str], statuses: Iterable[str], outcome: str, basis: str,
     confidence: str, reason_codes: Iterable[str], explanation: str, timestamp: str,
     origin: str, supersedes: str = "", decision_id: str | None = None,
+    id_factory: Callable[[], uuid.UUID] | None = None,
 ) -> dict[str, str]:
     return {
         "schema_version": CATALOG_RECONCILIATION_SCHEMA_VERSION,
-        "inventory_catalog_reconciliation_decision_id": decision_id or f"ICD-{uuid.uuid4()}",
+        "inventory_catalog_reconciliation_decision_id": decision_id or f"ICD-{(id_factory or uuid.uuid4)()}",
         "holding_id": holding_id,
         "inventory_observation_id": observation_id,
         "catalog_item_id": catalog_item_id,

@@ -155,7 +155,9 @@ python3 library_pipeline.py update-inventory \
 Preview is the default. It runs against temporary copies of `data/`, leaves
 durable repositories unchanged, and generates
 `output/inventory_audit_summary.csv` and
-`output/inventory_review_workbook.xlsx`. After reviewing the summary and queues,
+`output/inventory_review_workbook.xlsx`. Identical source content, durable
+starting state, audit area, scope, and completeness produce identical preview
+IDs, completion output, and artifact bytes. After reviewing the summary and queues,
 repeat the same command with `--publish` to authorize durable publication.
 The source must be inside an explicit audit-area folder below
 `--libib-input-dir` (default `input/libib`); the command never discovers files

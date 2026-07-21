@@ -469,6 +469,7 @@ def import_libib_inventory(
     audit_scope: str = "unknown",
     audit_completeness: str = "unknown",
     now: Callable[[], datetime] | None = None,
+    id_factory: Callable[[], uuid.UUID] | None = None,
 ) -> LibibInventoryImportResult:
     """Import, observe, and reconcile one file or one selected audit directory."""
 
@@ -525,7 +526,7 @@ def import_libib_inventory(
     if folder_path and folder is None:
         folder = {
             "schema_version": FOLDER_REPOSITORY_SCHEMA_VERSION,
-            "folder_id": f"LBF-{uuid.uuid4()}",
+            "folder_id": f"LBF-{(id_factory or uuid.uuid4)()}",
             "folder_path": folder_path,
             "expected_collection_label": collection_label,
             "first_imported_at": imported_at,
@@ -541,7 +542,7 @@ def import_libib_inventory(
             for row in folders
         ]
 
-    inventory_import_id = f"LBI-{uuid.uuid4()}"
+    inventory_import_id = f"LBI-{(id_factory or uuid.uuid4)()}"
     folder_id = folder["folder_id"] if folder else ""
     import_row = {
         "schema_version": IMPORT_REPOSITORY_SCHEMA_VERSION,

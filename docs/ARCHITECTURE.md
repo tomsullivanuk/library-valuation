@@ -799,6 +799,14 @@ Exact file repeats continue to use the existing content hash and create no new
 durable identities or decisions. `acquisitions.csv` is validated and counted,
 but never written by this workflow.
 
+Preview-only UUIDs and the proposed acceptance timestamp are deterministic
+under a versioned identity seed containing source content, audit-area context,
+scope/completeness arguments, and the relevant durable repository bytes. This
+makes two fresh previews of the same proposal byte-reproducible while ensuring
+changed source or starting state uses a different preview identity namespace.
+The factory is injected only into temporary preview processing. Publication
+continues to use the existing UUIDv4 allocation and wall-clock timestamp.
+
 ## Testing Expectations
 
 Tests should protect the parts of the system that are most likely to corrupt
