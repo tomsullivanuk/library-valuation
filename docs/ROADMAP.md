@@ -4,6 +4,8 @@ This roadmap translates the project vision and architecture into incremental
 implementation work. The intent is to grow from the current Amazon/Open Library
 catalog pipeline into a reproducible valuation and decision-support system
 without losing the source-of-truth discipline described in the architecture.
+The durable product mission and governing principles are defined in
+`PRODUCT_VISION.md`; this roadmap sequences work in service of that vision.
 
 ## Sprint 0: Completed Setup
 
@@ -14,7 +16,8 @@ Completed outcomes:
 - Repository created for the Library Valuation project.
 - `README.md` documents the current Amazon catalog pipeline and Open Library
   enrichment cascade.
-- `VISION.md` defines the mission, design philosophy, and long-term direction.
+- `PRODUCT_VISION.md` defines the mission, product principles, and long-term
+  direction.
 - `docs/ARCHITECTURE.md` documents the source-of-truth principle, current data
   flow, future architecture, generated artifact policy, and expected module
   boundaries.

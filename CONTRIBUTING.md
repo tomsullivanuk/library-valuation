@@ -4,9 +4,9 @@
 
 `CONTRIBUTING.md` describes the engineering practices expected of all
 contributors to Library Valuation. The project's architectural intent is
-documented in `VISION.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`, and
-`docs/ROADMAP.md`. Use this guide as the operating manual for making changes
-without drifting from those documents.
+documented in `docs/PRODUCT_VISION.md`, `docs/ARCHITECTURE.md`,
+`docs/DATA_MODEL.md`, and `docs/ROADMAP.md`. Use this guide as the operating
+manual for making changes without drifting from those documents.
 
 ## Development Environment
 
@@ -40,7 +40,7 @@ source of truth for current workflows.
 Prefer reproducibility over manual editing. Preserve backward compatibility
 where practical, especially for existing command behavior, output field names,
 and documented workflows. Favor incremental, reviewable changes. See
-`VISION.md` for the broader mission and design philosophy.
+`docs/PRODUCT_VISION.md` for the broader mission and product direction.
 
 ## Coding Principles
 
@@ -72,7 +72,7 @@ inside this guide; cross-reference the architecture documents instead.
 
 Architectural changes should be reflected in the relevant source document:
 
-- `VISION.md`
+- `docs/PRODUCT_VISION.md`
 - `docs/ARCHITECTURE.md`
 - `docs/DATA_MODEL.md`
 - `docs/ROADMAP.md`
@@ -131,7 +131,7 @@ that moves the project along the existing roadmap.
 Before making substantive changes, read the project documentation in this order:
 
 1. `README.md`
-2. `VISION.md`
+2. `docs/PRODUCT_VISION.md`
 3. `docs/ARCHITECTURE.md`
 4. `docs/DATA_MODEL.md`
 5. `docs/ROADMAP.md`

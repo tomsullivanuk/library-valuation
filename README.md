@@ -51,6 +51,8 @@ tracking number, payment method, gift fields, and other personal columns.
 
 ## Project Docs
 
+- `docs/PRODUCT_VISION.md`: durable mission, steward-centered product
+  principles, intended workflow, success criteria, and product boundaries.
 - `docs/ARCHITECTURE.md`: source-of-truth rules and system boundaries.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
