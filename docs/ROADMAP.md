@@ -1,589 +1,253 @@
 # Roadmap
 
-This roadmap translates the project vision and architecture into incremental
-implementation work. The intent is to grow from the current Amazon/Open Library
-catalog pipeline into a reproducible valuation and decision-support system
-without losing the source-of-truth discipline described in the architecture.
-The durable product mission and governing principles are defined in
-`PRODUCT_VISION.md`; this roadmap sequences work in service of that vision.
+This roadmap connects the durable mission in
+[Product Vision](PRODUCT_VISION.md) to future, release-specific plans. It
+describes the product outcomes Library Valuation should pursue without
+repeating implementation history or prematurely fixing technical designs.
 
-## Sprint 0: Completed Setup
+This roadmap is intentionally organized around the steward's workflow rather
+than the system's internal architecture. Infrastructure exists to support
+stewardship outcomes, not define the product.
 
-Sprint 0 established the project foundation.
+Release plans should translate the direction here into bounded deliverables,
+acceptance criteria, sequencing, and implementation decisions. Completed work
+belongs in release notes, the changelog, and architecture documentation.
 
-Completed outcomes:
+## Current Product Baseline
 
-- Repository created for the Library Valuation project.
-- `README.md` documents the current Amazon catalog pipeline and Open Library
-  enrichment cascade.
-- `PRODUCT_VISION.md` defines the mission, product principles, and long-term
-  direction.
-- `docs/ARCHITECTURE.md` documents the source-of-truth principle, current data
-  flow, future architecture, generated artifact policy, and expected module
-  boundaries.
-- Current pipeline extracts likely physical-book purchases from Amazon exports.
-- ISBN-10 values are validated and converted to ISBN-13.
-- Privacy-sensitive Amazon fields are excluded from extracted book rows.
-- Open Library enrichment and fallback resolution are available.
-- CSV and XLSX outputs are generated for browsing and review.
-- Tests cover the core ISBN, extraction, enrichment, output, and catalog-join
-  behavior currently in place.
+Through v0.10.0, Library Valuation has established:
 
-Exit condition:
+- a durable catalog and acquisition history derived from Amazon imports;
+- research prioritization and collector-owned review state;
+- source-aware AbeBooks and eBay asking-price evidence;
+- generated catalog, evidence, and review artifacts;
+- Libib physical-inventory imports with immutable observations;
+- conservative physical and catalog reconciliation;
+- explicit handling of unresolved identity and audit exceptions;
+- safe preview and explicit publication with deterministic previews, atomic
+  rollback, and idempotent repeat processing; and
+- an inventory review workbook for collector and steward review.
 
-- The project has a working catalog-generation baseline and enough written
-  architecture to guide future changes.
+The detailed record is maintained in [the changelog](../CHANGELOG.md),
+[v0.10.0 release notes](RELEASE_NOTES_v0.10.0.md), prior release notes, and the
+architecture documents.
 
-## Sprint 1: Repository Structure and Valuation Foundation
+## Steward Workflow
 
-Sprint 1 should prepare the codebase for valuation work while keeping behavior
-stable.
-
-Goals:
-
-- Introduce a clearer repository structure without changing the public workflow.
-- Establish durable boundaries between catalog facts, market observations,
-  valuation estimates, and decisions.
-- Add schema documentation for the normalized catalog and future valuation data.
-- Keep generated workbooks as outputs, not canonical data.
-
-Likely work:
-
-- Split the current single-file pipeline only where the boundary is obvious and
-  useful.
-- Create modules for ISBN utilities, Amazon import, Open Library access, cache
-  handling, catalog assembly, and artifact writing.
-- Define initial data contracts for:
-  - catalog records;
-  - market observations;
-  - valuation estimates;
-  - decision recommendations.
-- Add fixture-driven tests around any moved behavior.
-- Document how new generated artifacts should be named, stored, and regenerated.
-
-Exit condition:
-
-- The codebase has clear module boundaries for catalog work, and valuation data
-  can be added without mixing facts, estimates, and recommendations in one flat
-  table.
-
-## v0.2.0: Incremental Full-History Imports
-
-Version 0.2.0 should make the monthly Amazon workflow incremental without using
-generated workbooks as source data.
-
-Goals:
-
-- Treat each Amazon download as a full-history source file, not a delta.
-- Introduce durable CSV state under `data/`.
-- Use `catalog_item_id` as the permanent internal catalog identity.
-- Preserve durable `catalog_item_id` values across runs by loading existing
-  catalog state before assigning IDs.
-- Never derive `catalog_item_id` values from Amazon row order, catalog sort
-  order, output row order, or other run-local positions.
-- Treat ISBN-13 and ISBN-10 as preferred matching attributes, not canonical
-  identity.
-- Keep catalog items and acquisitions clearly separated.
-- Preserve existing Research Assessments for known catalog items.
-- Assess only newly discovered catalog items by default.
-- Keep Research Assessments separate from future market valuation.
-
-Durable files:
-
-- `data/import_manifest.csv`: import audit log with file hash, counts, pipeline
-  version, schema version, and latest-file marker.
-- `data/catalog_items.csv`: one row per distinct catalog item/book identity.
-- `data/acquisitions.csv`: one row per purchase or acquisition event.
-- `data/research_priority_assessments.csv`: durable assessments linked by
-  `catalog_item_id`.
-
-Cache layout:
-
-- `cache/openlibrary/isbn.json`
-- `cache/openlibrary/search.json`
-
-Default command:
-
-```bash
-python3 library_pipeline.py update-library
-```
-
-Future re-evaluation options:
+The product should support one understandable lifecycle:
 
 ```text
---reevaluate new
---reevaluate stale
---reevaluate all
+Import
+  ↓
+Catalog
+  ↓
+Inventory
+  ↓
+Understand
+  ↓
+Prioritize
+  ↓
+Recommend
+  ↓
+Publish
+  ↓
+Record Final Disposition
 ```
 
-Exit condition:
-
-- A monthly run from the latest full Amazon CSV or ZIP export rebuilds acquisitions, reconciles
-  them to durable catalog items, evaluates only new catalog items by default,
-  preserves prior assessments, records an import-manifest audit row, and
-  regenerates output artifacts from `input/`, `data/`, `cache/`, and `config/`.
-
-Implementation status:
-
-- Done: directory conventions and centralized path handling.
-- Done: durable `catalog_item_id` reuse from `data/catalog_items.csv`.
-- Done: `catalog_item_id` values in generated metadata and catalog outputs.
-- Done: `data/acquisitions.csv` rebuilt from the current full-history Amazon
-  export and linked to durable catalog items.
-- Done: `data/import_manifest.csv` append-only audit log.
-- Done: persistent Research Assessments in
-  `data/research_priority_assessments.csv`.
-- Done: latest `.csv`/`.zip` discovery in `input/amazon`.
-- Done: Amazon ZIP and compatible `Retail.OrderHistory.1` package support.
-- Done: Open Library caches default to `cache/openlibrary/`.
-- Done: release polish for friendly expected CLI errors and optional macOS
-  completion/failure notification.
-- Follow-up: because existing nonblank catalog fields are preserved, improved
-  external metadata will need an explicit refresh, override, or staleness policy.
-- Follow-up: acquisition IDs are deterministic hashes of available Amazon
-  evidence until a richer source-item layer exposes true source line IDs.
-- Not yet done: explicit `--reevaluate` modes.
-
-## Sprint 2: Research Assessments
-
-Sprint 2 should add Research Assessments that identify which books deserve
-human research first. A Research Assessment aggregates deterministic Research
-Signals into a priority score, band, and explanation. It is a prioritization
-tool, not a valuation estimate.
-
-Goals:
-
-- Rank books by expected research value using available catalog evidence.
-- Surface books likely to require manual attention.
-- Keep the scoring logic transparent and adjustable.
-
-Possible score inputs:
-
-- Presence or absence of LCC, Dewey, LCCN, OCLC, and subjects.
-- Subject area or classification signals associated with scholarly value.
-- Publication age or edition ambiguity.
-- Duplicate purchase or multi-volume signals.
-- Title-search fallback confidence.
-- Missing or weak bibliographic resolution.
-- Product-name clues that indicate sets, rare editions, imports, or specialized
-  academic works.
-
-Likely durable assessment fields:
-
-- A `research_priority_score`.
-- A `research_priority_band`, such as high, medium, low, or manual review.
-- Compact Research Signal codes and summaries.
-- Human-readable Research Signal explanations.
-
-Exit condition:
-
-- The catalog can produce reproducible Research Candidates that direct human
-  time toward books with the highest expected payoff or uncertainty.
-
-Implementation status:
-
-- Done: deterministic Research Signals.
-- Done: generated Research Assessments in the preserved durable
-  `data/research_priority_assessments.csv` path.
-- Done: generated `output/research_candidates.csv` and `.xlsx` views that rank
-  high, medium, and low Research Assessments for collector attention.
-- Done: durable `data/collector_reviews.csv` state for collector-owned review
-  workflow fields and notes.
-- Not yet done: reviewed-item filtering or priority override behavior.
-
-## v0.3.0: Collector Review State And Generated Workbook
-
-Version 0.3.0 introduces collector-owned review state and a generated workbook
-designed for research planning, without making the workbook the source of
-truth.
-
-Goals:
-
-- Produce a professional Collector Workbook from normalized data.
-- Separate catalog facts, Research Assessments, Collector Reviews, and generated
-  outputs.
-- Make review efficient for the highest-priority books.
-
-Likely workbook sections:
-
-- Catalog overview.
-- Research Candidates sorted by priority.
-- Current Acquisitions.
-- Reviewed Items.
-- Metadata Gaps.
-- Collector Reviews.
-- Summary dashboard metrics.
-
-Policy:
-
-- The workbook is generated.
-- Manual workbook edits are not durable unless imported through a documented
-  workflow.
-- Any import workflow must preserve provenance and avoid overwriting catalog
-  facts with opinions.
-
-Exit condition:
-
-- A user can regenerate a Collector Workbook from project data and use it to
-  guide review without hand-editing the canonical catalog.
-
-## v0.4.0: Market Validation Spike
-
-Version 0.4.0 is a documentation-first research experiment rather than a
-valuation implementation effort. It validates whether the existing Research
-Assessment model identifies books that are materially more likely to show
-meaningful external market signals.
-
-Plan:
-
-- Use the subsystem architecture in
-  [Market Intelligence](MARKET_INTELLIGENCE.md).
-- Use the experimental design in
-  [Market Validation Spike](MARKET_VALIDATION_SPIKE.md).
-- Sample books across Research Score bands instead of only high-scoring
-  candidates using `generate-market-validation-sample`, targeting 100 books
-  across five score bands when the catalog distribution supports it.
-- Collect lightweight AbeBooks market observations with
-  `collect-abebooks-observations`.
-- Treat AbeBooks as feasible for small ISBN-first observation runs, while
-  keeping the integration experimental.
-- Report observation coverage and source-access diagnostics with
-  `report-market-observation-coverage`.
-- Interpret externally observed market evidence in PR8 with
-  `analyze-market-validation`.
-- Review individual signal effectiveness and model calibration in PR9 with
-  `review-research-signal-effectiveness`.
-- Synthesize interpretation limits and calibration guardrails in
-  [Market Validation Findings](MARKET_VALIDATION_FINDINGS_v0.4.0.md).
-- Review calibration alternatives and future acceptance criteria in the
-  [Research Assessment Calibration Proposal](RESEARCH_ASSESSMENT_CALIBRATION_PROPOSAL_v0.4.0.md).
-- Analyze whether higher Research Scores are associated with stronger observed
-  asking-price signals and higher observation coverage.
-- Use the results to decide whether automated valuation, valuation import, or
-  model refinement should come next.
-
-PR8 findings:
-
-- Current Research Scores are heavily concentrated in the `8-10` band.
-- The validation sample reached 65 books because the `2-3` band is empty and
-  the `6-7` band has only five available books.
-- AbeBooks returned observations for all sampled books.
-- Higher-score books showed stronger maximum observed asking prices, but
-  low-score false-negative candidates remain important follow-up evidence.
-
-PR9 findings:
-
-- Signal effectiveness is mixed when judged by medians rather than maxima.
-- `university_press` and `missing_lcc` meet the sample median, while several
-  other signals remain weak, inconsistent, or too sparse to classify.
-- The observed score-band medians do not form a monotonic gradient.
-- Candidate model changes remain future work; PR9 does not alter scoring.
-
-PR10 records the provisional findings and calibration principles without
-changing the model. The recommended next step is PR11, a reviewed Research
-Assessment Calibration Proposal that defines specific refinements before any
-scoring implementation.
-
-PR11 recommends signal-role rebalancing as the preferred direction, subject to
-a before/after simulation. PR12 expands the original validation evidence first:
-it preserves 65 existing books, selects 140 additional candidates across
-available bands, records exhausted-band deficits, and supports bounded AbeBooks
-collection without replacing prior artifacts. PR13 should compare hypothetical
-evidence with the original 65-book findings. The refreshed results retain a
-non-monotonic median pattern but strengthen the `8+` band and two previously
-uncertain signals. PR14 should compare hypothetical score distributions,
-priority bands, candidate rankings, and known candidate misses without changing
-production configuration or persisted assessments.
-
-PR14 simulation result:
-
-- Conservative and market-likelihood scenarios alter many scores and several
-  production bands.
-- Neither scenario changes top-50 membership or its observed asking-price
-  profile.
-- Three false-positive references move down under each scenario, but no false-
-  negative references move up.
-- Outlier-sensitive top-50 representation remains unchanged.
-
-PR15 records the decision not to implement production scoring changes in
-v0.4.0. The simulated alternatives behaved differently but did not improve the
-practical top candidate set. Current scoring, signals, weights, and persisted
-assessments remain unchanged. A future model-design effort should investigate
-separate market-likelihood and research-effort concepts.
-
-PR16 confirms release readiness and closes the research spike without reopening
-calibration absent new evidence. The release is ready for final commit, tagging,
-and publication using `docs/RELEASE_NOTES_v0.4.0.md`.
-
-Exit condition:
-
-- The project has evidence about whether Research Score contains predictive
-  information about market value, and follow-on valuation work is grounded in
-  that evidence.
-
-## v0.5.0: Market Evidence First
-
-Version 0.5.0 implements the generated, source-neutral evidence layer proposed
-after the v0.4.0 experiment.
-
-Completed outcomes:
-
-- Defined the versioned Market Evidence Summary schema.
-- Aggregated source-specific observation and status rows per catalog item.
-- Classified evidence availability, market confidence, and outlier sensitivity.
-- Produced a cautious asking-price-derived range only where supported.
-- Added review recommendations that account for evidence usability, ambiguity,
-  fragility, and initial economic-interest thresholds.
-- Repositioned Research Signals as fallback and review-prioritization context
-  when market evidence is missing or unavailable.
-- Preserved production Research Assessment scoring and monthly import behavior.
-- Kept all market summary artifacts generated and non-durable.
-
-Exit condition:
-
-- A user can transform market observations into an explainable per-book summary
-  without confusing asking prices with completed sales or formal appraisals.
-
-## v0.6.0: Full AbeBooks Baseline & Review Artifacts
-
-Version 0.6.0 turns the AbeBooks market-evidence work into a conservatively
-throttled full-library workflow with reviewer-facing Excel and static HTML
-artifacts.
-
-Sequence:
-
-- PR1: Multi-Source Market Evidence Design Brief.
-- PR2: Source Integration Spike.
-- PR3: Full-Library AbeBooks Baseline Workflow.
-- PR4: AbeBooks Baseline Review Workbook.
-- PR5: Static AbeBooks Review Report.
-- PR6: Documentation, Release Notes, and Release Readiness.
-
-The baseline should quantify evidence coverage, confidence, outlier sensitivity,
-review recommendations, and the practical manual-review queue. It remains
-observed asking-price evidence rather than an appraisal or realized-sale
-estimate.
-
-## v0.7.0: eBay Active Listings Integration
-
-Add eBay incrementally as active-listing asking-price evidence:
-
-- PR1: v0.7.0 Release Plan.
-- PR2: eBay Access / Credential Spike.
-- PR3: eBay Active Listings Client.
-- PR4: eBay Observation Adapter.
-- PR5: Targeted eBay Collection Workflow.
-- PR6: Multi-Source Market Evidence Summary.
-- PR7: Multi-Source Workflow Readiness.
-- PR8: Documentation and Release Readiness.
-
-Begin with a 5–10 book smoke test, then a bounded possible-sale plus stratified
-manual/edition-review cohort. Do not make the initial eBay run full-library.
-Extend generated summaries to distinguish source agreement, conflict, and
-non-comparability without treating active asking prices as completed sales,
-appraisals, fair market value, or expected proceeds. Sold/completed evidence and
-automatic full-library collection remain deferred decisions. Existing AbeBooks
-workbook and HTML projections remain unchanged until a later source-context
-design is explicitly approved.
-
-The v0.7.0 release boundary is the verified sandbox access path, bounded
-targeted observation workflow, source-aware generated summary, and documented
-readiness checks. Production access, representative eBay evidence, workbook and
-HTML integration, match-confidence rules, shipping treatment, sold/completed
-evidence, and any full-library strategy remain future work.
-
-## v0.8.0: Production Validation and Reviewer Source Context — Released
-
-Validate production eBay evidence before reviewer integration, then expose only
-compact, source-aware context:
-
-- PR1: remove seller username from eBay evidence;
-- PR2: run and document a bounded production smoke test;
-- PR3: run and document a representative 100-book production validation; and
-- PR4: add source-aware eBay context to the generated reviewer workbook;
-- PR5: align the static HTML report with the source-aware workbook; and
-- PR6: finalize release notes and release readiness.
-
-The workbook and HTML report keep AbeBooks as the core range source for mixed
-rows and show eBay as supplemental active-listing item-price evidence. Production
-OAuth, bounded collection, representative evidence, seller suppression, and
-both reviewer projections are complete. Shipping-aware pricing, currency
-normalization, sold/completed evidence, improved match-confidence heuristics,
-automated edition matching, richer reviewer workflow, additional evidence
-sources, and production full-library collection remain deferred.
-
-Released as `v0.8.0` at `192271ecb658e82cd0a28c181316b5d5bf9476c9`.
-
-## v0.9.0: Full-Library eBay Baseline and Resumable Collection
-
-Build a separate production-only workflow for the approximately 3,014 assessed
-catalog items. It must be resumable, checkpointed, deterministic, safely paced,
-bounded in retries, restartable without duplicating completed work, and suitable
-for unattended overnight execution. A run manifest must preserve provenance and
-support final observation, multi-source summary, workbook, and HTML artifacts.
-
-This is not an increase to the targeted command's 100-book limit. The minimum
-checkpoint state needed for safe v0.9.0 operation will be designed before code;
-the broader durable refresh-history model remains future work. Seller identity
-remains suppressed. Detailed and reviewer artifacts remain ignored and
-non-durable unless a later design explicitly promotes them.
-
-PR6 completed the full 3,014-book production checkpoint: 2,881 books produced
-8,293 observed listings, 133 produced no results, and integrity, duplicate, and
-privacy validation passed. PR7 then materialized the ignored combined outputs
-and reconciled the multi-source summary, reviewer workbook, and HTML report.
-
-PR7 completed that materialization and reconciliation without changing
-valuation or matching semantics. PR8 completed the release documentation,
-privacy and artifact audits, and release gate. v0.9.0 is released. v0.10.0
-implementation and acceptance are complete and the release is ready for its
-final commit, tag, push, and GitHub Release.
-
-## v0.10.0: Libib Physical Inventory Integration
-
-Use Libib CSV/batch exports as a separate physical-inventory and location layer
-without treating them as durable intellectual/catalog identity. Use `holding_id`
-as the stable project-owned physical-copy identity. Libib
-identifiers and metadata are matching evidence and must not replace
-`catalog_item_id` or canonical bibliographic metadata. Preserve unmatched and
-ambiguous rows for review, and do not infer disposition from absence.
-Strong, unambiguous evidence may create a new catalog item and holding for a
-non-Amazon book without fabricating acquisition history. Progressive audit
-imports preserve partial, location-specific, filtered, full, or unknown scope;
-unmatched catalog items default to not yet audited rather than missing.
-The shared import direction is limited to Amazon Import, Libib Import, and
-Manual Entry; barcode scanning is an input mechanism. v0.10.0 reserves stable
-project-owned `location_id` references independently of Libib labels and stores
-verification context, while durable location creation and mapping remain deferred.
-Operational exports live under registered audit-area folders in `input/libib/`.
-Folder names and Libib collection labels remain separate evidence; mismatches
-require review. PR3 supports explicit-file and one-directory import, while
-recursive all-folder discovery remains a later workflow.
-
-Approved implementation sequence:
-
-1. Libib Physical Inventory Design and Release Plan.
-2. Libib Export Profiling and Parser.
-3. Durable Inventory Import and Physical-Item State.
-4. Inventory Observation and Reconciliation Design.
-5. Durable Inventory Observations and Holding Reconciliation.
-6. Catalog-to-Inventory Matching.
-7. Inventory Exceptions and Audit Views.
-8. Inventory Reviewer Artifact.
-9. End-to-End Import Workflow and Validation.
-10. Documentation and Release Readiness.
-
-PR4 settles that immutable Inventory Observations preserve historical source
-assertions, Inventory Holdings preserve current belief, and append-preserving
-reconciliation decisions explain their relationship. Physical reconciliation
-precedes catalog matching. PR5 implements only that evidence-to-holding layer;
-catalog matching moves to PR6. See `RELEASE_PLAN_v0.10.0.md`,
-`LIBIB_INVENTORY_DESIGN.md`, and `INVENTORY_RECONCILIATION_DESIGN.md`.
-
-All ten v0.10.0 PRs are complete. The final untouched 30-row preview confirmed
-30 holdings, 22 existing catalog links, 5 proposed catalog identities, 3
-unresolved catalog cases, and 0 acquisitions. Two fresh previews produced
-identical IDs, completion output, CSV, and workbook bytes without modifying real
-durable state. v0.11.0 is the next planned product release.
-
-## v0.11.0: Library Explorer and Action Center
-
-Create two static, self-contained web experiences backed by one shared generated
-presentation model:
-
-- Library Explorer: searchable, sortable, filterable catalog, inventory,
-  acquisition, market-evidence, recommendation, and freshness context.
-- Action Center: next-step queues for sale review, market research, edition or
-  condition review, physical-audit exceptions, metadata cleanup, missing market
-  evidence, and stale evidence.
-
-Neither page independently recalculates ranges, confidence, or recommendations.
-A server-backed application requires a later explicit justification.
-
-## v0.12.0: Automated Monthly Refresh Workflow
-
-Provide one repeatable refresh command that discovers the latest Amazon export,
-optionally imports Libib inventory, updates acquisitions and physical context,
-selects new/stale/missing-source market checks, incrementally refreshes AbeBooks
-and eBay evidence, rebuilds the shared summary and both web experiences, and
-writes a concise run report. Refresh intervals should become configuration-
-driven, with manual selected/all overrides.
-
-Reliable monthly refresh will likely require durable collection state and
-provenance such as source, catalog item, strategy, attempt/success dates,
-staleness, retry state, run identity, environment, and summary provenance.
-v0.9.0 should choose only the minimum safe checkpoint subset and avoid
-prematurely finalizing the v0.12.0 architecture.
-
-Across these releases, AbeBooks remains the primary/core range source unless a
-future reviewed design explicitly changes that behavior. eBay active listings
-remain supplemental asking-price evidence, not sold/completed evidence,
-appraisals, fair-market-value estimates, or realized-sale estimates. Shipping,
-currency conversion, and sold/completed eBay evidence remain deferred.
-
-## Later: Top-25 Market Research Workflow
-
-After the Market Validation Spike, the project may create a focused workflow
-for researching the highest-priority books first.
-
-Goals:
-
-- Select the top 25 Research Candidates.
-- Capture comparable market evidence in a structured way.
-- Produce initial valuation estimates backed by observed data.
-- Preserve source URLs, capture dates, condition notes, and confidence.
-
-Market sources may include:
-
-- AbeBooks.
-- eBay completed sales.
-- Bookfinder.
-- Amazon Used.
-- Other reputable secondary-market sources.
-
-Likely work:
-
-- Define the market-observation schema.
-- Add a structured input path for manual market research.
-- Add validation for required evidence fields.
-- Generate a top-25 research workbook or worksheet.
-- Produce first-pass retail and dealer-value estimates from captured evidence.
-- Keep heuristic scoring separate from evidence-based valuation.
-
-Exit condition:
-
-- The project can guide focused research on the top 25 books and turn that
-  research into transparent, evidence-backed valuation estimates.
-
-## Later
-
-Later work should build on the catalog, research, and valuation foundations
-rather than replacing them.
-
-Dealer prospectus:
-
-- Generate professional summaries for dealers or specialist buyers.
-- Group books by subject, collection, author, or classification range.
-- Include evidence-backed highlights and clear condition caveats.
-- Keep dealer-facing outputs generated from normalized project data.
-
-Automated pricing:
-
-- Add structured integrations or assisted workflows for market data collection.
-- Track source, date, condition, listing type, and sale status.
-- Distinguish asking prices from completed sales.
-- Compute valuation estimates with confidence and rationale.
-- Support recalculation when pricing strategy or market data changes.
-
-Collection analytics:
-
-- Analyze subject concentration by LCC, Dewey, author, publisher, or period.
-- Identify collection-level sale opportunities.
-- Highlight duplicate, incomplete, or multi-volume sets.
-- Produce estate, donation, retention, and family-review reports.
-
-Long-term exit condition:
-
-- The system helps users make informed selling, donating, and retention
-  decisions from reproducible data, transparent evidence, and generated
-  decision-support artifacts.
+- **Import:** Accept evidence from Amazon, Libib, and deliberate manual entry
+  while preserving provenance.
+- **Catalog:** Maintain stable intellectual identities and bibliographic facts
+  without confusing source metadata with canonical state.
+- **Inventory:** Establish what physical copies are believed to exist, where
+  they are believed to be, and how recently that belief was verified.
+- **Understand:** Reveal the character of the library, including subjects,
+  authors, editions, duplicates, sets, and coherent collections.
+- **Prioritize:** Direct limited steward attention toward the books,
+  collections, uncertainties, and opportunities most likely to matter.
+- **Recommend:** Explain practical next steps, expected value, expected effort,
+  uncertainty, and fallback strategies without making decisions for the
+  steward.
+- **Publish:** Generate the materials needed for family review, specialist
+  outreach, donation, sale preparation, or marketplace handoff.
+- **Record Final Disposition:** Preserve the final known outcome of a holding
+  without managing the external transaction.
+
+Future releases should materially strengthen one or more of these stages.
+
+## Product Principles
+
+Roadmap proposals should be evaluated by whether they:
+
+- reduce uncertainty for the steward;
+- reduce clerical work and avoid low-value effort;
+- improve Return on Stewardship Time;
+- improve the quality and explainability of decisions;
+- preserve evidence, provenance, and reproducibility;
+- preserve optionality before irreversible choices;
+- use progressive disclosure instead of exposing technical subsystems first;
+- keep recommendations advisory and final decisions steward-owned; and
+- remain within the product boundaries defined by the Product Vision.
+
+Technical sophistication is valuable only when it improves a stewardship
+outcome.
+
+## Planned Releases
+
+Release titles and boundaries remain working direction until each release plan
+is approved.
+
+### v0.11.0 — Steward Workspace
+
+Create a steward-oriented entry point to the current catalog, inventory,
+evidence, and review capabilities.
+
+The opening experience should ask:
+
+> What would you like to accomplish today?
+
+Its primary experiences should be:
+
+- **Explore:** Search, filter, and inspect books, holdings, acquisitions,
+  evidence, inventory confidence, and unresolved issues.
+- **Recommendations:** Present clear next-step queues for inventory review,
+  metadata correction, market research, collection investigation, and other
+  current priorities.
+- **Reports:** Find and generate appropriate review and communication
+  artifacts without requiring knowledge of internal pipelines.
+
+The workspace should use a shared presentation model so that facts, confidence,
+and recommendations remain consistent across experiences. Initial delivery
+should favor a generated, self-contained interface unless a server-backed
+application is justified by a specific steward need.
+
+### v0.12.0 — Collection Intelligence
+
+Help the steward understand the library as a collection rather than only as
+individual catalog rows.
+
+Likely outcomes include:
+
+- subject, classification, author, publisher, period, and language analysis;
+- identification of coherent scholarly, thematic, or family-significant
+  collections;
+- duplicate, edition, incomplete-set, and multi-volume detection;
+- collection-level market, donation, retention, and institutional
+  opportunities; and
+- explicit confidence and evidence behind proposed groupings.
+
+Proposed collections should remain reviewable. Automated grouping must not
+silently replace catalog or holding identity.
+
+### v0.13.0 — Decision Support
+
+Transform catalog, inventory, collection, and market evidence into practical,
+explainable recommendations.
+
+Each recommendation should communicate:
+
+- what action is suggested;
+- why it is suggested;
+- the evidence and uncertainty behind it;
+- expected steward effort;
+- expected financial or stewardship value;
+- a preferred strategy; and
+- reasonable fallback strategies that preserve optionality.
+
+Recommendations may address individual books, groups, or collections. They
+remain advisory: the application recommends and the steward decides.
+
+### v0.14.0 — Publishing
+
+Generate stewardship artifacts that prepare work for review or for external
+systems.
+
+Possible outputs include:
+
+- dealer or specialist prospectuses;
+- family review packets and retention lists;
+- collection catalogs and institutional inquiry materials;
+- donation and estate reports;
+- eBay listing drafts;
+- AbeBooks listing drafts;
+- marketplace-ready exports; and
+- printable or archival reports.
+
+Published materials should be generated from durable evidence and accepted
+decisions, identify important caveats, and remain reproducible. Publishing
+prepares information for dealers, marketplaces, institutions, and family
+members; it does not replace those external systems.
+
+### v0.15.0 — Disposition Tracking
+
+Record the final known outcome of each physical holding.
+
+Initial disposition categories may include:
+
+- retained;
+- sold;
+- donated;
+- gifted;
+- recycled or discarded; and
+- another explicitly documented removal outcome.
+
+Disposition changes should preserve provenance, dates when known, and relevant
+steward notes. The application should know what remains available and what has
+left the collection without becoming a marketplace, dealer CRM, payment
+processor, shipping system, or estate-accounting system.
+
+## Future Direction
+
+The following directions remain strategically valuable but should be promoted
+into planned releases only when evidence and steward need justify them.
+
+### Operational Continuity
+
+- Provide a safe, repeatable refresh workflow for new Amazon and Libib evidence,
+  inventory audits, stale market observations, and regenerated steward views.
+- Track freshness and provenance so the steward can tell what needs attention
+  without rerunning every source indiscriminately.
+- Preserve preview, explicit publication, rollback, and idempotent rerun
+  guarantees as workflows expand.
+
+### Market Evidence
+
+- Preserve the distinction among asking prices, completed sales, estimates,
+  formal appraisals, and realized proceeds.
+- Add completed-sale or other market sources only with source-specific
+  provenance, matching confidence, capture dates, condition context, and
+  explicit limitations.
+- Improve edition matching, comparable-quality assessment, shipping treatment,
+  and currency handling before using those factors in recommendations.
+- Keep AbeBooks and eBay integrations replaceable; the product outcome is
+  trustworthy evidence, not dependence on a particular provider.
+
+### Stewardship Intelligence
+
+- Improve durable location mapping and practical audit support without
+  requiring fine-grained shelf discipline.
+- Support manual discovery and non-Amazon provenance without fabricating
+  acquisition history.
+- Identify specialist dealers, institutions, archives, or donation channels
+  where collection evidence supports outreach.
+- Revisit valuation and prioritization models when new real-world outcomes
+  provide better evidence than asking-price proxies.
+
+Detailed candidates and deferred implementation tasks belong in
+`BACKLOG.md`. A future release plan should select only the smallest coherent
+set needed to deliver a demonstrable steward outcome.
+
+## Generalization Strategy
+
+Library Valuation should continue to solve the current family's stewardship
+problem well before attempting broad productization.
+
+The architecture may later support other families, executors, trustees,
+estates, or professional stewards, but generalization should follow additional
+real-world use cases and evidence. New abstractions should earn their place by
+solving observed problems rather than anticipated ones.
+
+## Success
+
+Every release should help the steward answer one question more effectively:
+
+> What is the next best use of my time?
