@@ -122,6 +122,11 @@ implementation specifications.
 Codex is used for implementation, validation, documentation updates, and
 repository maintenance.
 
+Prompts assigning work to Codex should follow the
+[Codex Prompt Standard](docs/CODEX_PROMPT_STANDARD.md). Define the context,
+outcome, requirements, constraints, and completion evidence while leaving
+unresolved design choices to Codex.
+
 When architecture is uncertain, explain the tradeoffs before implementing. Do
 not introduce new architecture silently in code. Prefer a small documented step
 that moves the project along the existing roadmap.
