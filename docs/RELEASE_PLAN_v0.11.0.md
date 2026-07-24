@@ -2,8 +2,8 @@
 
 ## v0.11.0 — Steward Workspace
 
-**Status:** Proposed implementation plan. PR1 design documentation is in
-progress; no release implementation has begun.
+**Status:** PR1 design is complete. PR2 shared presentation-model implementation
+is complete and awaiting review.
 
 ## 1. Release Theme
 
@@ -190,6 +190,16 @@ model bytes, privacy allowlists, and malformed-state failures.
 
 **Exit criteria:** One validated model can serve all three planned experiences
 without duplicating matching, reconciliation, or evidence logic.
+
+**Implemented contract:** `valuation/steward_presentation.py` provides immutable
+version `steward_presentation_v1` records and deterministic canonical JSON
+bytes without rendering or writes. The catalog is required; other durable
+subsystems are optional-but-strict; inventory is an all-or-none validated
+bundle. Derived market evidence and Research Candidates require explicit paths
+and catalog-snapshot provenance. Reports require explicit registration.
+Evidence states distinguish current, missing, unavailable, stale, and
+incompatible. Historical duplicate Amazon acquisition IDs receive
+occurrence-scoped presentation references without changing durable identity.
 
 ### PR3 — Workspace Shell and Explore
 

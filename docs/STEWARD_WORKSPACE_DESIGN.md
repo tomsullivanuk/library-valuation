@@ -574,3 +574,59 @@ PR2 should determine:
 These questions may change serialization or packaging details. They must not
 weaken the settled read-only, generated-artifact, shared-model, privacy, or
 domain-boundary decisions.
+
+## 18. Implemented PR2 Contract
+
+PR2 implements the shared model in `valuation/steward_presentation.py` with
+contract version `steward_presentation_v1`. It is an immutable in-memory object
+graph with canonical JSON bytes for deterministic testing and future clients;
+it writes no files and contains no rendering behavior.
+
+The implemented records are:
+
+- workspace snapshot and source status;
+- collection summary;
+- book and physical-holding views;
+- acquisitions;
+- Research Assessments and steward reviews;
+- inventory imports and observations;
+- physical and catalog reconciliation decisions;
+- market-evidence summaries;
+- generated advisory recommendation references; and
+- explicitly registered reports.
+
+`catalog_items.csv` is required and uses the existing strict catalog adapter.
+Acquisitions, Research Assessments, and Collector Reviews are optional, but a
+present file must have its exact implemented header and valid catalog
+references. Inventory remains optional as a subsystem; if any inventory
+repository exists, the complete import, folder, observation, physical-decision,
+holding, and catalog-decision bundle must exist and pass the existing strict
+repositories and audit-presentation integrity checks.
+
+Market Evidence Summaries and Research Candidates are accepted only through an
+explicit `DerivedEvidenceInput`. Exact headers and catalog identities are
+validated. Caller-supplied catalog snapshot hashes distinguish `current` from
+`stale`; malformed derived input is `incompatible`; absent input is
+`unavailable`. Stale or incompatible evidence cannot generate current
+recommendations.
+
+Reports are accepted only as explicit `RegisteredReport` values. The model
+exposes a safe relative public path, never its source filesystem path, and uses
+the catalog snapshot hash to classify a present report as current or stale.
+There is no output-directory discovery.
+
+The model uses `current`, `missing`, `unavailable`, `stale`, and `incompatible`
+as distinct evidence states. `missing` means a validated current source has no
+row for an entity; `unavailable` means the source was not supplied.
+
+Existing Amazon acquisition evidence can contain duplicate
+`acquisition_id` values because historical source data lacks a true line-item
+identifier. PR2 preserves those IDs and creates deterministic, occurrence-scoped
+presentation references such as `acquisition:AMZ-…:1`. These references are
+generated navigation identity only; they do not change durable acquisition
+semantics.
+
+Privacy is structural. Dataclasses expose only reviewed fields; arbitrary raw
+Libib evidence, unknown columns, private Amazon order identifiers, reviewer
+identity, local source paths, and unreviewed derived fields cannot enter the
+serialized model.
