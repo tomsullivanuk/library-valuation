@@ -630,3 +630,47 @@ Privacy is structural. Dataclasses expose only reviewed fields; arbitrary raw
 Libib evidence, unknown columns, private Amazon order identifiers, reviewer
 identity, local source paths, and unreviewed derived fields cannot enter the
 serialized model.
+
+## 19. Implemented PR3 Workspace Contract
+
+PR3 implements `valuation/steward_workspace.py` as a pure renderer for
+`steward_presentation_v1`. It produces deterministic
+`steward_workspace_v1` HTML bytes with inline styling, behavior, and
+script-safe canonical presentation JSON. The artifact uses no external assets,
+network access, server runtime, browser persistence, or durable writes.
+Hash-fragment routes allow direct `file://` navigation without weakening the
+single-file delivery model.
+
+The implemented shell provides:
+
+- a task-oriented Home view and persistent Home, Explore, Recommendations,
+  Reports, and About This Data navigation;
+- a functional book-first Explore view;
+- distinct book, holding, acquisition, assessment, review, market-evidence,
+  observation, and reconciliation-decision detail routes;
+- progressive Summary, Steward context, Evidence, and Technical provenance
+  disclosure;
+- explicit source-state messages for unavailable, stale, incomplete, or
+  incompatible evidence;
+- keyboard focus treatment, a skip link, semantic landmarks, labelled controls,
+  live result counts, and non-color status text; and
+- visible read-only notices explaining that decisions and filters are not
+  saved.
+
+Explore searches the fields actually present in the shared contract: title,
+creator, ISBN-10, ISBN-13, publisher, catalog item ID, holding ID, and
+acquisition presentation reference. It filters by inventory, acquisition,
+market-evidence, and review state, and sorts by title, creator, publication
+year, or catalog item ID. The browser displays at most 250 matching rows for
+responsive local use while reporting the complete match count.
+
+The approved design listed subject search, but `steward_presentation_v1`
+contains no authoritative subject evidence. PR3 therefore does not offer or
+simulate subject search. Adding it requires a future, explicit presentation
+contract backed by an authoritative or approved-derived source. Likewise,
+location, research-priority, confidence, and verification-recency controls
+appear only after the shared contract can supply them consistently.
+
+Recommendations and Reports remain honest navigation placeholders. Their
+records are preserved in the embedded shared model, but their full experiences
+remain PR4 and PR5 respectively.

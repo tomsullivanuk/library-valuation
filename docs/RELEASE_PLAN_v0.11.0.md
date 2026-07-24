@@ -2,8 +2,9 @@
 
 ## v0.11.0 — Steward Workspace
 
-**Status:** PR1 design is complete. PR2 shared presentation-model implementation
-is complete and awaiting review.
+**Status:** PR1 design and PR2 shared presentation-model implementation are
+complete. PR3 workspace shell and Explore implementation is complete and
+awaiting review.
 
 ## 1. Release Theme
 
@@ -219,6 +220,17 @@ privacy, and real-catalog size/performance profiling.
 
 **Exit criteria:** The Steward can open the workspace, find a known book, and
 understand its catalog and physical context without repository knowledge.
+
+**Implemented contract:** `valuation/steward_workspace.py` renders
+`steward_workspace_v1` as deterministic, self-contained HTML bytes from a
+`StewardPresentation` alone. Hash-fragment navigation supports Home, Explore,
+book and evidence detail, About This Data, and honest PR4/PR5 placeholders.
+Explore searches title, creator, ISBN, publisher, catalog ID, holding ID, and
+acquisition presentation reference; filters current presentation statuses; and
+sorts by title, creator, publication year, or catalog ID. Subject search is not
+implemented because `steward_presentation_v1` has no authoritative subject
+field; the renderer does not infer one. Results disclose the first 250 matches
+while preserving the full match count.
 
 ### PR4 — Recommendations
 
