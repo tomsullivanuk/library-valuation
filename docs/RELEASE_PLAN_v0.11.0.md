@@ -2,9 +2,9 @@
 
 ## v0.11.0 — Steward Workspace
 
-**Status:** PR1 design and PR2 shared presentation-model implementation are
-complete. PR3 workspace shell and Explore implementation is complete and
-awaiting review.
+**Status:** PR1 design, PR2 shared presentation-model implementation, and PR3
+workspace shell and Explore implementation are complete. PR4 Recommendations
+implementation is complete and awaiting review.
 
 ## 1. Release Theme
 
@@ -251,6 +251,24 @@ weak-evidence language, and no durable mutation.
 
 **Exit criteria:** The Steward can identify a useful next action and explain why
 it surfaced without mistaking it for a final decision.
+
+**Implemented contract:** PR4 projects actionable audit-coverage conditions and
+explicit steward priority overrides into the existing in-memory
+`RecommendationView` contract. The workspace organizes those records together
+with existing physical-review, catalog-review, location, newly-discovered,
+market-evidence, and research-candidate guidance into separate queues. Queue
+precedence is fixed; within each queue, ordering is confidence, steward-facing
+entity label, suggested action, and stable recommendation reference. “Start
+here” selects the first item from each of the first three nonempty queues rather
+than assigning a global score. Exact duplicate recommendation references are
+suppressed. Recommendations remain generated, advisory, read-only, and linked
+to their affected entity and supporting evidence.
+
+Unavailable, stale, or incompatible optional evidence is explained through the
+workspace source-status contract and cannot generate current market or research
+recommendations. PR4 does not invent recommendations from absent optional
+subsystems. Rich disposition strategy, effort/value optimization, and
+recommendation acceptance remain deferred.
 
 ### PR5 — Reports
 

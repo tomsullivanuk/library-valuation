@@ -11,11 +11,13 @@ from valuation.libib_inventory import import_libib_inventory
 from valuation.repositories import ACQUISITION_FIELDNAMES, CATALOG_ITEMS_FIELDNAMES
 from valuation.steward_presentation import (
     PRESENTATION_MODEL_VERSION,
+    RecommendationView,
     build_steward_presentation,
 )
 from valuation.steward_workspace import (
     ExploreQuery,
     StewardWorkspaceRenderError,
+    build_recommendation_queues,
     query_explore,
     render_steward_workspace,
 )
@@ -111,7 +113,7 @@ def test_catalog_only_workspace_has_task_home_explore_and_honest_placeholders(tm
     assert 'href="#explore"' in html
     assert 'href="#recommendations"' in html
     assert 'href="#reports"' in html
-    assert "reserved for PR4" in html
+    assert "Evidence-backed operational next steps" in html
     assert "reserved for PR5" in html
     assert "unavailable" in html
     assert "Read-only" in html
@@ -150,8 +152,160 @@ def test_inventory_state_renders_holdings_and_reconciliation_deep_links(tmp_path
     assert model.holdings[0].holding_id in html
     assert model.observations[0].inventory_observation_id in html
     assert model.decisions[0].decision_id in html
-    assert f'holding/{model.holdings[0].holding_id}' not in html  # links are built at runtime
+    assert f'holding/{model.holdings[0].holding_id}' in html
     assert "`holding/${encodeURIComponent(id)}`" in html
+    assert tuple(queue.queue_key for queue in build_recommendation_queues(model)) == (
+        "physical_identity",
+        "location",
+        "newly_discovered",
+    )
+
+
+def recommendation(
+    recommendation_id,
+    source_kind,
+    entity_id="BK000001",
+    *,
+    entity_type="catalog_item",
+    action="Review evidence",
+    explanation="Existing evidence requires review.",
+    confidence="medium",
+    evidence=("catalog:BK000001",),
+):
+    return RecommendationView(
+        recommendation_id=recommendation_id,
+        source_kind=source_kind,
+        source_reference=entity_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        suggested_action=action,
+        explanation=explanation,
+        confidence=confidence,
+        reason_codes=("review_needed",),
+        evidence_references=evidence,
+    )
+
+
+def test_recommendations_are_grouped_into_separate_supported_queues(tmp_path):
+    model = model_for(tmp_path, [catalog_row()])
+    model = replace(
+        model,
+        recommendations=(
+            recommendation("REC-4", "research_candidate"),
+            recommendation("REC-2", "market_evidence"),
+            recommendation("REC-1", "inventory_newly_discovered"),
+            recommendation("REC-3", "steward_priority"),
+        ),
+    )
+
+    queues = build_recommendation_queues(model)
+
+    assert tuple(queue.queue_key for queue in queues) == (
+        "newly_discovered",
+        "market_evidence",
+        "research",
+        "steward_priority",
+    )
+    assert all(queue.recommendations for queue in queues)
+
+
+def test_recommendation_order_is_confidence_then_label_then_stable_id(tmp_path):
+    model = model_for(
+        tmp_path,
+        [
+            catalog_row(),
+            catalog_row(
+                "BK000002",
+                isbn13="9780140449266",
+                isbn10="0140449264",
+                title="Alpha",
+                author="Homer",
+            ),
+        ],
+    )
+    model = replace(
+        model,
+        recommendations=(
+            recommendation("REC-LOW", "market_evidence", confidence="low"),
+            recommendation(
+                "REC-HIGH-Z",
+                "market_evidence",
+                action="Z action",
+                confidence="high",
+            ),
+            recommendation(
+                "REC-HIGH-A",
+                "market_evidence",
+                "BK000002",
+                confidence="high",
+            ),
+        ),
+    )
+
+    rows = build_recommendation_queues(model)[0].recommendations
+
+    assert tuple(row.recommendation_id for row in rows) == (
+        "REC-HIGH-A",
+        "REC-HIGH-Z",
+        "REC-LOW",
+    )
+
+
+def test_recommendation_reason_evidence_and_explore_links_are_preserved(tmp_path):
+    model = model_for(tmp_path, [catalog_row()])
+    model = replace(
+        model,
+        recommendations=(
+            recommendation(
+                "REC-1",
+                "market_evidence",
+                explanation="Comparable evidence conflicts.",
+                evidence=("catalog:BK000001", "market:BK000001"),
+            ),
+        ),
+    )
+
+    row = build_recommendation_queues(model)[0].recommendations[0]
+    html = render_steward_workspace(model).decode()
+
+    assert row.primary_route == "book/BK000001"
+    assert ("market:BK000001", "market/market:BK000001") in row.evidence_routes
+    assert "Comparable evidence conflicts." in html
+    assert "book/BK000001" in html
+    assert "market/market:BK000001" in html
+    assert 'route === "recommendation"' in html
+
+
+def test_duplicate_recommendation_ids_are_suppressed_deterministically(tmp_path):
+    model = model_for(tmp_path, [catalog_row()])
+    duplicate = recommendation("REC-1", "research_candidate")
+    model = replace(model, recommendations=(duplicate, duplicate))
+
+    queues = build_recommendation_queues(model)
+
+    assert sum(len(queue.recommendations) for queue in queues) == 1
+    assert render_steward_workspace(model) == render_steward_workspace(model)
+
+
+def test_recommendation_text_is_script_safe_and_uses_only_allowlisted_fields(tmp_path):
+    model = model_for(tmp_path, [catalog_row()])
+    model = replace(
+        model,
+        recommendations=(
+            recommendation(
+                "REC-1",
+                "research_candidate",
+                explanation="Review </script><script>PRIVATE</script> evidence.",
+            ),
+        ),
+    )
+
+    html = render_steward_workspace(model)
+
+    assert b"</script><script>PRIVATE" not in html
+    assert b"\\u003c/script\\u003e" in html
+    assert b"raw_evidence" not in html
+    assert b"source_path" not in html
 
 
 def test_query_filters_and_sorts_without_recalculating_domain_status(tmp_path):

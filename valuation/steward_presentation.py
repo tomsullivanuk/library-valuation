@@ -430,7 +430,7 @@ def build_steward_presentation(
     )
     market_views = _market_views(market)
     recommendations = _recommendation_views(
-        inventory["audit"], market, candidates
+        inventory["audit"], market, candidates, review_views
     )
     report_views, report_sources = _report_views(reports, catalog_hash)
     sources.extend(report_sources)
@@ -821,8 +821,10 @@ def _recommendation_views(
     audit: object,
     market: _LoadedDerived,
     candidates: _LoadedDerived,
+    reviews: Sequence[StewardReviewView],
 ) -> tuple[RecommendationView, ...]:
     pending: list[RecommendationView] = []
+    seen: set[str] = set()
 
     def add(
         source_kind: str,
@@ -836,6 +838,9 @@ def _recommendation_views(
         evidence: Iterable[str] = (),
     ) -> None:
         identity = "|".join((source_kind, source_reference, entity_type, entity_id, action))
+        if identity in seen:
+            return
+        seen.add(identity)
         recommendation_id = "recommendation:" + hashlib.sha256(identity.encode()).hexdigest()[:20]
         pending.append(
             RecommendationView(
@@ -888,6 +893,20 @@ def _recommendation_views(
                 reason_codes=_split_codes(row["location_review_status"]),
                 evidence=(f"holding:{row['holding_id']}",),
             )
+        for row in audit.audit_coverage:
+            outcome = row["audit_outcome"]
+            if outcome in {"verified_present", "outside_audit_scope"}:
+                continue
+            add(
+                "inventory_audit_coverage",
+                row["holding_id"],
+                "holding",
+                row["holding_id"],
+                row["reviewer_guidance"],
+                row["explanation"],
+                reason_codes=(outcome,),
+                evidence=(f"holding:{row['holding_id']}",),
+            )
         for row in audit.newly_discovered:
             add(
                 "inventory_newly_discovered",
@@ -923,6 +942,20 @@ def _recommendation_views(
                 reason_codes=_split_codes(row["research_signal_codes"]),
                 evidence=(f"assessment:{row['catalog_item_id']}",),
             )
+    for row in reviews:
+        if not row.priority_override:
+            continue
+        add(
+            "steward_priority",
+            row.review_id,
+            "catalog_item",
+            row.catalog_item_id,
+            "Review steward-prioritized book",
+            f"Steward priority is {row.priority_override}.",
+            "steward_set",
+            (f"priority_{row.priority_override}",),
+            (row.review_id,),
+        )
     return tuple(sorted(pending, key=lambda item: item.recommendation_id))
 
 

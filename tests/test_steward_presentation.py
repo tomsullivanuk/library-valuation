@@ -313,6 +313,12 @@ def test_complete_available_state_includes_all_concepts_and_registered_report(tm
     assert model.assessments[0].config_hash == "config-hash"
     assert model.assessments[0].acquisition_snapshot_hash == "acquisition-hash"
     assert model.collection.report_count == 1
+    assert any(
+        row.source_kind == "steward_priority"
+        and row.entity_id == catalog_id
+        and row.advisory
+        for row in model.recommendations
+    )
     serialized = model.to_json_bytes()
     assert b"PRIVATE-ORDER" not in serialized
     assert b"PRIVATE-NAME" not in serialized

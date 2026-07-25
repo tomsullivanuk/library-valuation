@@ -7,7 +7,8 @@ browser-side persistence.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 
 from valuation.steward_presentation import (
     PRESENTATION_MODEL_VERSION,
@@ -31,6 +32,156 @@ class ExploreQuery:
     market_evidence_status: str = ""
     review_status: str = ""
     sort_by: str = "title"
+
+
+@dataclass(frozen=True)
+class WorkspaceRecommendation:
+    recommendation_id: str
+    queue_key: str
+    entity_type: str
+    entity_id: str
+    entity_label: str
+    suggested_action: str
+    explanation: str
+    confidence: str
+    reason_codes: tuple[str, ...]
+    primary_route: str
+    evidence_routes: tuple[tuple[str, str], ...]
+    source_kind: str
+    advisory: bool
+
+
+@dataclass(frozen=True)
+class RecommendationQueue:
+    queue_key: str
+    title: str
+    purpose: str
+    recommendations: tuple[WorkspaceRecommendation, ...]
+
+
+_QUEUE_DEFINITIONS = (
+    (
+        "physical_identity",
+        "Resolve physical identity",
+        "Clarify which physical copy an inventory observation represents.",
+    ),
+    (
+        "catalog_identity",
+        "Resolve catalog identity",
+        "Connect a physical holding to the correct bibliographic identity.",
+    ),
+    (
+        "audit_coverage",
+        "Review inventory coverage",
+        "Clarify incomplete or uncertain physical-audit evidence.",
+    ),
+    (
+        "location",
+        "Verify locations",
+        "Map or confirm where physical holdings are believed to be.",
+    ),
+    (
+        "newly_discovered",
+        "Review newly discovered books",
+        "Review books first identified through physical inventory.",
+    ),
+    (
+        "market_evidence",
+        "Review market evidence",
+        "Investigate current market-evidence questions and limitations.",
+    ),
+    (
+        "research",
+        "Review research candidates",
+        "Inspect books already surfaced by the research workflow.",
+    ),
+    (
+        "steward_priority",
+        "Review steward priorities",
+        "Return to books explicitly prioritized by the Steward.",
+    ),
+    (
+        "other",
+        "Other review conditions",
+        "Review supported conditions that do not fit another queue.",
+    ),
+)
+_QUEUE_BY_SOURCE = {
+    "inventory_physical_review": "physical_identity",
+    "inventory_catalog_review": "catalog_identity",
+    "inventory_audit_coverage": "audit_coverage",
+    "inventory_location_review": "location",
+    "inventory_newly_discovered": "newly_discovered",
+    "market_evidence": "market_evidence",
+    "research_candidate": "research",
+    "steward_priority": "steward_priority",
+}
+_CONFIDENCE_ORDER = {"high": 0, "medium": 1, "low": 2, "unknown": 3, "": 4}
+
+
+def build_recommendation_queues(
+    presentation: StewardPresentation,
+) -> tuple[RecommendationQueue, ...]:
+    """Organize existing advisory records without creating new domain guidance."""
+
+    books = {row.catalog_item_id: row for row in presentation.books}
+    holdings = {row.holding_id: row for row in presentation.holdings}
+    observations = {
+        row.inventory_observation_id: row for row in presentation.observations
+    }
+    seen: set[str] = set()
+    grouped: dict[str, list[WorkspaceRecommendation]] = {
+        key: [] for key, _, _ in _QUEUE_DEFINITIONS
+    }
+    for row in presentation.recommendations:
+        if row.recommendation_id in seen:
+            continue
+        seen.add(row.recommendation_id)
+        queue_key = _QUEUE_BY_SOURCE.get(row.source_kind, "other")
+        entity_label = row.entity_id
+        if row.entity_type == "catalog_item" and row.entity_id in books:
+            entity_label = books[row.entity_id].title or row.entity_id
+        elif row.entity_type == "holding" and row.entity_id in holdings:
+            holding = holdings[row.entity_id]
+            book = books.get(holding.catalog_item_id)
+            entity_label = book.title if book and book.title else row.entity_id
+        elif row.entity_type == "inventory_observation" and row.entity_id in observations:
+            entity_label = observations[row.entity_id].title or row.entity_id
+        grouped[queue_key].append(
+            WorkspaceRecommendation(
+                recommendation_id=row.recommendation_id,
+                queue_key=queue_key,
+                entity_type=row.entity_type,
+                entity_id=row.entity_id,
+                entity_label=entity_label,
+                suggested_action=row.suggested_action,
+                explanation=row.explanation,
+                confidence=row.confidence,
+                reason_codes=row.reason_codes,
+                primary_route=_entity_route(row.entity_type, row.entity_id),
+                evidence_routes=tuple(
+                    route
+                    for reference in row.evidence_references
+                    if (route := _evidence_route(reference))
+                ),
+                source_kind=row.source_kind,
+                advisory=row.advisory,
+            )
+        )
+    queues: list[RecommendationQueue] = []
+    for queue_key, title, purpose in _QUEUE_DEFINITIONS:
+        rows = grouped[queue_key]
+        rows.sort(
+            key=lambda item: (
+                _CONFIDENCE_ORDER.get(item.confidence, 3),
+                item.entity_label.casefold(),
+                item.suggested_action.casefold(),
+                item.recommendation_id,
+            )
+        )
+        if rows:
+            queues.append(RecommendationQueue(queue_key, title, purpose, tuple(rows)))
+    return tuple(queues)
 
 
 def query_explore(
@@ -63,11 +214,47 @@ def render_steward_workspace(presentation: StewardPresentation) -> bytes:
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
     )
+    recommendation_json = json.dumps(
+        [asdict(queue) for queue in build_recommendation_queues(presentation)],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    recommendation_json = (
+        recommendation_json.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
     return (
         _DOCUMENT.replace("__WORKSPACE_DATA__", embedded_json)
+        .replace("__WORKSPACE_RECOMMENDATIONS__", recommendation_json)
         .replace("__RENDERER_VERSION__", WORKSPACE_RENDERER_VERSION)
         .encode("utf-8")
     )
+
+
+def _entity_route(entity_type: str, entity_id: str) -> str:
+    prefix = {
+        "catalog_item": "book",
+        "holding": "holding",
+        "inventory_observation": "observation",
+    }.get(entity_type, "explore")
+    return f"{prefix}/{entity_id}" if prefix != "explore" else prefix
+
+
+def _evidence_route(reference: str) -> tuple[str, str] | None:
+    kind, separator, identifier = reference.partition(":")
+    if not separator or not identifier:
+        return None
+    route = {
+        "catalog": f"book/{identifier}",
+        "holding": f"holding/{identifier}",
+        "observation": f"observation/{identifier}",
+        "assessment": f"assessment/assessment:{identifier}",
+        "market": f"market/market:{identifier}",
+        "review": f"review/review:{identifier}",
+    }.get(kind)
+    return (reference, route) if route else None
 
 
 def _matches_book(
@@ -355,10 +542,12 @@ _DOCUMENT = r"""<!doctype html>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
+  <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
   <script>
   "use strict";
   (() => {
     const DATA = JSON.parse(document.getElementById("workspace-data").textContent);
+    const QUEUES = JSON.parse(document.getElementById("recommendation-data").textContent);
     const main = document.getElementById("main-content");
     const RESULT_LIMIT = 250;
     const index = {
@@ -369,7 +558,8 @@ _DOCUMENT = r"""<!doctype html>
       reviews: new Map(DATA.steward_reviews.map(row => [row.review_id, row])),
       observations: new Map(DATA.observations.map(row => [row.inventory_observation_id, row])),
       decisions: new Map(DATA.decisions.map(row => [row.decision_id, row])),
-      market: new Map(DATA.market_evidence.map(row => [row.market_evidence_id, row]))
+      market: new Map(DATA.market_evidence.map(row => [row.market_evidence_id, row])),
+      recommendations: new Map(QUEUES.flatMap(queue => queue.recommendations).map(row => [row.recommendation_id, row]))
     };
 
     function node(tag, attrs = {}, text = "") {
@@ -452,7 +642,7 @@ _DOCUMENT = r"""<!doctype html>
       const explore = node("a", {class: "card", href: "#explore"});
       append(explore, node("h2", {}, "Explore the library"), node("p", {}, "Find a book and understand what is known about it."));
       const recommendations = node("a", {class: "card", href: "#recommendations"});
-      append(recommendations, node("h2", {}, "Review what needs attention"), node("p", {}, "Recommendations content is planned for the next workspace increment."));
+      append(recommendations, node("h2", {}, "Review what needs attention"), node("p", {}, "See evidence-backed next steps grouped by the kind of work involved."));
       const reports = node("a", {class: "card", href: "#reports"});
       append(reports, node("h2", {}, "Open reports"), node("p", {}, "Reports content is planned for a later workspace increment."));
       append(choices, explore, recommendations, reports);
@@ -622,7 +812,8 @@ _DOCUMENT = r"""<!doctype html>
         )
       );
       if (book.recommendation_ids.length) {
-        append(context, node("p", {class: "notice"}, `${book.recommendation_ids.length} existing review item(s) are associated with this book. Recommendation queues arrive in PR4.`));
+        append(context, node("p", {class: "notice"}, `${book.recommendation_ids.length} existing review item(s) are associated with this book.`));
+        append(context, linkList(book.recommendation_ids.map(id => [id, `recommendation/${encodeURIComponent(id)}`])));
       }
       append(main, detailSection("Steward context", context, true));
 
@@ -806,21 +997,94 @@ _DOCUMENT = r"""<!doctype html>
         ["Candidate IDs", row.candidate_ids.join(", ")]
       ])));
     }
+    function recommendationCard(row, compact = false) {
+      const card = node("article", {class: "card"});
+      append(card, node("h3", {}, row.suggested_action));
+      append(card, routeLink(row.entity_label, row.primary_route, "button-link"));
+      append(card, node("p", {}, row.explanation || "No additional explanation was supplied."));
+      const statuses = node("div", {class: "badges"});
+      append(
+        statuses,
+        badge("Confidence", row.confidence || "not_stated"),
+        badge("Guidance", row.advisory ? "advisory" : "unknown")
+      );
+      append(card, statuses);
+      if (!compact) {
+        const technical = node("div");
+        append(technical, definitionList([
+          ["Queue", human(row.queue_key)],
+          ["Source", human(row.source_kind)],
+          ["Reason codes", row.reason_codes.join(", ")],
+          ["Recommendation reference", row.recommendation_id]
+        ]));
+        if (row.evidence_routes.length) {
+          append(technical, node("h3", {}, "Supporting evidence"), linkList(row.evidence_routes));
+        }
+        append(card, detailSection("Why this surfaced", technical));
+      }
+      append(card, routeLink("Open recommendation detail", `recommendation/${encodeURIComponent(row.recommendation_id)}`));
+      return card;
+    }
+    function renderRecommendations() {
+      clear();
+      heading(
+        "Recommendations",
+        "Evidence-backed operational next steps, grouped by work that can be compared honestly."
+      );
+      append(main, node("p", {class: "notice"}, "Recommendations are advisory and read-only. The Steward retains every decision."));
+      append(main, sourceMessages());
+      if (!QUEUES.length) {
+        append(main, node("p", {class: "empty"}, "No current recommendation records are available. Unavailable evidence may limit what can surface."));
+        return;
+      }
+      const starting = QUEUES.slice(0, 3).map(queue => queue.recommendations[0]);
+      append(main, node("h2", {}, "Start here"));
+      append(main, node("p", {class: "muted"}, "One item from each of the first supported queues, using queue precedence and stable within-queue ordering."));
+      const startingGrid = node("div", {class: "grid"});
+      for (const row of starting) append(startingGrid, recommendationCard(row, true));
+      append(main, startingGrid, node("h2", {}, "All recommendation queues"));
+      for (const queue of QUEUES) {
+        const section = node("section", {class: "panel"});
+        append(
+          section,
+          node("h2", {}, queue.title),
+          node("p", {class: "muted"}, `${queue.purpose} ${queue.recommendations.length} ${queue.recommendations.length === 1 ? "item" : "items"}.`)
+        );
+        const rows = node("div", {class: "result-list"});
+        for (const row of queue.recommendations) append(rows, recommendationCard(row));
+        append(section, rows);
+        append(main, section);
+      }
+    }
+    function renderRecommendation(id) {
+      const row = index.recommendations.get(id);
+      if (!row) return renderNotFound("recommendation", id);
+      clear();
+      append(main, routeLink("← Back to Recommendations", "recommendations"));
+      heading(row.suggested_action, row.entity_label);
+      append(main, node("p", {}, row.explanation || "No additional explanation was supplied."));
+      append(main, definitionList([
+        ["Confidence", human(row.confidence || "not_stated")],
+        ["Advisory", row.advisory ? "Yes — the Steward decides" : "Unknown"],
+        ["Queue", human(row.queue_key)],
+        ["Source", human(row.source_kind)],
+        ["Reason codes", row.reason_codes.join(", ")],
+        ["Recommendation reference", row.recommendation_id]
+      ]));
+      append(main, routeLink("Open affected item", row.primary_route, "button-link"));
+      if (row.evidence_routes.length) append(main, detailSection("Supporting evidence", linkList(row.evidence_routes), true));
+      append(main, node("p", {class: "notice"}, "This workspace does not save acceptance, dismissal, notes, or decisions."));
+    }
     function renderPlaceholder(kind) {
       clear();
-      const isRecommendations = kind === "recommendations";
       heading(
         human(kind),
-        isRecommendations
-          ? "This navigation destination is reserved for PR4."
-          : "This navigation destination is reserved for PR5."
+        "This navigation destination is reserved for PR5."
       );
       append(main, node(
         "p",
         {class: "empty"},
-        isRecommendations
-          ? `The shared model contains ${DATA.recommendations.length} advisory record(s), but this release increment does not yet present recommendation queues.`
-          : `The shared model contains ${DATA.reports.length} registered report(s), but this release increment does not yet present the report catalog.`
+        `The shared model contains ${DATA.reports.length} registered report(s), but this release increment does not yet present the report catalog.`
       ));
     }
     function renderAbout() {
@@ -862,13 +1126,15 @@ _DOCUMENT = r"""<!doctype html>
       const [route, id] = currentRoute();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
-          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision"].includes(route) && link.dataset.nav === "explore");
+          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision"].includes(route) && link.dataset.nav === "explore")
+          || (route === "recommendation" && link.dataset.nav === "recommendations");
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");
       });
       if (route === "home") renderHome();
       else if (route === "explore") renderExplore();
-      else if (route === "recommendations" || route === "reports") renderPlaceholder(route);
+      else if (route === "recommendations") renderRecommendations();
+      else if (route === "reports") renderPlaceholder(route);
       else if (route === "about") renderAbout();
       else if (route === "book") renderBook(id);
       else if (route === "holding") renderHolding(id);
@@ -878,6 +1144,7 @@ _DOCUMENT = r"""<!doctype html>
       else if (route === "market") renderMarket(id);
       else if (route === "observation") renderObservation(id);
       else if (route === "decision") renderDecision(id);
+      else if (route === "recommendation") renderRecommendation(id);
       else renderNotFound("workspace route", route);
       document.title = `${main.querySelector("h1")?.textContent || "Steward Workspace"} — Library Valuation`;
       main.focus({preventScroll: true});

@@ -671,6 +671,53 @@ contract backed by an authoritative or approved-derived source. Likewise,
 location, research-priority, confidence, and verification-recency controls
 appear only after the shared contract can supply them consistently.
 
-Recommendations and Reports remain honest navigation placeholders. Their
-records are preserved in the embedded shared model, but their full experiences
-remain PR4 and PR5 respectively.
+Recommendations and Reports remain honest navigation placeholders in the PR3
+contract. Their records are preserved in the embedded shared model; their full
+experiences are assigned to PR4 and PR5 respectively.
+
+## 20. Implemented PR4 Recommendations Contract
+
+PR4 presents existing evidence-backed operational guidance without introducing
+a recommendation engine or durable recommendation repository. The shared
+presentation builder now includes actionable audit-coverage rows and explicit
+steward priority overrides alongside its existing inventory-review,
+market-evidence, and research-candidate recommendations. It does not turn
+unavailable evidence into a recommendation or reproduce the rules that created
+the underlying audit, reconciliation, assessment, or market condition.
+
+The workspace uses a closed, presentation-only queue taxonomy:
+
+- resolve physical identity;
+- resolve catalog identity;
+- review inventory coverage;
+- verify locations;
+- review newly discovered books;
+- review market evidence;
+- review research candidates;
+- review steward priorities; and
+- other supported review conditions, as a forward-compatible fallback.
+
+Only nonempty queues appear. Queue precedence follows the order above. Within a
+queue, current records sort by stated confidence, steward-facing entity label,
+suggested action, and stable recommendation reference. This is an explainable
+display order, not a cross-queue score. “Start here” shows at most one item from
+each of the first three nonempty queues.
+
+Every recommendation displays the existing suggested action and explanation,
+stated confidence or an explicit “not stated” value, advisory status, source
+kind, reason codes, affected entity, supporting evidence links, and generated
+recommendation reference. Book, holding, observation, assessment, market,
+review, and recommendation routes remain hash-fragment links suitable for the
+self-contained `file://` artifact.
+
+Exact duplicate recommendation references are displayed once. Recommendation
+references remain deterministic presentation identity only; accepting,
+dismissing, annotating, or otherwise persisting a recommendation is outside
+v0.11.0.
+
+Stale or incompatible derived evidence remains visible as a source limitation
+but cannot generate current market or research guidance. An unavailable
+optional subsystem produces neither invented guidance nor a false “nothing
+needs attention” conclusion. Rich disposition recommendations—including
+selling, donating, retaining, publishing, or dealer outreach—remain deferred to
+v0.13.0.
