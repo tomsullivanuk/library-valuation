@@ -161,7 +161,10 @@ python3 library_pipeline.py update-inventory \
 Preview is the default. It runs against temporary copies of `data/`, leaves
 durable repositories unchanged, and generates
 `output/inventory_audit_summary.csv` and
-`output/inventory_review_workbook.xlsx`. Identical source content, durable
+`output/inventory_review_workbook.xlsx` together with the self-contained
+`output/steward_workspace.html`. The workspace registers those two review
+artifacts against the same proposed catalog snapshot, so its Reports view can
+open them without scanning `output/`. Identical source content, durable
 starting state, audit area, scope, and completeness produce identical preview
 IDs, completion output, and artifact bytes. After reviewing the summary and queues,
 repeat the same command with `--publish` to authorize durable publication.

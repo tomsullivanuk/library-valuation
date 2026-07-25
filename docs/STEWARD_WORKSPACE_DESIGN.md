@@ -775,3 +775,46 @@ provenance.
 The Reports experience is deterministic, self-contained, local-first, and
 read-only. It does not generate report content, persist report state, contact
 external destinations, or turn opening an artifact into a project decision.
+
+## 22. Implemented PR6 Workflow and Acceptance Contract
+
+PR6 integrates workspace generation into `update-inventory`, the established
+preview and explicit-publication workflow. After all proposed repositories and
+the inventory audit presentation validate, the workflow:
+
+1. writes the inventory summary CSV and review workbook to a staging directory;
+2. registers both artifacts with the exact proposed catalog snapshot hash and
+   accepted import timestamp;
+3. builds the shared Steward Presentation Model from the proposed state;
+4. renders the self-contained Steward Workspace into the same staging
+   directory; and
+5. atomically publishes all three generated artifacts as one rollback-protected
+   set.
+
+The workspace renderer still receives only the shared model. It does not read
+the registered artifacts or their source paths. Report authority comes from
+explicit same-run registration and snapshot validation, not filename or
+directory presence.
+
+Preview generation uses the existing deterministic identity and timestamp
+namespace. Identical source, durable starting state, audit arguments, and
+workflow version produce byte-identical repositories, summary CSV, review
+workbook, completion summary, and workspace HTML. Publication retains existing
+UUIDv4 durable identity behavior. A failure during workspace construction,
+rendering, or any generated-artifact replacement restores all durable
+repositories and prior artifacts.
+
+Acceptance tests exercise locating a book, confirming its linked physical
+holding, preserving separate catalog and holding identities, reading a
+recommendation explanation, following its affected-entity and evidence routes,
+finding both registered reports, recognizing current snapshot status and
+limitations, and identifying unavailable market and Research Candidate
+evidence.
+
+The real 30-row preview validates the implemented workflow without durable
+publication. Automated browser control cannot navigate local `file://` URLs in
+the validation environment because of an enforced URL policy. PR6 therefore
+records JavaScript syntax and deterministic DOM-contract acceptance as
+automated evidence; opening the same generated file in a supported local browser
+remains an explicit release-readiness task rather than being simulated through
+a server or alternate browser surface.

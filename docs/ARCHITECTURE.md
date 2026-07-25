@@ -793,8 +793,9 @@ Publication snapshots the seven mutable repositories (`catalog_items.csv` and
 the six inventory import, folder, observation, physical-decision, holding, and
 catalog-decision repositories) before invoking existing components. A failure
 in import, either reconciliation stage, validation, or artifact generation
-restores their prior bytes. The two generated audit artifacts are staged and
-published only after the proposed durable state and presentation validate.
+restores their prior bytes. The two generated audit artifacts and the Steward
+Workspace HTML are staged and published only after the proposed durable state
+and presentation validate.
 Exact file repeats continue to use the existing content hash and create no new
 durable identities or decisions. `acquisitions.csv` is validated and counted,
 but never written by this workflow.
@@ -806,6 +807,28 @@ makes two fresh previews of the same proposal byte-reproducible while ensuring
 changed source or starting state uses a different preview identity namespace.
 The factory is injected only into temporary preview processing. Publication
 continues to use the existing UUIDv4 allocation and wall-clock timestamp.
+
+### v0.11.0 Steward Workspace workflow integration
+
+The existing `update-inventory` command is the production generation boundary
+for the first Steward Workspace client. After import, physical reconciliation,
+catalog reconciliation, and inventory-audit projection validate in temporary
+workflow state, the workflow builds one shared Steward Presentation Model and
+renders `steward_workspace.html`.
+
+The staged inventory summary CSV and inventory-review workbook are explicitly
+registered with the model using the same proposed catalog snapshot hash and
+accepted import timestamp. Their presence in `output/` alone grants no
+authority. The renderer reads only the shared model; it does not read those
+artifacts, scan directories, or recalculate their content.
+
+The summary CSV, review workbook, and workspace HTML form one generated
+artifact publication set. Same-directory temporary files, `fsync`, atomic
+replacement, and prior-byte restoration protect all three outputs. A failure
+during workspace construction, rendering, or any artifact replacement restores
+published durable and generated state through the existing workflow rollback
+boundary. Preview still mutates no durable repository; `--publish` remains the
+only durable authorization.
 
 ## Testing Expectations
 

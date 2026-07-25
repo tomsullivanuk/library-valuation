@@ -1,5 +1,6 @@
 import csv
 import json
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -56,6 +57,16 @@ def state_bytes(data_dir: Path):
     }
 
 
+def embedded_json(workspace: str, script_id: str):
+    match = re.search(
+        rf'<script id="{re.escape(script_id)}" type="application/json">(.*?)</script>',
+        workspace,
+        re.DOTALL,
+    )
+    assert match
+    return json.loads(match.group(1))
+
+
 def run(source, libib_root, data_dir, output_dir, *, publish=False):
     return update_inventory(
         source,
@@ -99,6 +110,13 @@ def test_preview_is_default_complete_and_does_not_mutate_durable_state(tmp_path)
     assert state_bytes(data_dir) == before
     assert (output_dir / "inventory_audit_summary.csv").exists()
     assert (output_dir / "inventory_review_workbook.xlsx").exists()
+    assert (output_dir / "steward_workspace.html").exists()
+    assert result.steward_workspace == str(output_dir / "steward_workspace.html")
+    workspace = (output_dir / "steward_workspace.html").read_text(encoding="utf-8")
+    assert "Inventory Audit Summary" in workspace
+    assert "Inventory Review Workbook" in workspace
+    assert '"status":"current"' in workspace
+    assert 'href: row.public_path' in workspace
 
 
 def test_two_fresh_previews_have_identical_summaries_ids_and_artifacts(tmp_path):
@@ -107,6 +125,7 @@ def test_two_fresh_previews_have_identical_summaries_ids_and_artifacts(tmp_path)
     first = preview_with_default_clock(source, libib_root, data_dir, output_dir)
     first_csv = (output_dir / "inventory_audit_summary.csv").read_bytes()
     first_xlsx = (output_dir / "inventory_review_workbook.xlsx").read_bytes()
+    first_workspace = (output_dir / "steward_workspace.html").read_bytes()
 
     second = preview_with_default_clock(source, libib_root, data_dir, output_dir)
 
@@ -114,6 +133,7 @@ def test_two_fresh_previews_have_identical_summaries_ids_and_artifacts(tmp_path)
     assert first.inventory_import_id == second.inventory_import_id
     assert (output_dir / "inventory_audit_summary.csv").read_bytes() == first_csv
     assert (output_dir / "inventory_review_workbook.xlsx").read_bytes() == first_xlsx
+    assert (output_dir / "steward_workspace.html").read_bytes() == first_workspace
     assert state_bytes(data_dir) == before
 
 
@@ -133,6 +153,60 @@ def test_two_fresh_previews_create_identical_temporary_repository_rows(tmp_path,
     preview_with_default_clock(source, libib_root, data_dir, output_dir)
     preview_with_default_clock(source, libib_root, data_dir, output_dir)
     assert captured[0] == captured[1]
+
+
+def test_generated_workspace_supports_steward_acceptance_tasks(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+
+    run(source, libib_root, data_dir, output_dir)
+
+    workspace = (output_dir / "steward_workspace.html").read_text(encoding="utf-8")
+    presentation = embedded_json(workspace, "workspace-data")
+    queues = embedded_json(workspace, "recommendation-data")
+    report_groups = embedded_json(workspace, "report-data")
+
+    book = next(row for row in presentation["books"] if row["title"] == "Example Physics")
+    holding = next(
+        row
+        for row in presentation["holdings"]
+        if row["holding_id"] in book["holding_ids"]
+    )
+    assert book["catalog_item_id"] != holding["holding_id"]
+    assert holding["inventory_status"] == "verified_present"
+    assert holding["catalog_item_id"] == book["catalog_item_id"]
+
+    recommendations = [
+        row for queue in queues for row in queue["recommendations"]
+    ]
+    assert recommendations
+    recommendation = recommendations[0]
+    assert recommendation["suggested_action"]
+    assert recommendation["explanation"]
+    assert recommendation["primary_route"]
+    assert recommendation["evidence_routes"]
+
+    reports = [row for group in report_groups for row in group["reports"]]
+    assert {row["report_key"] for row in reports} == {
+        "inventory_audit_summary",
+        "inventory_review_workbook",
+    }
+    assert all(row["status"] == "current" for row in reports)
+    assert all(row["can_open"] for row in reports)
+    assert all(row["limitations"] for row in reports)
+    assert {row["public_path"] for row in reports} == {
+        "inventory_audit_summary.csv",
+        "inventory_review_workbook.xlsx",
+    }
+
+    sources = {
+        row["source_key"]: row["status"] for row in presentation["snapshot"]["sources"]
+    }
+    assert sources["market_evidence"] == "unavailable"
+    assert sources["research_candidates"] == "unavailable"
+    assert 'href="#explore"' in workspace
+    assert 'href="#recommendations"' in workspace
+    assert 'href="#reports"' in workspace
+    assert "This workspace is read-only" in workspace
 
 
 def test_single_audit_area_directory_is_an_explicit_supported_input(tmp_path):
@@ -160,6 +234,7 @@ def test_identical_repeat_reuses_import_and_creates_no_durable_duplicates(tmp_pa
     first = run(source, libib_root, data_dir, output_dir, publish=True)
     before = state_bytes(data_dir)
     workbook_before = (output_dir / "inventory_review_workbook.xlsx").read_bytes()
+    workspace_before = (output_dir / "steward_workspace.html").read_bytes()
 
     repeated = run(source, libib_root, data_dir, output_dir, publish=True)
 
@@ -171,6 +246,7 @@ def test_identical_repeat_reuses_import_and_creates_no_durable_duplicates(tmp_pa
     assert repeated.durable_state_changed is False
     assert state_bytes(data_dir) == before
     assert (output_dir / "inventory_review_workbook.xlsx").read_bytes() == workbook_before
+    assert (output_dir / "steward_workspace.html").read_bytes() == workspace_before
 
 
 def test_publication_keeps_existing_random_uuid4_identity_behavior(tmp_path):
@@ -195,9 +271,11 @@ def test_repeat_completion_summary_and_artifacts_are_deterministic(tmp_path):
     run(source, libib_root, data_dir, output_dir, publish=True)
     first = run(source, libib_root, data_dir, output_dir)
     workbook = (output_dir / "inventory_review_workbook.xlsx").read_bytes()
+    workspace = (output_dir / "steward_workspace.html").read_bytes()
     second = run(source, libib_root, data_dir, output_dir)
     assert first.as_dict() == second.as_dict()
     assert (output_dir / "inventory_review_workbook.xlsx").read_bytes() == workbook
+    assert (output_dir / "steward_workspace.html").read_bytes() == workspace
 
 
 def test_changed_source_uses_existing_conservative_reconciliation_without_real_mutation(tmp_path):
@@ -261,7 +339,7 @@ def test_materially_changed_durable_state_changes_preview_identity_and_remains_c
     assert state_bytes(data_dir) == changed_state
 
 
-@pytest.mark.parametrize("failure_stage", ["inventory", "catalog", "artifacts"])
+@pytest.mark.parametrize("failure_stage", ["inventory", "catalog", "artifacts", "workspace"])
 def test_failure_after_each_workflow_stage_restores_every_repository(tmp_path, monkeypatch, failure_stage):
     source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
     before = state_bytes(data_dir)
@@ -269,6 +347,7 @@ def test_failure_after_each_workflow_stage_restores_every_repository(tmp_path, m
         "inventory": "import_libib_inventory",
         "catalog": "reconcile_inventory_catalog",
         "artifacts": "write_inventory_audit_artifacts",
+        "workspace": "render_steward_workspace",
     }[failure_stage]
     original = getattr(workflow, target_name)
 
@@ -282,6 +361,37 @@ def test_failure_after_each_workflow_stage_restores_every_repository(tmp_path, m
 
     assert state_bytes(data_dir) == before
     assert not output_dir.exists()
+
+
+def test_partial_artifact_publication_restores_all_prior_artifacts(
+    tmp_path, monkeypatch
+):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    output_dir.mkdir()
+    prior = {name: f"prior-{name}".encode() for name in workflow.ARTIFACT_NAMES}
+    for name, content in prior.items():
+        (output_dir / name).write_bytes(content)
+    before = state_bytes(data_dir)
+    real_replace = workflow.os.replace
+    replacements = 0
+
+    def fail_on_workspace(source_path, destination_path):
+        nonlocal replacements
+        if Path(destination_path).parent == output_dir:
+            replacements += 1
+            if replacements == len(workflow.ARTIFACT_NAMES):
+                raise OSError("injected final artifact replacement failure")
+        return real_replace(source_path, destination_path)
+
+    monkeypatch.setattr(workflow.os, "replace", fail_on_workspace)
+
+    with pytest.raises(OSError, match="final artifact"):
+        run(source, libib_root, data_dir, output_dir, publish=True)
+
+    assert state_bytes(data_dir) == before
+    assert {
+        name: (output_dir / name).read_bytes() for name in workflow.ARTIFACT_NAMES
+    } == prior
 
 
 def test_artifact_publication_failure_restores_durable_and_prior_artifacts(tmp_path, monkeypatch):
@@ -368,4 +478,6 @@ def test_cli_defaults_to_preview_and_prints_machine_readable_summary(tmp_path, c
     assert exit_code == 0
     assert summary["mode"] == "preview"
     assert summary["durable_state_changed"] is False
+    assert summary["steward_workspace"] == str(output_dir / "steward_workspace.html")
+    assert (output_dir / "steward_workspace.html").exists()
     assert state_bytes(data_dir) == before

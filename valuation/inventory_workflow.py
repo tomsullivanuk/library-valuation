@@ -21,11 +21,14 @@ from valuation.libib_catalog import (
     reconcile_inventory_catalog,
 )
 from valuation.libib_inventory import (
+    InventoryImportRepository,
     import_libib_inventory,
     inventory_repository_paths,
     resolve_libib_import_source,
 )
 from valuation.repositories import ACQUISITION_FIELDNAMES
+from valuation.steward_presentation import RegisteredReport, build_steward_presentation
+from valuation.steward_workspace import render_steward_workspace
 
 
 class InventoryWorkflowError(ValueError):
@@ -41,7 +44,11 @@ DURABLE_REPOSITORY_NAMES = (
     "inventory_holdings.csv",
     "inventory_catalog_reconciliation_decisions.csv",
 )
-ARTIFACT_NAMES = ("inventory_audit_summary.csv", "inventory_review_workbook.xlsx")
+ARTIFACT_NAMES = (
+    "inventory_audit_summary.csv",
+    "inventory_review_workbook.xlsx",
+    "steward_workspace.html",
+)
 PREVIEW_IDENTITY_VERSION = "inventory_preview_identity_v1"
 _PREVIEW_NAMESPACE = uuid.UUID("3154cc32-a0a5-4f3d-9c44-60f77e738197")
 
@@ -73,6 +80,7 @@ class InventoryWorkflowSummary:
     reconciled_holdings: int
     summary_csv: str
     review_workbook: str
+    steward_workspace: str
     durable_state_changed: bool
     proposed_durable_changes: bool
     repeat: bool
@@ -157,6 +165,51 @@ def update_inventory(
                 data_dir=working_data,
                 output_dir=staged_output,
             )
+            workspace_generated_at = _inventory_import_timestamp(
+                working_data, import_result.inventory_import_id or ""
+            )
+            catalog_hash = _file_hash(working_data / "catalog_items.csv")
+            workspace_presentation = build_steward_presentation(
+                data_dir=working_data,
+                reports=(
+                    RegisteredReport(
+                        report_key="inventory_audit_summary",
+                        name="Inventory Audit Summary",
+                        purpose="Review inventory coverage and exception counts",
+                        audience="Steward",
+                        format="csv",
+                        source_path=staged_output / "inventory_audit_summary.csv",
+                        public_path="inventory_audit_summary.csv",
+                        producing_workflow="update-inventory",
+                        catalog_snapshot_sha256=catalog_hash,
+                        generated_at=workspace_generated_at,
+                        limitations=(
+                            "Summary counts support review; use the workbook for "
+                            "row-level evidence."
+                        ),
+                    ),
+                    RegisteredReport(
+                        report_key="inventory_review_workbook",
+                        name="Inventory Review Workbook",
+                        purpose="Review inventory, reconciliation, location, and audit questions",
+                        audience="Steward",
+                        format="xlsx",
+                        source_path=staged_output / "inventory_review_workbook.xlsx",
+                        public_path="inventory_review_workbook.xlsx",
+                        producing_workflow="update-inventory",
+                        catalog_snapshot_sha256=catalog_hash,
+                        generated_at=workspace_generated_at,
+                        limitations=(
+                            "Generated review artifact only; edits are not imported "
+                            "into durable project state."
+                        ),
+                    ),
+                ),
+                generated_at=workspace_generated_at,
+            )
+            (staged_output / "steward_workspace.html").write_bytes(
+                render_steward_workspace(workspace_presentation)
+            )
             acquisition_count_after = _acquisition_count(working_data / "acquisitions.csv")
             if acquisition_count_after != acquisition_count_before:
                 raise InventoryWorkflowError("Libib inventory workflow must not create acquisitions")
@@ -204,6 +257,7 @@ def update_inventory(
         reconciled_holdings=len(presentation.reconciled_holdings),
         summary_csv=str(output_dir / ARTIFACT_NAMES[0]),
         review_workbook=str(output_dir / ARTIFACT_NAMES[1]),
+        steward_workspace=str(output_dir / ARTIFACT_NAMES[2]),
         durable_state_changed=publish and proposed,
         proposed_durable_changes=proposed,
         repeat=import_result.status == "duplicate",
@@ -326,3 +380,19 @@ def _acquisition_count(path: Path) -> int:
         if reader.fieldnames != ACQUISITION_FIELDNAMES:
             raise InventoryWorkflowError(f"Unsupported or malformed acquisition repository: {path}")
         return sum(1 for _ in reader)
+
+
+def _inventory_import_timestamp(data_dir: Path, inventory_import_id: str) -> str:
+    rows = InventoryImportRepository(
+        inventory_repository_paths(data_dir)["imports"]
+    ).load()
+    matching = [
+        row["imported_at"]
+        for row in rows
+        if row["inventory_import_id"] == inventory_import_id
+    ]
+    if len(matching) != 1:
+        raise InventoryWorkflowError(
+            "Accepted inventory import must have exactly one durable timestamp"
+        )
+    return matching[0]

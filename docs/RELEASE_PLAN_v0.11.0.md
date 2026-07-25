@@ -3,8 +3,9 @@
 ## v0.11.0 — Steward Workspace
 
 **Status:** PR1 design, PR2 shared presentation-model implementation, PR3
-workspace shell and Explore implementation, and PR4 Recommendations are
-complete. PR5 Reports implementation is complete and awaiting review.
+workspace shell and Explore implementation, PR4 Recommendations, and PR5
+Reports are complete. PR6 workflow integration and acceptance is complete and
+awaiting review.
 
 ## 1. Release Theme
 
@@ -332,6 +333,27 @@ tasks.
 **Exit criteria:** One command generates a trustworthy workspace, the real
 Steward can complete the approved tasks, and no source or durable repository is
 modified.
+
+**Implemented contract:** `update-inventory` now stages
+`steward_workspace.html` alongside `inventory_audit_summary.csv` and
+`inventory_review_workbook.xlsx`. The two reports are explicitly registered
+against the same proposed catalog snapshot and accepted import timestamp before
+the shared model renders the workspace. All three artifacts publish through the
+existing atomic replacement and rollback boundary. Preview remains the default
+and leaves durable repositories byte-for-byte unchanged.
+
+End-to-end tests cover deterministic preview and repeat bytes, report freshness,
+steward task navigation contracts, failure after workspace rendering, and
+rollback when final artifact replacement fails. The untouched 30-row Libib
+export produced 30 holdings, 22 existing catalog links, 5 proposed catalog
+items, 3 unresolved catalog cases, 2 current registered reports, and no
+acquisitions while leaving real durable state unchanged.
+
+Automated browser control in the validation environment cannot navigate local
+`file://` URLs because of its enforced URL policy. JavaScript syntax, semantic
+markup, keyboard/focus foundations, hash routes, and task flows are validated
+through deterministic artifact and DOM-contract tests. Manual supported-browser
+acceptance of the generated local file remains a release-readiness check.
 
 ### PR7 — Documentation and Release Readiness
 
