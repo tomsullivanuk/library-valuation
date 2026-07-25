@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import shutil
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -11,13 +12,16 @@ from valuation.libib_inventory import import_libib_inventory
 from valuation.repositories import ACQUISITION_FIELDNAMES, CATALOG_ITEMS_FIELDNAMES
 from valuation.steward_presentation import (
     PRESENTATION_MODEL_VERSION,
+    RegisteredReport,
     RecommendationView,
+    StewardPresentationError,
     build_steward_presentation,
 )
 from valuation.steward_workspace import (
     ExploreQuery,
     StewardWorkspaceRenderError,
     build_recommendation_queues,
+    build_report_groups,
     query_explore,
     render_steward_workspace,
 )
@@ -114,11 +118,202 @@ def test_catalog_only_workspace_has_task_home_explore_and_honest_placeholders(tm
     assert 'href="#recommendations"' in html
     assert 'href="#reports"' in html
     assert "Evidence-backed operational next steps" in html
-    assert "reserved for PR5" in html
+    assert "Only explicitly registered reports appear here" in html
     assert "unavailable" in html
     assert "Read-only" in html
     assert "does not save" in html
     assert "decisions or modify the catalog" in html
+
+
+def test_registered_reports_are_grouped_by_declared_steward_purpose(tmp_path):
+    data_dir = tmp_path / "data"
+    write_catalog(data_dir, [catalog_row()])
+    catalog_hash = hashlib.sha256((data_dir / "catalog_items.csv").read_bytes()).hexdigest()
+    report_dir = tmp_path / "generated"
+    report_dir.mkdir()
+    inventory = report_dir / "inventory.xlsx"
+    research = report_dir / "research.pdf"
+    inventory.write_bytes(b"inventory report")
+    research.write_bytes(b"research report")
+    model = build_steward_presentation(
+        data_dir=data_dir,
+        reports=(
+            RegisteredReport(
+                "inventory_review",
+                "Inventory Review",
+                "Review audit and holding questions",
+                "Steward",
+                "xlsx",
+                inventory,
+                "reports/inventory.xlsx",
+                "inventory-workflow",
+                catalog_hash,
+                "2026-07-25T12:00:00Z",
+                "Covers the latest accepted audit only.",
+            ),
+            RegisteredReport(
+                "collection_research",
+                "Collection Research",
+                "Review bibliographic research",
+                "Steward",
+                "pdf",
+                research,
+                "reports/research.pdf",
+                "research-workflow",
+                catalog_hash,
+            ),
+        ),
+    )
+
+    groups = build_report_groups(model)
+
+    assert tuple(group.category_key for group in groups) == (
+        "inventory_audit",
+        "catalog_research",
+    )
+    assert all(row.status == "current" for group in groups for row in group.reports)
+    assert groups[0].reports[0].limitations == "Covers the latest accepted audit only."
+    assert groups[0].reports[0].can_open
+
+
+def test_report_states_distinguish_current_stale_missing_incompatible_and_unavailable(
+    tmp_path,
+):
+    data_dir = tmp_path / "data"
+    write_catalog(data_dir, [catalog_row()])
+    catalog_hash = hashlib.sha256((data_dir / "catalog_items.csv").read_bytes()).hexdigest()
+    current = tmp_path / "current.xlsx"
+    stale = tmp_path / "stale.xlsx"
+    incompatible = tmp_path / "wrong.csv"
+    current.write_bytes(b"current")
+    stale.write_bytes(b"stale")
+    incompatible.write_bytes(b"incompatible")
+    reports = (
+        RegisteredReport("current", "Current", "Steward review", "Steward", "xlsx", current, "current.xlsx", "review", catalog_hash),
+        RegisteredReport("stale", "Stale", "Steward review", "Steward", "xlsx", stale, "stale.xlsx", "review", "old-hash"),
+        RegisteredReport("missing", "Missing", "Steward review", "Steward", "xlsx", tmp_path / "missing.xlsx", "missing.xlsx", "review", catalog_hash),
+        RegisteredReport("incompatible", "Incompatible", "Steward review", "Steward", "xlsx", incompatible, "wrong.xlsx", "review", catalog_hash),
+    )
+
+    model = build_steward_presentation(data_dir=data_dir, reports=reports)
+    statuses = {row.report_key: row.status for row in model.reports}
+    grouped = {
+        row.report_key: row
+        for group in build_report_groups(model)
+        for row in group.reports
+    }
+
+    assert statuses == {
+        "current": "current",
+        "stale": "stale",
+        "missing": "missing",
+        "incompatible": "incompatible",
+    }
+    assert grouped["current"].can_open
+    assert grouped["stale"].can_open
+    assert not grouped["missing"].can_open
+    assert not grouped["incompatible"].can_open
+    assert tuple(
+        row.report_key for row in build_report_groups(model)[0].reports
+    ) == ("current", "stale", "missing", "incompatible")
+    assert not build_report_groups(model_for(tmp_path / "catalog-only", [catalog_row()]))
+
+
+@pytest.mark.parametrize(
+    "public_path",
+    (
+        "../private.xlsx",
+        "/absolute.xlsx",
+        ".",
+        "https:report.xlsx",
+        "report.xlsx?private=1",
+        "report.xlsx#fragment",
+        "reports\\report.xlsx",
+        "%2e%2e/private.xlsx",
+        " //example.invalid/report.xlsx",
+    ),
+)
+def test_report_public_paths_fail_closed_when_not_safe(tmp_path, public_path):
+    data_dir = tmp_path / "data"
+    write_catalog(data_dir, [catalog_row()])
+    report = tmp_path / "report.xlsx"
+    report.write_bytes(b"report")
+
+    with pytest.raises(StewardPresentationError, match="safe and relative"):
+        build_steward_presentation(
+            data_dir=data_dir,
+            reports=(
+                RegisteredReport(
+                    "unsafe",
+                    "Unsafe",
+                    "Review",
+                    "Steward",
+                    "xlsx",
+                    report,
+                    public_path,
+                    "test",
+                ),
+            ),
+        )
+
+
+def test_report_rendering_is_deterministic_script_safe_and_links_only_safe_artifacts(
+    tmp_path,
+):
+    data_dir = tmp_path / "data"
+    write_catalog(data_dir, [catalog_row()])
+    catalog_hash = hashlib.sha256((data_dir / "catalog_items.csv").read_bytes()).hexdigest()
+    report = tmp_path / "report.xlsx"
+    report.write_bytes(b"report")
+    model = build_steward_presentation(
+        data_dir=data_dir,
+        reports=(
+            RegisteredReport(
+                "review",
+                "Steward Review",
+                "Review </script><script>PRIVATE</script> questions",
+                "Steward",
+                "xlsx",
+                report,
+                "reports/review.xlsx",
+                "review-workflow",
+                catalog_hash,
+                limitations="Does not record decisions.",
+            ),
+        ),
+    )
+
+    first = render_steward_workspace(model)
+    second = render_steward_workspace(model)
+
+    assert first == second
+    assert b"</script><script>PRIVATE" not in first
+    assert b"\\u003c/script\\u003e" in first
+    assert b"reports/review.xlsx" in first
+    assert b"Open local report" in first
+    assert b"Download" in first
+    assert b"source_path" not in first
+    assert 'route === "report"' in first.decode()
+
+
+def test_duplicate_report_registration_is_rejected_before_rendering(tmp_path):
+    data_dir = tmp_path / "data"
+    write_catalog(data_dir, [catalog_row()])
+    report = tmp_path / "report.xlsx"
+    report.write_bytes(b"report")
+    duplicate = RegisteredReport(
+        "same",
+        "Same",
+        "Review",
+        "Steward",
+        "xlsx",
+        report,
+        "report.xlsx",
+        "test",
+    )
+
+    with pytest.raises(StewardPresentationError, match="unique"):
+        build_steward_presentation(data_dir=data_dir, reports=(duplicate, duplicate))
 
 
 def test_query_searches_allowlisted_book_and_related_identity_fields(tmp_path):

@@ -13,6 +13,7 @@ from dataclasses import asdict, dataclass
 from valuation.steward_presentation import (
     PRESENTATION_MODEL_VERSION,
     BookView,
+    ReportView,
     StewardPresentation,
 )
 
@@ -57,6 +58,31 @@ class RecommendationQueue:
     title: str
     purpose: str
     recommendations: tuple[WorkspaceRecommendation, ...]
+
+
+@dataclass(frozen=True)
+class WorkspaceReport:
+    report_key: str
+    category_key: str
+    name: str
+    purpose: str
+    audience: str
+    format: str
+    public_path: str
+    producing_workflow: str
+    status: str
+    generated_at: str
+    limitations: str
+    content_sha256: str
+    can_open: bool
+
+
+@dataclass(frozen=True)
+class ReportGroup:
+    category_key: str
+    title: str
+    purpose: str
+    reports: tuple[WorkspaceReport, ...]
 
 
 _QUEUE_DEFINITIONS = (
@@ -117,6 +143,45 @@ _QUEUE_BY_SOURCE = {
     "steward_priority": "steward_priority",
 }
 _CONFIDENCE_ORDER = {"high": 0, "medium": 1, "low": 2, "unknown": 3, "": 4}
+_REPORT_GROUPS = (
+    (
+        "inventory_audit",
+        "Inventory and audit",
+        "Artifacts for physical inventory, audit coverage, and reconciliation review.",
+    ),
+    (
+        "catalog_research",
+        "Catalog and research",
+        "Artifacts for bibliographic review and collection research.",
+    ),
+    (
+        "market_evidence",
+        "Market evidence",
+        "Artifacts that summarize current market observations and limitations.",
+    ),
+    (
+        "steward_review",
+        "Steward review",
+        "Artifacts prepared for the Steward's internal review workflow.",
+    ),
+    (
+        "family_external",
+        "Family or external communication",
+        "Artifacts prepared to communicate collection evidence to other people.",
+    ),
+    (
+        "other",
+        "Other registered reports",
+        "Registered stewardship artifacts that do not fit another purpose.",
+    ),
+)
+_REPORT_STATUS_ORDER = {
+    "current": 0,
+    "stale": 1,
+    "missing": 2,
+    "unavailable": 3,
+    "incompatible": 4,
+}
 
 
 def build_recommendation_queues(
@@ -184,6 +249,78 @@ def build_recommendation_queues(
     return tuple(queues)
 
 
+def build_report_groups(
+    presentation: StewardPresentation,
+) -> tuple[ReportGroup, ...]:
+    """Group explicitly registered reports without discovering or recalculating them."""
+
+    grouped: dict[str, list[WorkspaceReport]] = {
+        key: [] for key, _, _ in _REPORT_GROUPS
+    }
+    seen: set[str] = set()
+    for row in presentation.reports:
+        if row.report_key in seen:
+            continue
+        seen.add(row.report_key)
+        category_key = _report_category(row)
+        grouped[category_key].append(
+            WorkspaceReport(
+                report_key=row.report_key,
+                category_key=category_key,
+                name=row.name,
+                purpose=row.purpose,
+                audience=row.audience,
+                format=row.format,
+                public_path=row.public_path,
+                producing_workflow=row.producing_workflow,
+                status=row.status,
+                generated_at=row.generated_at,
+                limitations=row.limitations,
+                content_sha256=row.content_sha256,
+                can_open=row.status in {"current", "stale"} and bool(row.public_path),
+            )
+        )
+    groups: list[ReportGroup] = []
+    for category_key, title, purpose in _REPORT_GROUPS:
+        rows = grouped[category_key]
+        rows.sort(
+            key=lambda item: (
+                _REPORT_STATUS_ORDER.get(item.status, 5),
+                item.name.casefold(),
+                item.report_key,
+            )
+        )
+        if rows:
+            groups.append(ReportGroup(category_key, title, purpose, tuple(rows)))
+    return tuple(groups)
+
+
+def _report_category(report: ReportView) -> str:
+    text = " ".join(
+        (
+            report.report_key,
+            report.name,
+            report.purpose,
+            report.producing_workflow,
+        )
+    ).casefold()
+    categories = (
+        ("inventory_audit", ("inventory", "audit", "holding", "reconciliation")),
+        ("market_evidence", ("market", "valuation", "price", "comparable")),
+        ("catalog_research", ("catalog", "research", "bibliographic", "metadata")),
+        ("family_external", ("family", "external", "dealer", "prospectus", "communication")),
+        ("steward_review", ("steward", "review", "priority", "decision")),
+    )
+    return next(
+        (
+            category
+            for category, keywords in categories
+            if any(keyword in text for keyword in keywords)
+        ),
+        "other",
+    )
+
+
 def query_explore(
     presentation: StewardPresentation, query: ExploreQuery = ExploreQuery()
 ) -> tuple[str, ...]:
@@ -225,9 +362,21 @@ def render_steward_workspace(presentation: StewardPresentation) -> bytes:
         .replace("<", "\\u003c")
         .replace(">", "\\u003e")
     )
+    report_json = json.dumps(
+        [asdict(group) for group in build_report_groups(presentation)],
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    report_json = (
+        report_json.replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+    )
     return (
         _DOCUMENT.replace("__WORKSPACE_DATA__", embedded_json)
         .replace("__WORKSPACE_RECOMMENDATIONS__", recommendation_json)
+        .replace("__WORKSPACE_REPORTS__", report_json)
         .replace("__RENDERER_VERSION__", WORKSPACE_RENDERER_VERSION)
         .encode("utf-8")
     )
@@ -543,11 +692,13 @@ _DOCUMENT = r"""<!doctype html>
   </noscript>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
+  <script id="report-data" type="application/json">__WORKSPACE_REPORTS__</script>
   <script>
   "use strict";
   (() => {
     const DATA = JSON.parse(document.getElementById("workspace-data").textContent);
     const QUEUES = JSON.parse(document.getElementById("recommendation-data").textContent);
+    const REPORT_GROUPS = JSON.parse(document.getElementById("report-data").textContent);
     const main = document.getElementById("main-content");
     const RESULT_LIMIT = 250;
     const index = {
@@ -559,7 +710,8 @@ _DOCUMENT = r"""<!doctype html>
       observations: new Map(DATA.observations.map(row => [row.inventory_observation_id, row])),
       decisions: new Map(DATA.decisions.map(row => [row.decision_id, row])),
       market: new Map(DATA.market_evidence.map(row => [row.market_evidence_id, row])),
-      recommendations: new Map(QUEUES.flatMap(queue => queue.recommendations).map(row => [row.recommendation_id, row]))
+      recommendations: new Map(QUEUES.flatMap(queue => queue.recommendations).map(row => [row.recommendation_id, row])),
+      reports: new Map(REPORT_GROUPS.flatMap(group => group.reports).map(row => [row.report_key, row]))
     };
 
     function node(tag, attrs = {}, text = "") {
@@ -644,7 +796,7 @@ _DOCUMENT = r"""<!doctype html>
       const recommendations = node("a", {class: "card", href: "#recommendations"});
       append(recommendations, node("h2", {}, "Review what needs attention"), node("p", {}, "See evidence-backed next steps grouped by the kind of work involved."));
       const reports = node("a", {class: "card", href: "#reports"});
-      append(reports, node("h2", {}, "Open reports"), node("p", {}, "Reports content is planned for a later workspace increment."));
+      append(reports, node("h2", {}, "Open reports"), node("p", {}, "Find registered artifacts by purpose and understand whether they are current."));
       append(choices, explore, recommendations, reports);
       append(main, choices, node("h2", {}, "Collection at a glance"));
       const metrics = node("div", {class: "grid"});
@@ -1075,17 +1227,96 @@ _DOCUMENT = r"""<!doctype html>
       if (row.evidence_routes.length) append(main, detailSection("Supporting evidence", linkList(row.evidence_routes), true));
       append(main, node("p", {class: "notice"}, "This workspace does not save acceptance, dismissal, notes, or decisions."));
     }
-    function renderPlaceholder(kind) {
-      clear();
-      heading(
-        human(kind),
-        "This navigation destination is reserved for PR5."
+    function reportCard(row) {
+      const card = node("article", {class: "card"});
+      append(
+        card,
+        node("h3", {}, row.name || row.report_key),
+        badge("Status", row.status),
+        node("p", {}, row.purpose || "No purpose was supplied."),
+        definitionList([
+          ["Audience", row.audience],
+          ["Format", row.format],
+          ["Generated", row.generated_at],
+          ["Producing workflow", row.producing_workflow]
+        ])
       );
-      append(main, node(
-        "p",
-        {class: "empty"},
-        `The shared model contains ${DATA.reports.length} registered report(s), but this release increment does not yet present the report catalog.`
-      ));
+      if (row.limitations) append(card, node("p", {class: "notice"}, `Limitation: ${row.limitations}`));
+      const actions = node("div", {class: "badges"});
+      append(actions, routeLink("View report details", `report/${encodeURIComponent(row.report_key)}`, "button-link"));
+      if (row.can_open) {
+        append(
+          actions,
+          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener"}, "Open local report"),
+          node("a", {href: row.public_path, class: "button-link", download: ""}, "Download")
+        );
+      } else {
+        append(actions, node("span", {class: "muted"}, "No safe local action is available for this status."));
+      }
+      append(card, actions);
+      return card;
+    }
+    function renderReports() {
+      clear();
+      heading("Reports", "Choose a registered stewardship artifact by purpose, audience, and freshness.");
+      append(main, node("p", {class: "notice"}, "Only explicitly registered reports appear here. Files elsewhere in the project have no authority merely because they exist."));
+      append(main, sourceMessages());
+      if (!REPORT_GROUPS.length) {
+        append(main, node("p", {class: "empty"}, "No reports are registered for this workspace snapshot. This is unavailable report coverage, not confirmation that no useful artifact could be generated."));
+        return;
+      }
+      for (const group of REPORT_GROUPS) {
+        const section = node("section", {class: "panel"});
+        append(
+          section,
+          node("h2", {}, group.title),
+          node("p", {class: "muted"}, `${group.purpose} ${group.reports.length} ${group.reports.length === 1 ? "report" : "reports"}.`)
+        );
+        const rows = node("div", {class: "result-list"});
+        for (const row of group.reports) append(rows, reportCard(row));
+        append(section, rows);
+        append(main, section);
+      }
+    }
+    function renderReport(id) {
+      const row = index.reports.get(id);
+      if (!row) return renderNotFound("report", id);
+      clear();
+      append(main, routeLink("← Back to Reports", "reports"));
+      heading(row.name || row.report_key, row.purpose);
+      append(main, badge("Status", row.status));
+      if (row.status === "stale") {
+        append(main, node("p", {class: "notice"}, "This artifact is available, but it does not match the current catalog snapshot."));
+      } else if (row.status === "missing") {
+        append(main, node("p", {class: "notice"}, "The report is registered, but its artifact file is missing."));
+      } else if (row.status === "incompatible") {
+        append(main, node("p", {class: "notice"}, "The registered format is incompatible with the artifact path."));
+      } else if (row.status === "unavailable") {
+        append(main, node("p", {class: "notice"}, "This registered report is currently unavailable."));
+      }
+      append(main, definitionList([
+        ["Audience", row.audience],
+        ["Format", row.format],
+        ["Generated", row.generated_at],
+        ["Producing workflow", row.producing_workflow],
+        ["Limitations", row.limitations],
+        ["Report key", row.report_key]
+      ]));
+      if (row.can_open) {
+        const actions = node("div", {class: "badges"});
+        append(
+          actions,
+          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener"}, "Open local report"),
+          node("a", {href: row.public_path, class: "button-link", download: ""}, "Download")
+        );
+        append(main, actions);
+      }
+      append(main, detailSection("Technical provenance", definitionList([
+        ["Public path", row.public_path],
+        ["Content SHA-256", row.content_sha256],
+        ["Workspace snapshot", DATA.snapshot.snapshot_id]
+      ])));
+      append(main, node("p", {class: "notice"}, "Opening or downloading a report does not modify project state."));
     }
     function renderAbout() {
       clear();
@@ -1127,14 +1358,15 @@ _DOCUMENT = r"""<!doctype html>
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
           || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision"].includes(route) && link.dataset.nav === "explore")
-          || (route === "recommendation" && link.dataset.nav === "recommendations");
+          || (route === "recommendation" && link.dataset.nav === "recommendations")
+          || (route === "report" && link.dataset.nav === "reports");
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");
       });
       if (route === "home") renderHome();
       else if (route === "explore") renderExplore();
       else if (route === "recommendations") renderRecommendations();
-      else if (route === "reports") renderPlaceholder(route);
+      else if (route === "reports") renderReports();
       else if (route === "about") renderAbout();
       else if (route === "book") renderBook(id);
       else if (route === "holding") renderHolding(id);
@@ -1145,6 +1377,7 @@ _DOCUMENT = r"""<!doctype html>
       else if (route === "observation") renderObservation(id);
       else if (route === "decision") renderDecision(id);
       else if (route === "recommendation") renderRecommendation(id);
+      else if (route === "report") renderReport(id);
       else renderNotFound("workspace route", route);
       document.title = `${main.querySelector("h1")?.textContent || "Steward Workspace"} — Library Valuation`;
       main.focus({preventScroll: true});

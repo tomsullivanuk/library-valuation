@@ -970,14 +970,38 @@ def _report_views(
             raise StewardPresentationError("Report keys must be nonblank and unique")
         keys.add(report.report_key)
         public_path = PurePosixPath(report.public_path)
-        if public_path.is_absolute() or ".." in public_path.parts or not report.public_path:
+        if (
+            public_path.is_absolute()
+            or ".." in public_path.parts
+            or not report.public_path
+            or not public_path.parts
+            or report.public_path != report.public_path.strip()
+            or "\\" in report.public_path
+            or "%" in report.public_path
+            or "?" in report.public_path
+            or "#" in report.public_path
+            or ":" in public_path.parts[0]
+            or any(ord(character) < 32 for character in report.public_path)
+        ):
             raise StewardPresentationError("Report public_path must be safe and relative")
         path = Path(report.source_path)
         if not path.is_file():
-            status, digest, explanation = "unavailable", "", "Registered report is unavailable."
+            status, digest, explanation = "missing", "", "Registered report file is missing."
         else:
             digest = _file_sha256(path)
-            if report.catalog_snapshot_sha256 == catalog_hash:
+            format_name = report.format.casefold().lstrip(".")
+            source_suffix = path.suffix.casefold().lstrip(".")
+            public_suffix = public_path.suffix.casefold().lstrip(".")
+            if (
+                not format_name
+                or source_suffix != format_name
+                or public_suffix != format_name
+            ):
+                status, explanation = (
+                    "incompatible",
+                    "Registered report format and file extension do not agree.",
+                )
+            elif report.catalog_snapshot_sha256 == catalog_hash:
                 status, explanation = "current", "Registered report matches the catalog snapshot."
             else:
                 status, explanation = "stale", "Report catalog snapshot is absent or does not match."

@@ -721,3 +721,57 @@ optional subsystem produces neither invented guidance nor a false “nothing
 needs attention” conclusion. Rich disposition recommendations—including
 selling, donating, retaining, publishing, or dealer outreach—remain deferred to
 v0.13.0.
+
+## 21. Implemented PR5 Reports Contract
+
+PR5 replaces the Reports placeholder with a curated catalog built exclusively
+from `RegisteredReport` records in the shared presentation model. Neither the
+model nor renderer scans `output/` or any other directory. Unregistered
+artifacts remain generated files without presentation authority.
+
+Reports are grouped from their declared key, name, purpose, and producing
+workflow into:
+
+- inventory and audit;
+- catalog and research;
+- market evidence;
+- steward review;
+- family or external communication; and
+- other registered reports.
+
+These categories organize discovery only; they do not recalculate or interpret
+report contents. Nonempty groups sort by the established category order.
+Reports within a group sort by status, steward-facing name, and stable report
+key. Duplicate report keys fail closed during registration; the client also
+displays each accepted key at most once.
+
+The implemented status rules are:
+
+- `current`: the artifact exists, its registered catalog snapshot matches the
+  workspace catalog, and its declared format matches its source and public
+  filename extensions;
+- `stale`: the compatible artifact exists but its catalog snapshot is absent or
+  does not match;
+- `missing`: the report is registered but its source artifact does not exist;
+- `incompatible`: the artifact exists but declared format and filename
+  extensions disagree; and
+- unavailable report coverage: no reports were registered for the snapshot.
+
+Current and stale reports may expose local Open and Download actions. Stale
+reports remain labelled as mismatched and are never presented as current.
+Missing, incompatible, and unavailable reports expose no artifact action.
+Public paths must be relative and reject traversal, absolute paths, URI
+schemes, query strings, fragments, backslashes, percent encoding, surrounding
+whitespace, and control characters.
+
+Each report view shows its purpose, audience, format, producing workflow,
+generation time, status, limitations, stable key, content hash, and workspace
+snapshot context. The `registered_report_v1` contract does not currently carry
+a distinct scope field or related book, holding, recommendation, or evidence
+references. PR5 does not infer those relationships. Adding them requires an
+explicit future presentation-contract revision backed by producing-workflow
+provenance.
+
+The Reports experience is deterministic, self-contained, local-first, and
+read-only. It does not generate report content, persist report state, contact
+external destinations, or turn opening an artifact into a project decision.

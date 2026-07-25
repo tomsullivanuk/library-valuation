@@ -2,9 +2,9 @@
 
 ## v0.11.0 — Steward Workspace
 
-**Status:** PR1 design, PR2 shared presentation-model implementation, and PR3
-workspace shell and Explore implementation are complete. PR4 Recommendations
-implementation is complete and awaiting review.
+**Status:** PR1 design, PR2 shared presentation-model implementation, PR3
+workspace shell and Explore implementation, and PR4 Recommendations are
+complete. PR5 Reports implementation is complete and awaiting review.
 
 ## 1. Release Theme
 
@@ -288,6 +288,28 @@ ordering, and no promotion of arbitrary output to authority.
 
 **Exit criteria:** The Steward can select the appropriate existing report and
 understand whether it is current without knowing its filename or producer.
+
+**Implemented contract:** PR5 presents only explicit `RegisteredReport` values
+already accepted by the shared model. It groups reports by declared
+steward-facing purpose into inventory and audit, catalog and research, market
+evidence, steward review, family or external communication, and other
+registered reports. Within a group, ordering is status, name, and stable report
+key.
+
+A present artifact is `current` only when its registered catalog snapshot
+matches and its declared format agrees with both source and public filename
+extensions. A mismatched snapshot is `stale`; a missing registered file is
+`missing`; and a format/path disagreement is `incompatible`. No registrations
+is explained as unavailable report coverage. Current and stale artifacts may
+be opened or downloaded through their validated relative public paths; stale
+artifacts carry an explicit mismatch warning. Missing, unavailable, and
+incompatible entries have no open action.
+
+The implemented `registered_report_v1` contract does not contain a separate
+scope field or related book, holding, or recommendation references. PR5 shows
+purpose, audience, workflow, generated time, status, limitations, content hash,
+and snapshot context, but does not infer scope or entity links. No directory is
+scanned, no report is recalculated, and no durable report state is introduced.
 
 ### PR6 — Integrated Generation and Steward Acceptance
 
