@@ -117,8 +117,8 @@ def test_catalog_only_workspace_has_task_home_explore_and_honest_placeholders(tm
     assert 'href="#explore"' in html
     assert 'href="#recommendations"' in html
     assert 'href="#reports"' in html
-    assert "Evidence-backed operational next steps" in html
-    assert "Only explicitly registered reports appear here" in html
+    assert "Review evidence-backed next steps" in html
+    assert "Every report shown here was registered and checked" in html
     assert "unavailable" in html
     assert "Read-only" in html
     assert "does not save" in html
@@ -290,8 +290,8 @@ def test_report_rendering_is_deterministic_script_safe_and_links_only_safe_artif
     assert b"</script><script>PRIVATE" not in first
     assert b"\\u003c/script\\u003e" in first
     assert b"reports/review.xlsx" in first
-    assert b"Open local report" in first
-    assert b"Download" in first
+    assert b"Open report" in first
+    assert b"Download a copy" in first
     assert b"source_path" not in first
     assert 'route === "report"' in first.decode()
 
@@ -550,7 +550,7 @@ def test_deep_links_preserve_book_holding_and_evidence_entity_distinctions(tmp_p
     ):
         assert f'route === "{route}"' in html
     assert "Catalog item ID" in html
-    assert "Physical holding" in html
+    assert "physical copy" in html
     assert "Acquisition evidence" in html
     assert "Reconciliation decisions" in html
 
@@ -590,6 +590,30 @@ def test_accessibility_foundations_and_progressive_disclosure_are_present(tmp_pa
     assert 'node("details"' in html
     assert 'node("summary"' in html
     assert "<noscript>" in html
+
+
+def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
+    html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+
+    assert "Books in the catalog" in html
+    assert "Physical copies recorded" in html
+    assert "Purchase records" in html
+    assert "Items needing attention" in html
+    assert '"Physical copy"' in html
+    assert '"Purchase history"' in html
+    assert '"Market research"' in html
+    assert "No purchase record is linked. The book may have come from another source." in html
+    assert "A useful first item from up to three different areas needing attention." in html
+    assert "All areas needing attention" in html
+    assert "About this report" in html
+    assert "Open report" in html
+    assert "Download a copy" in html
+    assert "Every report shown here was registered and checked for this workspace." in html
+    assert 'detailSection("Technical details"' in html
+    assert "Some information is not included or may need review." in html
+    assert "What information is affected" in html
+    assert '"aria-describedby": "explore-search-help"' in html
+    assert '"aria-label": `Open ${row.name || row.report_key}`' in html
 
 
 def test_renderer_rejects_an_incompatible_presentation_contract(tmp_path):

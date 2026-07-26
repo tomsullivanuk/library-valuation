@@ -88,23 +88,23 @@ class ReportGroup:
 _QUEUE_DEFINITIONS = (
     (
         "physical_identity",
-        "Resolve physical identity",
-        "Clarify which physical copy an inventory observation represents.",
+        "Identify a physical copy",
+        "Clarify which physical copy an inventory record represents.",
     ),
     (
         "catalog_identity",
-        "Resolve catalog identity",
-        "Connect a physical holding to the correct bibliographic identity.",
+        "Identify the correct book",
+        "Connect a physical copy to the correct catalog entry.",
     ),
     (
         "audit_coverage",
-        "Review inventory coverage",
-        "Clarify incomplete or uncertain physical-audit evidence.",
+        "Review what has been checked",
+        "Clarify incomplete or uncertain inventory coverage.",
     ),
     (
         "location",
         "Verify locations",
-        "Map or confirm where physical holdings are believed to be.",
+        "Confirm where physical copies are believed to be.",
     ),
     (
         "newly_discovered",
@@ -147,32 +147,32 @@ _REPORT_GROUPS = (
     (
         "inventory_audit",
         "Inventory and audit",
-        "Artifacts for physical inventory, audit coverage, and reconciliation review.",
+        "Reports for physical inventory, audit coverage, and identity review.",
     ),
     (
         "catalog_research",
         "Catalog and research",
-        "Artifacts for bibliographic review and collection research.",
+        "Reports for catalog review and collection research.",
     ),
     (
         "market_evidence",
         "Market evidence",
-        "Artifacts that summarize current market observations and limitations.",
+        "Reports that summarize current market observations and limitations.",
     ),
     (
         "steward_review",
         "Steward review",
-        "Artifacts prepared for the Steward's internal review workflow.",
+        "Reports prepared for the Steward's own review.",
     ),
     (
         "family_external",
         "Family or external communication",
-        "Artifacts prepared to communicate collection evidence to other people.",
+        "Reports prepared to communicate collection information to other people.",
     ),
     (
         "other",
-        "Other registered reports",
-        "Registered stewardship artifacts that do not fit another purpose.",
+        "Other reports",
+        "Prepared reports that do not fit another purpose.",
     ),
 )
 _REPORT_STATUS_ORDER = {
@@ -557,6 +557,13 @@ _DOCUMENT = r"""<!doctype html>
     .card { display: block; padding: 1.15rem; text-decoration: none; }
     .card:hover { border-color: var(--brand); }
     .card h2, .card h3 { margin-top: 0; color: var(--brand-dark); }
+    .card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .5rem;
+      margin-top: .9rem;
+    }
     .panel { padding: 1.15rem; margin-block: 1rem; }
     .metric strong { display: block; font-size: 1.8rem; color: var(--brand-dark); }
     .muted { color: var(--muted); }
@@ -610,11 +617,13 @@ _DOCUMENT = r"""<!doctype html>
       border: 1px solid var(--line);
       border-radius: 999px;
       background: #f2f1eb;
-      font-size: .78rem;
+      font-size: .82rem;
     }
     .badge[data-status="current"] { background: #e2f2e8; border-color: #7aa88b; }
     .badge[data-status="stale"],
     .badge[data-status="incompatible"] { background: var(--warning-bg); }
+    .badge[data-status="missing"],
+    .badge[data-status="unavailable"] { border-style: dashed; color: var(--muted); }
     .button-link {
       display: inline-block;
       padding: .5rem .7rem;
@@ -622,6 +631,11 @@ _DOCUMENT = r"""<!doctype html>
       background: var(--brand);
       color: white;
       text-decoration: none;
+    }
+    .button-link.secondary {
+      background: transparent;
+      color: var(--brand-dark);
+      border: 1px solid var(--brand);
     }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
     dl {
@@ -728,16 +742,91 @@ _DOCUMENT = r"""<!doctype html>
       return parent;
     }
     function clear() { main.replaceChildren(); }
-    function valueOrUnknown(value) { return value || "Unknown"; }
+    function valueOrUnknown(value) { return value || "Not recorded"; }
     function human(value) {
       if (!value) return "Unknown";
       return value.replaceAll("_", " ").replace(/\b\w/g, match => match.toUpperCase());
     }
-    function badge(label, status) {
-      return node("span", {class: "badge", "data-status": status || ""}, `${label}: ${human(status)}`);
+    function friendlyExplanation(value) {
+      if (!value) return "No additional explanation was supplied.";
+      return value.includes("_") && !value.includes(" ") ? human(value) : value;
     }
-    function routeLink(label, route, className = "") {
-      return node("a", {href: `#${route}`, class: className}, label);
+    const STATUS_LABELS = {
+      current: "Current",
+      stale: "May be out of date",
+      missing: "Not available",
+      unavailable: "Not included",
+      incompatible: "Cannot be used",
+      unknown: "Not known",
+      not_stated: "Not stated",
+      advisory: "Steward decides",
+      needs_review: "Needs attention",
+      no_review: "No current review item",
+      verified_present: "Confirmed present",
+      not_yet_audited: "Not yet checked",
+      outside_audit_scope: "Outside this audit",
+      possible_missing: "May be missing",
+      complete_scope: "Complete for this area",
+      partial_scope: "Partial for this area"
+    };
+    const SOURCE_LABELS = {
+      catalog: "Library catalog",
+      acquisitions: "Purchase history",
+      inventory: "Physical inventory",
+      research_assessments: "Research priorities",
+      collector_reviews: "Steward reviews",
+      market_evidence: "Market research",
+      research_candidates: "Research candidates",
+      registered_reports: "Reports"
+    };
+    function statusLabel(status) {
+      return STATUS_LABELS[status] || human(status);
+    }
+    function sourceLabel(key) {
+      if (key.startsWith("report:")) return "Registered report";
+      return SOURCE_LABELS[key] || human(key);
+    }
+    function sourceStatusExplanation(status) {
+      return {
+        stale: "This information was prepared from a different catalog view and is not treated as current.",
+        missing: "Expected information could not be found.",
+        unavailable: "This information was not included when the workspace was created.",
+        incompatible: "This information could not be used safely."
+      }[status] || "Review the data details for more information.";
+    }
+    function evidenceStatus(kind, status) {
+      const labels = {
+        inventory: {
+          current: "Holding recorded",
+          missing: "No holding recorded",
+          unavailable: "Inventory not included",
+          stale: "Inventory may be out of date",
+          incompatible: "Inventory cannot be used"
+        },
+        acquisition: {
+          current: "Purchase record found",
+          missing: "No purchase record",
+          unavailable: "Purchase history not included",
+          stale: "Purchase history may be out of date",
+          incompatible: "Purchase history cannot be used"
+        },
+        market: {
+          current: "Current research",
+          missing: "No market research",
+          unavailable: "Market research not included",
+          stale: "Research may be out of date",
+          incompatible: "Research cannot be used"
+        }
+      };
+      return labels[kind]?.[status] || statusLabel(status);
+    }
+    function badge(label, status, display = "") {
+      return node("span", {class: "badge", "data-status": status || ""}, `${label}: ${display || statusLabel(status)}`);
+    }
+    function routeLink(label, route, className = "", ariaLabel = "") {
+      const attrs = {href: `#${route}`, class: className};
+      if (ariaLabel) attrs["aria-label"] = ariaLabel;
+      return node("a", attrs, label);
     }
     function definitionList(values) {
       const list = node("dl");
@@ -765,16 +854,24 @@ _DOCUMENT = r"""<!doctype html>
     function sourceMessages() {
       const fragment = document.createDocumentFragment();
       const noteworthy = DATA.snapshot.sources.filter(source => source.status !== "current");
+      if (!noteworthy.length && !DATA.snapshot.warnings.length) return fragment;
+      append(fragment, node(
+        "p",
+        {class: "notice"},
+        "Some information is not included or may need review. The workspace will not guess when evidence is unavailable."
+      ));
+      const affected = node("ul");
       for (const source of noteworthy) {
-        append(fragment, node(
-          "p",
-          {class: "notice"},
-          `${human(source.source_key)} — ${human(source.status)}. ${source.explanation}`
+        append(affected, node(
+          "li",
+          {},
+          `${sourceLabel(source.source_key)}: ${statusLabel(source.status)}. ${sourceStatusExplanation(source.status)}`
         ));
       }
       for (const warning of DATA.snapshot.warnings) {
-        append(fragment, node("p", {class: "notice"}, warning));
+        append(affected, node("li", {}, warning));
       }
+      append(fragment, detailSection("What information is affected", affected));
       return fragment;
     }
     function metric(label, value, note) {
@@ -796,33 +893,37 @@ _DOCUMENT = r"""<!doctype html>
       const recommendations = node("a", {class: "card", href: "#recommendations"});
       append(recommendations, node("h2", {}, "Review what needs attention"), node("p", {}, "See evidence-backed next steps grouped by the kind of work involved."));
       const reports = node("a", {class: "card", href: "#reports"});
-      append(reports, node("h2", {}, "Open reports"), node("p", {}, "Find registered artifacts by purpose and understand whether they are current."));
+      append(reports, node("h2", {}, "Open reports"), node("p", {}, "Choose a prepared report and see whether it reflects this workspace."));
       append(choices, explore, recommendations, reports);
       append(main, choices, node("h2", {}, "Collection at a glance"));
       const metrics = node("div", {class: "grid"});
       append(
         metrics,
-        metric("Cataloged books", DATA.collection.catalog_item_count),
-        metric("Physical holdings", DATA.collection.holding_count, sourceStatus("inventory")),
-        metric("Acquisition records", DATA.collection.acquisition_count, sourceStatus("acquisitions")),
-        metric("Items flagged for review", DATA.collection.recommendation_count)
+        metric("Books in the catalog", DATA.collection.catalog_item_count),
+        metric("Physical copies recorded", DATA.collection.holding_count, sourceStatus("inventory")),
+        metric("Purchase records", DATA.collection.acquisition_count, sourceStatus("acquisitions")),
+        metric("Items needing attention", DATA.collection.recommendation_count)
       );
-      append(main, metrics, node("h2", {}, "Evidence availability"), sourceMessages());
+      append(main, metrics, node("h2", {}, "Information included in this workspace"));
+      const messages = sourceMessages();
+      append(main, DATA.snapshot.sources.every(source => source.status === "current") && !DATA.snapshot.warnings.length
+        ? node("p", {class: "panel"}, "All included information is current for this workspace.")
+        : messages);
     }
 
     function sourceStatus(key) {
       const source = DATA.snapshot.sources.find(row => row.source_key === key);
-      return source ? human(source.status) : "Unavailable";
+      return source ? statusLabel(source.status) : "Not included";
     }
     function statusOptions(field) {
       const values = [...new Set(DATA.books.map(book => book[field]).filter(Boolean))].sort();
       return values;
     }
-    function selectControl(id, labelText, values) {
+    function selectControl(id, labelText, values, display = statusLabel) {
       const label = node("label", {for: id}, labelText);
       const select = node("select", {id});
       append(select, node("option", {value: ""}, "All"));
-      for (const value of values) append(select, node("option", {value}, human(value)));
+      for (const value of values) append(select, node("option", {value}, display(value)));
       append(label, select);
       return label;
     }
@@ -864,7 +965,7 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       heading(
         "Explore the library",
-        "Search cataloged books and inspect physical, acquisition, research, and market context."
+        "Find a book, see whether a physical copy is recorded, and review the information available about it."
       );
       append(main, sourceMessages());
       const controls = node("form", {class: "controls", role: "search"});
@@ -873,14 +974,20 @@ _DOCUMENT = r"""<!doctype html>
         id: "explore-search",
         type: "search",
         placeholder: "Title, creator, ISBN, publisher, or ID",
-        autocomplete: "off"
+        autocomplete: "off",
+        "aria-describedby": "explore-search-help"
       });
-      append(searchLabel, search);
-      const inventory = selectControl("inventory-filter", "Physical inventory", statusOptions("inventory_status"));
-      const acquisition = selectControl("acquisition-filter", "Acquisition evidence", statusOptions("acquisition_status"));
-      const market = selectControl("market-filter", "Market evidence", statusOptions("market_evidence_status"));
-      const review = selectControl("review-filter", "Review state", ["needs_review", "no_review"]);
-      const sort = selectControl("sort-order", "Sort by", ["title", "author", "publication_year", "catalog_item_id"]);
+      append(searchLabel, search, node("span", {id: "explore-search-help", class: "muted"}, "Searches titles, creators, ISBNs, publishers, and project references."));
+      const inventory = selectControl("inventory-filter", "Physical copy", statusOptions("inventory_status"), value => evidenceStatus("inventory", value));
+      const acquisition = selectControl("acquisition-filter", "Purchase history", statusOptions("acquisition_status"), value => evidenceStatus("acquisition", value));
+      const market = selectControl("market-filter", "Market research", statusOptions("market_evidence_status"), value => evidenceStatus("market", value));
+      const review = selectControl("review-filter", "Attention needed", ["needs_review", "no_review"]);
+      const sort = selectControl("sort-order", "Sort by", ["title", "author", "publication_year", "catalog_item_id"], value => ({
+        title: "Title",
+        author: "Creator",
+        publication_year: "Publication year",
+        catalog_item_id: "Catalog reference"
+      })[value]);
       sort.querySelector("select").value = "title";
       append(controls, searchLabel, inventory, acquisition, market, review, sort);
       const header = node("div", {class: "results-header"});
@@ -925,11 +1032,11 @@ _DOCUMENT = r"""<!doctype html>
       const statuses = node("div", {class: "badges"});
       append(
         statuses,
-        badge("Held", book.inventory_status),
-        badge("Acquisition", book.acquisition_status),
-        badge("Market", book.market_evidence_status)
+        badge("Physical copy", book.inventory_status, evidenceStatus("inventory", book.inventory_status)),
+        badge("Purchase history", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
+        badge("Market research", book.market_evidence_status, evidenceStatus("market", book.market_evidence_status))
       );
-      append(article, identity, statuses, routeLink("View details", `book/${encodeURIComponent(book.catalog_item_id)}`, "button-link"));
+      append(article, identity, statuses, routeLink("View details", `book/${encodeURIComponent(book.catalog_item_id)}`, "button-link", `View details for ${valueOrUnknown(book.title)}`));
       return article;
     }
 
@@ -939,7 +1046,7 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       append(main, routeLink("← Back to Explore", "explore"));
       const title = node("div", {class: "detail-heading"});
-      append(title, node("h1", {}, valueOrUnknown(book.title)), node("span", {class: "badge"}, book.catalog_item_id));
+      append(title, node("h1", {}, valueOrUnknown(book.title)), node("span", {class: "badge", title: "Stable catalog reference"}, book.catalog_item_id));
       append(main, title, node("p", {class: "lede"}, valueOrUnknown(book.author)));
       append(
         main,
@@ -954,27 +1061,27 @@ _DOCUMENT = r"""<!doctype html>
       const context = node("div");
       append(
         context,
-        node("p", {}, "These statuses summarize available evidence; unavailable does not mean absent."),
+        node("p", {}, "These labels describe the information included here. Information that is not included should not be treated as proof that a book or record does not exist."),
         append(
           node("div", {class: "badges"}),
-          badge("Physical inventory", book.inventory_status),
-          badge("Acquisition evidence", book.acquisition_status),
-          badge("Assessment", book.assessment_status),
-          badge("Market evidence", book.market_evidence_status)
+          badge("Physical copy", book.inventory_status, evidenceStatus("inventory", book.inventory_status)),
+          badge("Purchase history", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
+          badge("Research priority", book.assessment_status),
+          badge("Market research", book.market_evidence_status, evidenceStatus("market", book.market_evidence_status))
         )
       );
       if (book.recommendation_ids.length) {
-        append(context, node("p", {class: "notice"}, `${book.recommendation_ids.length} existing review item(s) are associated with this book.`));
-        append(context, linkList(book.recommendation_ids.map(id => [id, `recommendation/${encodeURIComponent(id)}`])));
+        append(context, node("p", {class: "notice"}, `${book.recommendation_ids.length} item${book.recommendation_ids.length === 1 ? "" : "s"} need attention for this book.`));
+        append(context, linkList(book.recommendation_ids.map((id, index) => [`Review item ${index + 1}`, `recommendation/${encodeURIComponent(id)}`])));
       }
       append(main, detailSection("Steward context", context, true));
 
       const evidence = node("div");
-      if (book.holding_ids.length) append(evidence, node("h3", {}, "Physical holdings"), linkList(book.holding_ids.map(id => [id, `holding/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.inventory_status === "unavailable" ? "Physical inventory evidence is unavailable." : "No physical holding is currently linked."));
-      if (book.acquisition_ids.length) append(evidence, node("h3", {}, "Acquisitions"), linkList(book.acquisition_ids.map(id => [id, `acquisition/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.acquisition_status === "unavailable" ? "Acquisition evidence is unavailable." : "No acquisition record is linked."));
-      if (book.assessment_id) append(evidence, node("h3", {}, "Research assessment"), linkList([["View assessment", `assessment/${encodeURIComponent(book.assessment_id)}`]]));
+      if (book.holding_ids.length) append(evidence, node("h3", {}, "Physical copies"), linkList(book.holding_ids.map((id, index) => [`View physical copy ${index + 1}`, `holding/${encodeURIComponent(id)}`])));
+      else append(evidence, node("p", {}, book.inventory_status === "unavailable" ? "Physical inventory was not included in this workspace." : "No physical copy is currently linked to this catalog entry."));
+      if (book.acquisition_ids.length) append(evidence, node("h3", {}, "Purchase history"), linkList(book.acquisition_ids.map((id, index) => [`View purchase record ${index + 1}`, `acquisition/${encodeURIComponent(id)}`])));
+      else append(evidence, node("p", {}, book.acquisition_status === "unavailable" ? "Purchase history was not included in this workspace." : "No purchase record is linked. The book may have come from another source."));
+      if (book.assessment_id) append(evidence, node("h3", {}, "Research priority"), linkList([["View research priority", `assessment/${encodeURIComponent(book.assessment_id)}`]]));
       if (book.market_evidence_id) append(evidence, node("h3", {}, "Market evidence"), linkList([["View market summary", `market/${encodeURIComponent(book.market_evidence_id)}`]]));
       if (book.steward_review_id) append(evidence, node("h3", {}, "Steward review"), linkList([["View steward review", `review/${encodeURIComponent(book.steward_review_id)}`]]));
       append(main, detailSection("Evidence", evidence));
@@ -997,20 +1104,20 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       const book = index.books.get(holding.catalog_item_id);
       append(main, routeLink("← Back to book", book ? `book/${encodeURIComponent(book.catalog_item_id)}` : "explore"));
-      heading(book ? book.title : "Unresolved physical holding", `Physical holding ${holding.holding_id}`);
+      heading(book ? book.title : "Unresolved physical copy", "Details about one physical copy represented in the inventory.");
       append(main, definitionList([
-        ["Inventory status", human(holding.inventory_status)],
+        ["Inventory status", statusLabel(holding.inventory_status)],
         ["Copies represented", holding.copies],
-        ["Holding type", human(holding.holding_state_type)],
-        ["Current location", holding.current_location_id],
-        ["Source collection", holding.source_collection_label],
+        ["Record type", human(holding.holding_state_type)],
+        ["Current believed location", holding.current_location_id],
+        ["Collection label from source", holding.source_collection_label],
         ["Last verified", holding.last_verified_at],
-        ["Verification scope", holding.verification_scope],
-        ["Verification completeness", human(holding.verification_completeness)]
+        ["Area checked", holding.verification_scope],
+        ["Audit coverage", statusLabel(holding.verification_completeness)]
       ]));
       const evidence = node("div");
-      if (holding.observation_ids.length) append(evidence, node("h3", {}, "Inventory observations"), linkList(holding.observation_ids.map(id => [id, `observation/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, "No linked observation is available."));
+      if (holding.observation_ids.length) append(evidence, node("h3", {}, "Inventory evidence"), linkList(holding.observation_ids.map((id, index) => [`View inventory observation ${index + 1}`, `observation/${encodeURIComponent(id)}`])));
+      else append(evidence, node("p", {}, "No linked inventory observation is available."));
       append(main, detailSection("Evidence", evidence, true));
       const provenance = node("div");
       const links = [
@@ -1152,49 +1259,51 @@ _DOCUMENT = r"""<!doctype html>
     function recommendationCard(row, compact = false) {
       const card = node("article", {class: "card"});
       append(card, node("h3", {}, row.suggested_action));
-      append(card, routeLink(row.entity_label, row.primary_route, "button-link"));
-      append(card, node("p", {}, row.explanation || "No additional explanation was supplied."));
+      append(card, node("p", {class: "muted"}, row.entity_label));
+      append(card, node("p", {}, friendlyExplanation(row.explanation)));
       const statuses = node("div", {class: "badges"});
-      append(
-        statuses,
-        badge("Confidence", row.confidence || "not_stated"),
-        badge("Guidance", row.advisory ? "advisory" : "unknown")
-      );
+      append(statuses, badge("Confidence", row.confidence || "not_stated"));
       append(card, statuses);
       if (!compact) {
         const technical = node("div");
         append(technical, definitionList([
-          ["Queue", human(row.queue_key)],
-          ["Source", human(row.source_kind)],
+          ["Area", human(row.queue_key)],
+          ["Evidence source", human(row.source_kind)],
           ["Reason codes", row.reason_codes.join(", ")],
           ["Recommendation reference", row.recommendation_id]
         ]));
         if (row.evidence_routes.length) {
           append(technical, node("h3", {}, "Supporting evidence"), linkList(row.evidence_routes));
         }
-        append(card, detailSection("Why this surfaced", technical));
+        append(card, detailSection("Why this is here", technical));
       }
-      append(card, routeLink("Open recommendation detail", `recommendation/${encodeURIComponent(row.recommendation_id)}`));
+      const actions = node("div", {class: "card-actions"});
+      append(
+        actions,
+        routeLink("Review this item", `recommendation/${encodeURIComponent(row.recommendation_id)}`, "button-link", `Review ${row.suggested_action} for ${row.entity_label}`),
+        routeLink("View related book or copy", row.primary_route, "button-link secondary", `View related book or physical copy for ${row.entity_label}`)
+      );
+      append(card, actions);
       return card;
     }
     function renderRecommendations() {
       clear();
       heading(
         "Recommendations",
-        "Evidence-backed operational next steps, grouped by work that can be compared honestly."
+        "Review evidence-backed next steps, grouped by the kind of attention they need."
       );
       append(main, node("p", {class: "notice"}, "Recommendations are advisory and read-only. The Steward retains every decision."));
       append(main, sourceMessages());
       if (!QUEUES.length) {
-        append(main, node("p", {class: "empty"}, "No current recommendation records are available. Unavailable evidence may limit what can surface."));
+        append(main, node("p", {class: "empty"}, "No review items can be shown from the information included here. This is not necessarily an all-clear."));
         return;
       }
       const starting = QUEUES.slice(0, 3).map(queue => queue.recommendations[0]);
       append(main, node("h2", {}, "Start here"));
-      append(main, node("p", {class: "muted"}, "One item from each of the first supported queues, using queue precedence and stable within-queue ordering."));
+      append(main, node("p", {class: "muted"}, "A useful first item from up to three different areas needing attention."));
       const startingGrid = node("div", {class: "grid"});
       for (const row of starting) append(startingGrid, recommendationCard(row, true));
-      append(main, startingGrid, node("h2", {}, "All recommendation queues"));
+      append(main, startingGrid, node("h2", {}, "All areas needing attention"));
       for (const queue of QUEUES) {
         const section = node("section", {class: "panel"});
         append(
@@ -1214,17 +1323,19 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       append(main, routeLink("← Back to Recommendations", "recommendations"));
       heading(row.suggested_action, row.entity_label);
-      append(main, node("p", {}, row.explanation || "No additional explanation was supplied."));
+      append(main, node("p", {}, friendlyExplanation(row.explanation)));
       append(main, definitionList([
         ["Confidence", human(row.confidence || "not_stated")],
-        ["Advisory", row.advisory ? "Yes — the Steward decides" : "Unknown"],
-        ["Queue", human(row.queue_key)],
-        ["Source", human(row.source_kind)],
+        ["Decision", row.advisory ? "Advisory — you decide what to do" : "Not stated"]
+      ]));
+      append(main, routeLink("View related book or copy", row.primary_route, "button-link"));
+      if (row.evidence_routes.length) append(main, detailSection("Supporting evidence", linkList(row.evidence_routes), true));
+      append(main, detailSection("Technical details", definitionList([
+        ["Area", human(row.queue_key)],
+        ["Evidence source", human(row.source_kind)],
         ["Reason codes", row.reason_codes.join(", ")],
         ["Recommendation reference", row.recommendation_id]
-      ]));
-      append(main, routeLink("Open affected item", row.primary_route, "button-link"));
-      if (row.evidence_routes.length) append(main, detailSection("Supporting evidence", linkList(row.evidence_routes), true));
+      ])));
       append(main, node("p", {class: "notice"}, "This workspace does not save acceptance, dismissal, notes, or decisions."));
     }
     function reportCard(row) {
@@ -1232,37 +1343,42 @@ _DOCUMENT = r"""<!doctype html>
       append(
         card,
         node("h3", {}, row.name || row.report_key),
-        badge("Status", row.status),
+        badge("Status", row.status, {
+          current: "Ready for this workspace",
+          stale: "Available, but may be out of date",
+          missing: "File not found",
+          incompatible: "File cannot be used safely",
+          unavailable: "Not available"
+        }[row.status] || statusLabel(row.status)),
         node("p", {}, row.purpose || "No purpose was supplied."),
         definitionList([
-          ["Audience", row.audience],
-          ["Format", row.format],
-          ["Generated", row.generated_at],
-          ["Producing workflow", row.producing_workflow]
+          ["Prepared for", row.audience],
+          ["File type", row.format.toUpperCase()],
+          ["Prepared", row.generated_at]
         ])
       );
-      if (row.limitations) append(card, node("p", {class: "notice"}, `Limitation: ${row.limitations}`));
-      const actions = node("div", {class: "badges"});
-      append(actions, routeLink("View report details", `report/${encodeURIComponent(row.report_key)}`, "button-link"));
+      if (row.limitations) append(card, node("p", {class: "notice"}, `Keep in mind: ${row.limitations}`));
+      const actions = node("div", {class: "card-actions"});
+      append(actions, routeLink("About this report", `report/${encodeURIComponent(row.report_key)}`, "button-link secondary", `About ${row.name || row.report_key}`));
       if (row.can_open) {
         append(
           actions,
-          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener"}, "Open local report"),
-          node("a", {href: row.public_path, class: "button-link", download: ""}, "Download")
+          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener", "aria-label": `Open ${row.name || row.report_key}`}, "Open report"),
+          node("a", {href: row.public_path, class: "button-link secondary", download: "", "aria-label": `Download ${row.name || row.report_key}`}, "Download a copy")
         );
       } else {
-        append(actions, node("span", {class: "muted"}, "No safe local action is available for this status."));
+        append(actions, node("span", {class: "muted"}, "This report cannot be opened from the current workspace."));
       }
       append(card, actions);
       return card;
     }
     function renderReports() {
       clear();
-      heading("Reports", "Choose a registered stewardship artifact by purpose, audience, and freshness.");
-      append(main, node("p", {class: "notice"}, "Only explicitly registered reports appear here. Files elsewhere in the project have no authority merely because they exist."));
+      heading("Reports", "Choose a prepared report by what you want to review or share.");
+      append(main, node("p", {class: "notice"}, "Every report shown here was registered and checked for this workspace. Other project files are not shown automatically."));
       append(main, sourceMessages());
       if (!REPORT_GROUPS.length) {
-        append(main, node("p", {class: "empty"}, "No reports are registered for this workspace snapshot. This is unavailable report coverage, not confirmation that no useful artifact could be generated."));
+        append(main, node("p", {class: "empty"}, "No reports were prepared for this workspace. Other reports may still be available through their established workflows."));
         return;
       }
       for (const group of REPORT_GROUPS) {
@@ -1284,34 +1400,40 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       append(main, routeLink("← Back to Reports", "reports"));
       heading(row.name || row.report_key, row.purpose);
-      append(main, badge("Status", row.status));
+      append(main, badge("Status", row.status, {
+        current: "Ready for this workspace",
+        stale: "Available, but may be out of date",
+        missing: "File not found",
+        incompatible: "File cannot be used safely",
+        unavailable: "Not available"
+      }[row.status] || statusLabel(row.status)));
       if (row.status === "stale") {
-        append(main, node("p", {class: "notice"}, "This artifact is available, but it does not match the current catalog snapshot."));
+        append(main, node("p", {class: "notice"}, "This report can be opened, but it was prepared from an older view of the catalog."));
       } else if (row.status === "missing") {
-        append(main, node("p", {class: "notice"}, "The report is registered, but its artifact file is missing."));
+        append(main, node("p", {class: "notice"}, "This report was expected, but its file could not be found."));
       } else if (row.status === "incompatible") {
-        append(main, node("p", {class: "notice"}, "The registered format is incompatible with the artifact path."));
+        append(main, node("p", {class: "notice"}, "This report's file type and filename do not agree, so it cannot be opened safely."));
       } else if (row.status === "unavailable") {
-        append(main, node("p", {class: "notice"}, "This registered report is currently unavailable."));
+        append(main, node("p", {class: "notice"}, "This report is not available in the current workspace."));
       }
       append(main, definitionList([
-        ["Audience", row.audience],
-        ["Format", row.format],
-        ["Generated", row.generated_at],
-        ["Producing workflow", row.producing_workflow],
-        ["Limitations", row.limitations],
-        ["Report key", row.report_key]
+        ["Prepared for", row.audience],
+        ["File type", row.format.toUpperCase()],
+        ["Prepared", row.generated_at],
+        ["Limitations", row.limitations]
       ]));
       if (row.can_open) {
         const actions = node("div", {class: "badges"});
         append(
           actions,
-          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener"}, "Open local report"),
-          node("a", {href: row.public_path, class: "button-link", download: ""}, "Download")
+          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener", "aria-label": `Open ${row.name || row.report_key}`}, "Open report"),
+          node("a", {href: row.public_path, class: "button-link secondary", download: "", "aria-label": `Download ${row.name || row.report_key}`}, "Download a copy")
         );
         append(main, actions);
       }
       append(main, detailSection("Technical provenance", definitionList([
+        ["Producing workflow", row.producing_workflow],
+        ["Report key", row.report_key],
         ["Public path", row.public_path],
         ["Content SHA-256", row.content_sha256],
         ["Workspace snapshot", DATA.snapshot.snapshot_id]

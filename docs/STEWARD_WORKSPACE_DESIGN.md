@@ -818,3 +818,25 @@ records JavaScript syntax and deterministic DOM-contract acceptance as
 automated evidence; opening the same generated file in a supported local browser
 remains an explicit release-readiness task rather than being simulated through
 a server or alternate browser surface.
+
+## 23. Implemented PR6A Steward Experience Polish
+
+Manual browser acceptance found no architectural or functional defect, but it
+showed that several correct domain concepts were presented in language closer
+to the implementation than to the Steward's task. PR6A adds a renderer-only
+vocabulary and hierarchy refinement:
+
+- physical holdings, acquisitions, evidence status, and review state lead with
+  physical-copy, purchase-history, information-availability, and
+  attention-needed language;
+- raw status values remain unchanged but receive context-specific display
+  labels;
+- recommendation cards explain the item before presenting evidence-source and
+  reason-code detail;
+- report cards make purpose, readiness, limitations, open, and download actions
+  explicit while moving workflow keys into technical detail; and
+- stable IDs and reconciliation provenance remain available through progressive
+  disclosure rather than leading the experience.
+
+The refinement changes no presentation-model field, queue membership, ordering,
+route, report registration, workflow, domain rule, or durable state.
