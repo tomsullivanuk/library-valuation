@@ -810,6 +810,11 @@ continues to use the existing UUIDv4 allocation and wall-clock timestamp.
 
 ### v0.11.0 Steward Workspace workflow integration
 
+Workspace presentation decisions are governed by the durable
+[Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md). This
+section records implementation and publication boundaries rather than
+redefining the Steward experience.
+
 The existing `update-inventory` command is the production generation boundary
 for the first Steward Workspace client. After import, physical reconciliation,
 catalog reconciliation, and inventory-audit projection validate in temporary

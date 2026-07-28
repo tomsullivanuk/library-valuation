@@ -57,6 +57,8 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
+- `docs/STEWARD_WORKSPACE_DESIGN.md`: canonical, long-term Steward Workspace
+  design principles.
 - `docs/RELEASE_PLAN_v0.9.0.md`: completed resumable full-library eBay release
   plan.
 - `docs/RELEASE_PLAN_v0.10.0.md`: completed Libib physical-inventory PR

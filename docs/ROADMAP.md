@@ -91,34 +91,27 @@ Roadmap proposals should be evaluated by whether they:
 Technical sophistication is valuable only when it improves a stewardship
 outcome.
 
-## Planned Releases
-
-Release titles and boundaries remain working direction until each release plan
-is approved.
+## Delivered Release
 
 ### v0.11.0 — Steward Workspace
 
 Create a steward-oriented entry point to the current catalog, inventory,
 evidence, and review capabilities.
 
-The opening experience should ask:
+The delivered release established a generated, read-only workspace over a
+shared presentation model. Future workspace evolution is governed by the
+[Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md): books and
+stewardship tasks lead, Explore presents conclusions, Details presents evidence,
+and separate pages or reports must provide value beyond search and filtering.
 
-> What would you like to accomplish today?
+## Planned Releases
 
-Its primary experiences should be:
+Release titles and boundaries remain working direction until each release plan
+is approved.
 
-- **Explore:** Search, filter, and inspect books, holdings, acquisitions,
-  evidence, inventory confidence, and unresolved issues.
-- **Recommendations:** Present clear next-step queues for inventory review,
-  metadata correction, market research, collection investigation, and other
-  current priorities.
-- **Reports:** Find and generate appropriate review and communication
-  artifacts without requiring knowledge of internal pipelines.
-
-The workspace should use a shared presentation model so that facts, confidence,
-and recommendations remain consistent across experiences. Initial delivery
-should favor a generated, self-contained interface unless a server-backed
-application is justified by a specific steward need.
+Future release plans that change the workspace should reference the
+[Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md) rather than
+restate or redefine them.
 
 ### v0.12.0 — Collection Intelligence
 

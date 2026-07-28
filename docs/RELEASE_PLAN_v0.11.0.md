@@ -27,8 +27,9 @@ This release is governed by:
 
 The Product Vision defines why the product exists. The Roadmap defines the
 steward workflow and release direction. The Architecture defines durable system
-boundaries. The Steward Workspace Design defines the v0.11.0 presentation
-contract and user experience.
+boundaries. The Steward Workspace Design is the canonical long-term design
+philosophy; this release plan records the v0.11.0-specific implementation and
+acceptance contract.
 
 ## 3. Problem Statement
 
@@ -151,8 +152,9 @@ The three primary experiences are:
 - **Reports:** Find current supported artifacts by purpose and audience rather
   than by filename or pipeline.
 
-The detailed behavior and presentation contract are defined in
-[Steward Workspace Design](STEWARD_WORKSPACE_DESIGN.md).
+The release-specific behavior and presentation contract are recorded below.
+Long-term interface decisions are governed by the
+[Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md).
 
 ## 9. Proposed PR Sequence
 
