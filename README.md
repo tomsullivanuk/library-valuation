@@ -57,8 +57,11 @@ tracking number, payment method, gift fields, and other personal columns.
 - `docs/DATA_MODEL.md`: durable CSV layouts and future valuation model.
 - `docs/ROADMAP.md`: release direction and implementation sequence.
 - `docs/BACKLOG.md`: lightweight product backlog for future releases.
+- `docs/RELEASE_PLAN_v0.11.0.md`: Steward Workspace release plan.
 - `docs/STEWARD_WORKSPACE_DESIGN.md`: canonical, long-term Steward Workspace
   design principles.
+- `docs/RELEASE_NOTES_v0.11.0.md`: v0.11.0 release summary and limitations.
+- `docs/RELEASE_READINESS_v0.11.0.md`: validation evidence and release gate.
 - `docs/RELEASE_PLAN_v0.9.0.md`: completed resumable full-library eBay release
   plan.
 - `docs/RELEASE_PLAN_v0.10.0.md`: completed Libib physical-inventory PR
@@ -157,7 +160,8 @@ Preview one approved Libib audit through the complete inventory workflow:
 python3 library_pipeline.py update-inventory \
   --source input/libib/study/library_20260720_013144.csv \
   --audit-scope "Study" \
-  --audit-completeness partial_scope
+  --audit-completeness partial_scope \
+  --market-evidence-summary output/full_multisource_market_evidence_summary.csv
 ```
 
 Preview is the default. It runs against temporary copies of `data/`, leaves
@@ -165,8 +169,12 @@ durable repositories unchanged, and generates
 `output/inventory_audit_summary.csv` and
 `output/inventory_review_workbook.xlsx` together with the self-contained
 `output/steward_workspace.html`. The workspace registers those two review
-artifacts against the same proposed catalog snapshot, so its Reports view can
-open them without scanning `output/`. Identical source content, durable
+artifacts against the same proposed catalog snapshot without scanning
+`output/`; the book-first Library remains read-only and does not treat arbitrary
+files as evidence. Market evidence is likewise included only through the
+explicit `--market-evidence-summary` input. Its catalog identities are validated
+before rendering; a missing, incompatible, or mismatched file fails closed.
+Identical source content, durable
 starting state, audit area, scope, and completeness produce identical preview
 IDs, completion output, and artifact bytes. After reviewing the summary and queues,
 repeat the same command with `--publish` to authorize durable publication.

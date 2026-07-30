@@ -1,4 +1,4 @@
-"""Deterministic self-contained Steward Workspace shell and Explore renderer.
+"""Deterministic self-contained Steward Workspace and Library renderer.
 
 The renderer consumes only an already-built :class:`StewardPresentation`. It
 does not read repositories, recalculate domain rules, write files, or provide
@@ -461,18 +461,18 @@ _DOCUMENT = r"""<!doctype html>
   <style>
     :root {
       color-scheme: light;
-      --ink: #20251f;
-      --muted: #5c655b;
-      --paper: #f6f3eb;
-      --surface: #fffdf7;
-      --line: #d8d4c9;
-      --brand: #295c48;
-      --brand-dark: #173d2e;
+      --ink: #202423;
+      --muted: #66706c;
+      --paper: #ffffff;
+      --surface: #ffffff;
+      --line: #dde2df;
+      --brand: #27624d;
+      --brand-dark: #1d4f3d;
       --accent: #b85c38;
       --warning: #7a4b00;
       --warning-bg: #fff2d6;
       --focus: #1b6fc2;
-      --shadow: 0 8px 24px rgba(32, 37, 31, .08);
+      --shadow: 0 1px 2px rgba(32, 37, 31, .05);
     }
     * { box-sizing: border-box; }
     body {
@@ -499,9 +499,10 @@ _DOCUMENT = r"""<!doctype html>
     }
     .skip-link:focus { top: .75rem; }
     header {
-      background: var(--brand-dark);
-      color: white;
-      padding: 1rem clamp(1rem, 4vw, 3rem);
+      background: white;
+      color: var(--ink);
+      padding: .6rem clamp(1rem, 4vw, 3rem);
+      border-bottom: 1px solid var(--line);
     }
     .brand {
       display: flex;
@@ -511,7 +512,7 @@ _DOCUMENT = r"""<!doctype html>
       max-width: 86rem;
       margin: auto;
     }
-    .brand strong { font-family: Georgia, serif; font-size: 1.35rem; }
+    .brand strong { font-family: Georgia, serif; font-size: 1.15rem; }
     .read-only { font-size: .88rem; }
     nav {
       position: sticky;
@@ -519,7 +520,7 @@ _DOCUMENT = r"""<!doctype html>
       z-index: 5;
       display: flex;
       gap: .25rem;
-      padding: .5rem clamp(1rem, 4vw, 3rem);
+      padding: .3rem clamp(1rem, 4vw, 3rem);
       overflow-x: auto;
       background: var(--surface);
       border-bottom: 1px solid var(--line);
@@ -534,11 +535,17 @@ _DOCUMENT = r"""<!doctype html>
       background: var(--brand);
       color: white;
     }
+    nav [aria-disabled="true"] {
+      padding: .65rem .85rem;
+      color: var(--muted);
+      white-space: nowrap;
+      cursor: not-allowed;
+    }
     main {
       max-width: 86rem;
       min-height: 60vh;
       margin: auto;
-      padding: clamp(1rem, 4vw, 3rem);
+      padding: .65rem clamp(1rem, 4vw, 3rem) 2rem;
     }
     h1, h2, h3 { font-family: Georgia, serif; line-height: 1.2; }
     h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin-top: 0; }
@@ -580,6 +587,106 @@ _DOCUMENT = r"""<!doctype html>
       align-items: end;
       margin-block: 1rem;
     }
+    .library-controls {
+      display: grid;
+      gap: .4rem;
+      margin-block: 0 .45rem;
+    }
+    .search-row { max-width: 50rem; }
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+      gap: .55rem;
+      align-items: end;
+    }
+    .library-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      align-items: center;
+      margin-block: .25rem .55rem;
+      padding-block: .35rem;
+      border-block: 1px solid var(--line);
+    }
+    .library-actions .export-action { margin-left: auto; }
+    .library-actions .result-count { margin: 0; color: var(--muted); }
+    .sort-menu { position: relative; }
+    .sort-menu summary {
+      min-width: 10rem;
+      padding: .45rem .7rem;
+      border: 1px solid var(--brand);
+      border-radius: .35rem;
+      background: white;
+      color: var(--brand-dark);
+      font-weight: 650;
+      cursor: pointer;
+      list-style: none;
+    }
+    .sort-menu summary::-webkit-details-marker { display: none; }
+    .sort-menu > div {
+      position: absolute;
+      z-index: 8;
+      display: grid;
+      min-width: 13rem;
+      padding: .35rem;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: .35rem;
+      box-shadow: 0 5px 16px rgba(32, 37, 31, .12);
+    }
+    .sort-menu > div button {
+      border: 0;
+      text-align: left;
+      font-weight: 500;
+    }
+    button {
+      min-height: 2.4rem;
+      padding: .45rem .7rem;
+      border: 1px solid var(--brand);
+      border-radius: .35rem;
+      background: white;
+      color: var(--brand-dark);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"], button.primary {
+      background: var(--brand);
+      color: white;
+    }
+    .library-card-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .5rem;
+    }
+    .library-card {
+      display: grid;
+      grid-template-columns: minmax(17rem, 2fr) minmax(18rem, 1.15fr);
+      gap: 1rem;
+      align-items: start;
+      padding: .7rem .85rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: .45rem;
+    }
+    .library-card h2 { margin: 0; font-size: 1.16rem; font-weight: 750; }
+    .book-title-link { text-decoration-thickness: 1px; text-underline-offset: .18em; }
+    .book-title-link:hover { color: var(--brand); text-decoration-thickness: 2px; }
+    .library-card p { margin: .15rem 0; }
+    .publication-line { font-size: .82rem; color: var(--muted); }
+    .book-facts { display: grid; gap: .25rem; margin: 0 0 .65rem; }
+    .book-facts div { display: grid; grid-template-columns: 6.2rem 1fr; gap: .4rem; }
+    .book-facts dt {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-size: .7rem;
+      font-weight: 650;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .book-facts dd { font-size: .9rem; }
+    .book-facts dt:last-of-type,
+    .book-facts dd:last-of-type { opacity: .62; }
     label { display: grid; gap: .3rem; font-weight: 650; }
     input, select {
       width: 100%;
@@ -591,25 +698,7 @@ _DOCUMENT = r"""<!doctype html>
       color: var(--ink);
       font: inherit;
     }
-    .results-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 1rem;
-      margin-block: 1.25rem .5rem;
-    }
     .result-list { display: grid; gap: .65rem; }
-    .book-row {
-      display: grid;
-      grid-template-columns: minmax(12rem, 2fr) minmax(9rem, 1fr) auto;
-      gap: 1rem;
-      align-items: center;
-      padding: .9rem 1rem;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: .5rem;
-    }
-    .book-row h3 { margin: 0; font-size: 1.05rem; }
     .badges { display: flex; flex-wrap: wrap; gap: .35rem; }
     .badge {
       display: inline-block;
@@ -666,11 +755,14 @@ _DOCUMENT = r"""<!doctype html>
     }
     @media (max-width: 70rem) {
       .controls { grid-template-columns: repeat(2, minmax(12rem, 1fr)); }
+      .filter-row { grid-template-columns: repeat(3, minmax(10rem, 1fr)); }
     }
     @media (max-width: 42rem) {
       .brand, .results-header, .detail-heading { display: block; }
       .controls { grid-template-columns: 1fr; }
-      .book-row { grid-template-columns: 1fr; }
+      .filter-row { grid-template-columns: 1fr; }
+      .library-card { grid-template-columns: 1fr; }
+      .library-actions .export-action { margin-left: 0; }
       dl { grid-template-columns: 1fr; }
       dd { margin-bottom: .45rem; }
     }
@@ -690,16 +782,15 @@ _DOCUMENT = r"""<!doctype html>
     </div>
   </header>
   <nav aria-label="Primary">
-    <a href="#home" data-nav="home">Home</a>
-    <a href="#explore" data-nav="explore">Explore</a>
-    <a href="#recommendations" data-nav="recommendations">Recommendations</a>
-    <a href="#reports" data-nav="reports">Reports</a>
-    <a href="#about" data-nav="about">About this data</a>
+    <a href="#library" data-nav="library">Library</a>
+    <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
+    <span aria-disabled="true" title="Settings are not available in this read-only release">Settings</span>
   </nav>
   <main id="main-content" tabindex="-1"></main>
   <footer>
     <p>This generated workspace is a view of project evidence. It does not save
-      decisions or modify the catalog, inventory, acquisitions, or reviews.</p>
+      decisions, preferences, or changes to the catalog, inventory, acquisitions,
+      or reviews. <a href="#about">About this data</a></p>
   </footer>
   <noscript>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
@@ -714,7 +805,6 @@ _DOCUMENT = r"""<!doctype html>
     const QUEUES = JSON.parse(document.getElementById("recommendation-data").textContent);
     const REPORT_GROUPS = JSON.parse(document.getElementById("report-data").textContent);
     const main = document.getElementById("main-content");
-    const RESULT_LIMIT = 250;
     const index = {
       books: new Map(DATA.books.map(row => [row.catalog_item_id, row])),
       holdings: new Map(DATA.holdings.map(row => [row.holding_id, row])),
@@ -771,7 +861,7 @@ _DOCUMENT = r"""<!doctype html>
     };
     const SOURCE_LABELS = {
       catalog: "Library catalog",
-      acquisitions: "Purchase history",
+      acquisitions: "Acquisition history",
       inventory: "Physical inventory",
       research_assessments: "Research priorities",
       collector_reviews: "Steward reviews",
@@ -804,11 +894,11 @@ _DOCUMENT = r"""<!doctype html>
           incompatible: "Inventory cannot be used"
         },
         acquisition: {
-          current: "Purchase record found",
-          missing: "No purchase record",
-          unavailable: "Purchase history not included",
-          stale: "Purchase history may be out of date",
-          incompatible: "Purchase history cannot be used"
+          current: "Acquisition recorded",
+          missing: "No acquisition record",
+          unavailable: "Acquisition history not included",
+          stale: "Acquisition history may be out of date",
+          incompatible: "Acquisition history cannot be used"
         },
         market: {
           current: "Current research",
@@ -927,12 +1017,15 @@ _DOCUMENT = r"""<!doctype html>
       append(label, select);
       return label;
     }
+    const libraryState = {
+      search: "", acquisition: "", market: "", location: "",
+      sort: "title", sortDirection: 1, visibleBooks: []
+    };
     function bookMatches(book, state) {
-      if (state.inventory && book.inventory_status !== state.inventory) return false;
       if (state.acquisition && book.acquisition_status !== state.acquisition) return false;
-      if (state.market && book.market_evidence_status !== state.market) return false;
-      if (state.review === "needs_review" && !book.recommendation_ids.length) return false;
-      if (state.review === "no_review" && book.recommendation_ids.length) return false;
+      if (state.market && book.resale_market_status !== state.market) return false;
+      if (state.location === "__not_recorded__" && book.location_values.length) return false;
+      if (state.location && state.location !== "__not_recorded__" && !book.location_values.includes(state.location)) return false;
       if (!state.search) return true;
       const searchable = [
         book.catalog_item_id, book.isbn13, book.isbn10, book.title, book.author,
@@ -940,111 +1033,204 @@ _DOCUMENT = r"""<!doctype html>
       ].join(" ").toLocaleLowerCase();
       return searchable.includes(state.search);
     }
-    function bookCompare(sortBy) {
+    function bookCompare(sortBy, direction = 1) {
       return (left, right) => {
+        if (sortBy === "estimated_value") {
+          const leftLowRaw = String(left.estimated_value_sort_low ?? "").trim();
+          const leftHighRaw = String(left.estimated_value_sort_high ?? "").trim();
+          const rightLowRaw = String(right.estimated_value_sort_low ?? "").trim();
+          const rightHighRaw = String(right.estimated_value_sort_high ?? "").trim();
+          const leftLow = Number(leftLowRaw);
+          const leftHigh = Number(leftHighRaw);
+          const rightLow = Number(rightLowRaw);
+          const rightHigh = Number(rightHighRaw);
+          const leftHasValue = leftLowRaw !== "" && leftHighRaw !== ""
+            && Number.isFinite(leftLow) && Number.isFinite(leftHigh);
+          const rightHasValue = rightLowRaw !== "" && rightHighRaw !== ""
+            && Number.isFinite(rightLow) && Number.isFinite(rightHigh);
+          if (leftHasValue !== rightHasValue) return leftHasValue ? -1 : 1;
+          if (leftHasValue && rightHasValue) {
+            const valueOrder = direction === 1
+              ? (leftLow - rightLow) || (leftHigh - rightHigh)
+              : (rightHigh - leftHigh) || (rightLow - leftLow);
+            return valueOrder
+              || left.title.localeCompare(right.title)
+              || left.catalog_item_id.localeCompare(right.catalog_item_id);
+          }
+          const titleOrder = left.title.localeCompare(right.title);
+          return titleOrder || left.catalog_item_id.localeCompare(right.catalog_item_id);
+        }
         let leftKey;
         let rightKey;
         if (sortBy === "author") {
           leftKey = [left.author, left.title, left.catalog_item_id];
           rightKey = [right.author, right.title, right.catalog_item_id];
-        } else if (sortBy === "publication_year") {
-          leftKey = [left.publication_year || "99999", left.title, left.catalog_item_id];
-          rightKey = [right.publication_year || "99999", right.title, right.catalog_item_id];
-        } else if (sortBy === "catalog_item_id") {
-          leftKey = [left.catalog_item_id];
-          rightKey = [right.catalog_item_id];
+        } else if (sortBy === "purchase_date") {
+          leftKey = [left.purchase_date || "", left.title, left.catalog_item_id];
+          rightKey = [right.purchase_date || "", right.title, right.catalog_item_id];
+        } else if (sortBy === "location_summary" || sortBy === "disposition") {
+          leftKey = [left[sortBy], left.title, left.catalog_item_id];
+          rightKey = [right[sortBy], right.title, right.catalog_item_id];
         } else {
           leftKey = [left.title, left.author, left.catalog_item_id];
           rightKey = [right.title, right.author, right.catalog_item_id];
         }
         return leftKey.map(value => String(value).toLocaleLowerCase()).join("\u0000")
-          .localeCompare(rightKey.map(value => String(value).toLocaleLowerCase()).join("\u0000"));
+          .localeCompare(rightKey.map(value => String(value).toLocaleLowerCase()).join("\u0000")) * direction;
       };
     }
-    function renderExplore() {
+    function renderLibrary() {
       clear();
-      heading(
-        "Explore the library",
-        "Find a book, see whether a physical copy is recorded, and review the information available about it."
-      );
-      append(main, sourceMessages());
-      const controls = node("form", {class: "controls", role: "search"});
-      const searchLabel = node("label", {for: "explore-search"}, "Search");
+      const controls = node("form", {class: "library-controls", role: "search"});
+      const searchRow = node("div", {class: "search-row"});
+      const searchLabel = node("label", {for: "library-search"}, "Search");
       const search = node("input", {
-        id: "explore-search",
+        id: "library-search",
         type: "search",
-        placeholder: "Title, creator, ISBN, publisher, or ID",
-        autocomplete: "off",
-        "aria-describedby": "explore-search-help"
+        placeholder: "Title, author, ISBN, publisher, or ID",
+        autocomplete: "off"
       });
-      append(searchLabel, search, node("span", {id: "explore-search-help", class: "muted"}, "Searches titles, creators, ISBNs, publishers, and project references."));
-      const inventory = selectControl("inventory-filter", "Physical copy", statusOptions("inventory_status"), value => evidenceStatus("inventory", value));
-      const acquisition = selectControl("acquisition-filter", "Purchase history", statusOptions("acquisition_status"), value => evidenceStatus("acquisition", value));
-      const market = selectControl("market-filter", "Market research", statusOptions("market_evidence_status"), value => evidenceStatus("market", value));
-      const review = selectControl("review-filter", "Attention needed", ["needs_review", "no_review"]);
-      const sort = selectControl("sort-order", "Sort by", ["title", "author", "publication_year", "catalog_item_id"], value => ({
+      search.value = libraryState.search;
+      append(searchLabel, search);
+      append(searchRow, searchLabel);
+      const filterRow = node("div", {class: "filter-row"});
+      const acquisition = selectControl("acquisition-filter", "Acquired", statusOptions("acquisition_status"), value => evidenceStatus("acquisition", value));
+      const market = selectControl("market-filter", "Resale market", statusOptions("resale_market_status"), value => ({
+        estimate_available: "Estimate available",
+        no_reliable_estimate: "No reliable estimate",
+        not_researched: "Not researched"
+      })[value] || statusLabel(value));
+      const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right));
+      const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
+      const clearButton = node("button", {type: "button"}, "Clear");
+      append(filterRow, acquisition, market, location, clearButton);
+      append(controls, searchRow, filterRow);
+      const marketSource = DATA.snapshot.sources.find(source => source.source_key === "market_evidence");
+      if (marketSource && marketSource.status !== "current") {
+        append(
+          controls,
+          node("p", {class: "muted"}, `Resale-market information: ${statusLabel(marketSource.status)}. ${sourceStatusExplanation(marketSource.status)}`)
+        );
+      }
+      for (const [id, value] of [["acquisition-filter", libraryState.acquisition], ["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
+      const actions = node("div", {class: "library-actions"});
+      const sortNames = {
         title: "Title",
-        author: "Creator",
-        publication_year: "Publication year",
-        catalog_item_id: "Catalog reference"
-      })[value]);
-      sort.querySelector("select").value = "title";
-      append(controls, searchLabel, inventory, acquisition, market, review, sort);
-      const header = node("div", {class: "results-header"});
-      const count = node("p", {id: "result-count", role: "status", "aria-live": "polite"});
-      append(header, node("h2", {}, "Books"), count);
-      const results = node("div", {class: "result-list", id: "explore-results"});
-      append(main, controls, header, results);
+        author: "Author",
+        estimated_value: "Estimated value",
+        purchase_date: "Acquisition date"
+      };
+      const sort = node("details", {class: "sort-menu"});
+      const sortSummary = node("summary");
+      const sortChoices = node("div");
+      for (const [value, label] of Object.entries(sortNames)) {
+        const choice = node("button", {type: "button"}, label);
+        choice.addEventListener("click", () => {
+          libraryState.sortDirection = libraryState.sort === value
+            ? -libraryState.sortDirection
+            : 1;
+          libraryState.sort = value;
+          sort.removeAttribute("open");
+          update();
+        });
+        append(sortChoices, choice);
+      }
+      append(sort, sortSummary, sortChoices);
+      const exportButton = node("button", {type: "button", class: "export-action"}, "Export filtered CSV");
+      const count = node("p", {id: "result-count", class: "result-count", role: "status", "aria-live": "polite"});
+      append(actions, sort, count, exportButton);
+      const results = node("div", {id: "library-results"});
+      append(main, controls, actions, results);
 
       function update() {
-        const state = {
-          search: search.value.trim().toLocaleLowerCase(),
-          inventory: controls.querySelector("#inventory-filter").value,
-          acquisition: controls.querySelector("#acquisition-filter").value,
-          market: controls.querySelector("#market-filter").value,
-          review: controls.querySelector("#review-filter").value,
-          sort: controls.querySelector("#sort-order").value
-        };
-        const books = DATA.books.filter(book => bookMatches(book, state)).sort(bookCompare(state.sort));
+        libraryState.search = search.value.trim().toLocaleLowerCase();
+        libraryState.acquisition = controls.querySelector("#acquisition-filter").value;
+        libraryState.market = controls.querySelector("#market-filter").value;
+        libraryState.location = controls.querySelector("#location-filter").value;
+        sortSummary.textContent = `Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
+        const books = DATA.books.filter(book => bookMatches(book, libraryState)).sort(bookCompare(libraryState.sort, libraryState.sortDirection));
+        libraryState.visibleBooks = books;
         results.replaceChildren();
-        count.textContent = books.length > RESULT_LIMIT
-          ? `${books.length} matches; showing the first ${RESULT_LIMIT}. Refine your search to narrow the list.`
-          : `${books.length} ${books.length === 1 ? "book" : "books"}`;
+        const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
+        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "book" : "books"}${filtered ? " match" : ""}`;
         if (!books.length) {
           append(results, node("p", {class: "empty"}, "No books match these filters."));
           return;
         }
-        for (const book of books.slice(0, RESULT_LIMIT)) append(results, bookResult(book));
+        results.className = "library-card-grid";
+        for (const book of books) append(results, bookCard(book));
       }
       controls.addEventListener("input", update);
       controls.addEventListener("change", update);
       controls.addEventListener("submit", event => event.preventDefault());
+      clearButton.addEventListener("click", () => {
+        search.value = "";
+        for (const select of controls.querySelectorAll("select")) select.value = "";
+        libraryState.sort = "title";
+        libraryState.sortDirection = 1;
+        update();
+      });
+      exportButton.addEventListener("click", exportFilteredCsv);
       update();
     }
-    function bookResult(book) {
-      const article = node("article", {class: "book-row"});
+    function bookCard(book) {
+      const article = node("article", {class: "library-card"});
       const identity = node("div");
+      const publication = [book.publisher, book.publication_year].filter(Boolean).join(" • ");
+      const title = node("h2");
+      append(
+        title,
+        routeLink(
+          valueOrUnknown(book.title),
+          `book/${encodeURIComponent(book.catalog_item_id)}`,
+          "book-title-link",
+          `View details for ${valueOrUnknown(book.title)}`
+        )
+      );
       append(
         identity,
-        node("h3", {}, valueOrUnknown(book.title)),
-        node("div", {class: "muted"}, valueOrUnknown(book.author))
+        title,
+        node("p", {class: "muted"}, valueOrUnknown(book.author))
       );
-      const statuses = node("div", {class: "badges"});
+      if (publication) append(identity, node("p", {class: "publication-line"}, publication));
+      if (book.copy_count > 1) append(identity, node("p", {class: "publication-line"}, `${book.copy_count} copies`));
+      const conclusionRows = [
+        ["Location", book.location_summary],
+        ["Acquired", book.purchase_summary],
+        ["Disposition", human(book.disposition)]
+      ];
+      if (book.resale_market_card_summary) {
+        conclusionRows.splice(2, 0, ["Resale market", book.resale_market_card_summary]);
+      }
+      const conclusions = definitionList(conclusionRows);
+      conclusions.className = "book-facts";
       append(
-        statuses,
-        badge("Physical copy", book.inventory_status, evidenceStatus("inventory", book.inventory_status)),
-        badge("Purchase history", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
-        badge("Market research", book.market_evidence_status, evidenceStatus("market", book.market_evidence_status))
+        article,
+        identity,
+        conclusions
       );
-      append(article, identity, statuses, routeLink("View details", `book/${encodeURIComponent(book.catalog_item_id)}`, "button-link", `View details for ${valueOrUnknown(book.title)}`));
       return article;
+    }
+    function csvCell(value) {
+      return `"${String(value ?? "").replaceAll('"', '""')}"`;
+    }
+    function filteredCsvText(books) {
+      const columns = [["Catalog ID", "catalog_item_id"], ["Title", "title"], ["Author", "author"], ["ISBN-13", "isbn13"], ["Publisher", "publisher"], ["Location", "location_summary"], ["Acquisition Source", "acquisition_source"], ["Acquisition Month", "acquisition_month"], ["Acquisition Count", "acquisition_count"], ["Estimate Low", "estimated_value_precise_low"], ["Estimate High", "estimated_value_precise_high"], ["Currency", "estimated_value_currency"], ["Resale Market Display", "estimated_value_display"], ["Disposition", "disposition"]];
+      const lines = [columns.map(([label]) => csvCell(label)).join(",")];
+      for (const book of books) lines.push(columns.map(([, key]) => csvCell(book[key])).join(","));
+      return `${lines.join("\r\n")}\r\n`;
+    }
+    function exportFilteredCsv() {
+      const url = URL.createObjectURL(new Blob([filteredCsvText(libraryState.visibleBooks)], {type: "text/csv;charset=utf-8"}));
+      const link = node("a", {href: url, download: "library-filtered.csv"});
+      document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
     }
 
     function renderBook(bookId) {
       const book = index.books.get(bookId);
       if (!book) return renderNotFound("book", bookId);
       clear();
-      append(main, routeLink("← Back to Explore", "explore"));
+      append(main, routeLink("← Back to Library", "library"));
       const title = node("div", {class: "detail-heading"});
       append(title, node("h1", {}, valueOrUnknown(book.title)), node("span", {class: "badge", title: "Stable catalog reference"}, book.catalog_item_id));
       append(main, title, node("p", {class: "lede"}, valueOrUnknown(book.author)));
@@ -1058,6 +1244,9 @@ _DOCUMENT = r"""<!doctype html>
           ["Physical holdings", String(book.holding_ids.length)]
         ])
       );
+      if (book.description) {
+        append(main, node("p", {class: "panel"}, book.description));
+      }
       const context = node("div");
       append(
         context,
@@ -1065,7 +1254,7 @@ _DOCUMENT = r"""<!doctype html>
         append(
           node("div", {class: "badges"}),
           badge("Physical copy", book.inventory_status, evidenceStatus("inventory", book.inventory_status)),
-          badge("Purchase history", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
+          badge("Acquired", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
           badge("Research priority", book.assessment_status),
           badge("Market research", book.market_evidence_status, evidenceStatus("market", book.market_evidence_status))
         )
@@ -1078,9 +1267,9 @@ _DOCUMENT = r"""<!doctype html>
 
       const evidence = node("div");
       if (book.holding_ids.length) append(evidence, node("h3", {}, "Physical copies"), linkList(book.holding_ids.map((id, index) => [`View physical copy ${index + 1}`, `holding/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.inventory_status === "unavailable" ? "Physical inventory was not included in this workspace." : "No physical copy is currently linked to this catalog entry."));
-      if (book.acquisition_ids.length) append(evidence, node("h3", {}, "Purchase history"), linkList(book.acquisition_ids.map((id, index) => [`View purchase record ${index + 1}`, `acquisition/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.acquisition_status === "unavailable" ? "Purchase history was not included in this workspace." : "No purchase record is linked. The book may have come from another source."));
+      else append(evidence, node("p", {}, book.inventory_status === "unavailable" ? "Physical inventory was not included in this workspace." : "This book is not currently located."));
+      if (book.acquisition_ids.length) append(evidence, node("h3", {}, "Acquisition history"), linkList(book.acquisition_ids.map((id, index) => [`View acquisition record ${index + 1}`, `acquisition/${encodeURIComponent(id)}`])));
+      else append(evidence, node("p", {}, book.acquisition_status === "unavailable" ? "Acquisition history was not included in this workspace." : "No acquisition record is linked. The book may have come from another source."));
       if (book.assessment_id) append(evidence, node("h3", {}, "Research priority"), linkList([["View research priority", `assessment/${encodeURIComponent(book.assessment_id)}`]]));
       if (book.market_evidence_id) append(evidence, node("h3", {}, "Market evidence"), linkList([["View market summary", `market/${encodeURIComponent(book.market_evidence_id)}`]]));
       if (book.steward_review_id) append(evidence, node("h3", {}, "Steward review"), linkList([["View steward review", `review/${encodeURIComponent(book.steward_review_id)}`]]));
@@ -1467,10 +1656,10 @@ _DOCUMENT = r"""<!doctype html>
     function renderNotFound(kind, id) {
       clear();
       heading("Not found", `No ${kind} matches ${id}.`);
-      append(main, routeLink("Return to Explore", "explore", "button-link"));
+      append(main, routeLink("Return to Library", "library", "button-link"));
     }
     function currentRoute() {
-      const raw = location.hash.slice(1) || "home";
+      const raw = location.hash.slice(1) || "library";
       const slash = raw.indexOf("/");
       if (slash === -1) return [raw, ""];
       return [raw.slice(0, slash), decodeURIComponent(raw.slice(slash + 1))];
@@ -1479,14 +1668,12 @@ _DOCUMENT = r"""<!doctype html>
       const [route, id] = currentRoute();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
-          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision"].includes(route) && link.dataset.nav === "explore")
-          || (route === "recommendation" && link.dataset.nav === "recommendations")
-          || (route === "report" && link.dataset.nav === "reports");
+          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision", "recommendation", "report"].includes(route) && link.dataset.nav === "library")
+          || (["home", "explore"].includes(route) && link.dataset.nav === "library");
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");
       });
-      if (route === "home") renderHome();
-      else if (route === "explore") renderExplore();
+      if (route === "library" || route === "home" || route === "explore") renderLibrary();
       else if (route === "recommendations") renderRecommendations();
       else if (route === "reports") renderReports();
       else if (route === "about") renderAbout();

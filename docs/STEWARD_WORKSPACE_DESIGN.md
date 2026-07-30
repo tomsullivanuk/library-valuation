@@ -42,9 +42,9 @@ necessary to explain evidence or resolve an exception.
 Prefer “physical copy,” “purchase history,” and “location not confirmed” over
 repository names, reconciliation outcomes, and implementation identifiers.
 
-### 2. Explore presents conclusions
+### 2. Library presents conclusions
 
-Explore is the primary workspace. It should summarize the best current
+Library is the primary workspace. It should summarize the best current
 understanding of each book and support:
 
 - searching;
@@ -69,7 +69,7 @@ available, evidence may include:
 - matching or reconciliation detail; and
 - stable technical identifiers.
 
-Explore is the place for conclusions. Details is the place for evidence.
+Library is the place for conclusions. Details is the place for evidence.
 Progressive disclosure should connect them without collapsing the distinction.
 
 ### 4. Books are the primary content
@@ -191,7 +191,7 @@ a decision.
 When evaluating a workspace change, ask:
 
 1. Does it help the Steward understand or manage the library?
-2. Can the task be completed through Explore and Details?
+2. Can the task be completed through Library and Details?
 3. Does it reduce routine effort or reserve attention for a real exception?
 4. Is the language about the library rather than the implementation?
 5. Are entity boundaries, uncertainty, and provenance still honest?

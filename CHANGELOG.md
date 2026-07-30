@@ -1,5 +1,53 @@
 # Changelog
 
+## v0.11.0 - 2026-07-26
+
+Release focus: Steward Workspace.
+
+Added:
+
+- A shared, versioned Steward Presentation Model over existing catalog,
+  inventory, acquisition, research, market-evidence, and report contracts.
+- A deterministic, self-contained local workspace centered on a searchable,
+  filterable Library with book details and supporting evidence.
+- Atomic workflow generation of the inventory summary, review workbook, and
+  Steward Workspace.
+
+Changed:
+
+- `update-inventory` now presents validated results through one integrated
+  steward workflow while preserving preview-first operation and explicit
+  `--publish` authorization.
+- `update-inventory` can explicitly validate and include an established
+  market-evidence summary without discovering arbitrary generated files.
+- Existing evidence is translated into progressive steward-facing views
+  without creating durable recommendation or report state.
+- Steward-facing labels, status explanations, recommendation actions, report
+  actions, and detail hierarchy use plain language while retaining technical
+  provenance behind progressive disclosure.
+
+Validated:
+
+- The untouched 30-row preview produced 30 holdings, 22 existing catalog links,
+  5 proposed catalog identities, 3 unresolved cases, 38 recommendations,
+  2 registered reports, and 0 acquisitions.
+- Identical previews produced byte-identical CSV, XLSX, and HTML artifacts.
+- Injected failures restored durable repositories and prior artifacts.
+
+Unchanged:
+
+- Domain components retain ownership of catalog, acquisition, inventory,
+  reconciliation, assessment, and market-evidence semantics.
+- The workspace adds no server, network, browser persistence, database,
+  authentication, or cloud behavior.
+
+Known limitations:
+
+- Subject search, richer disposition strategy, Publishing, and Disposition
+  Tracking remain deferred.
+- Final supported-browser regression of the approved PR6A presentation polish
+  remains a release gate.
+
 ## v0.10.0 - 2026-07-21
 
 Release focus: Libib Physical Inventory Integration.

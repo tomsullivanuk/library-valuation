@@ -1,5 +1,67 @@
 # Release Checklist
 
+## v0.11.0
+
+Automated and workflow checks:
+
+- [x] Confirm 87 combined workspace/presentation/workflow/export and 529
+  full-suite tests pass.
+- [x] Run `.venv/bin/python -m compileall -q library_pipeline.py valuation tests`.
+- [x] Validate embedded JavaScript syntax and Markdown links.
+- [x] Confirm the untouched 30-row preview produces 30 holdings, 22 existing
+  catalog links, 5 proposed identities, 3 unresolved cases, 38 recommendations,
+  2 registered reports, and 0 acquisitions.
+- [x] Confirm identical previews produce identical summaries, IDs, repositories,
+  CSV, XLSX, and HTML artifacts.
+- [x] Confirm preview does not mutate durable state.
+- [x] Confirm injected publication failures restore durable repositories and
+  prior generated artifacts.
+- [x] Confirm exact repeat publication remains idempotent.
+
+Product and browser acceptance:
+
+- [x] Confirm current, stale, unavailable, missing, and incompatible evidence
+  remain distinct in automated acceptance fixtures.
+- [x] Confirm semantic landmarks, keyboard-operable controls, labelled inputs,
+  visible focus support, and a skip link are present.
+- [x] Open the generated workspace directly in a supported browser.
+- [x] Exercise Library navigation, book details, filters, sorting, and evidence
+  links.
+- [x] Exercise search, filtering, sorting, detail routes, and safe registered
+  report actions.
+- [x] Confirm read-only, freshness, uncertainty, provenance, and limitation
+  messages are understandable without project terminology.
+- [x] Complete a keyboard-only pass and inspect common desktop and narrow
+  viewport widths.
+- [x] Complete the focused supported-browser regression after PR6C presentation
+  and filtered-export refinements.
+
+Privacy and boundary checks:
+
+- [x] Confirm only allowlisted presentation fields are rendered.
+- [x] Confirm source paths, arbitrary raw evidence, and unregistered output
+  files are not exposed.
+- [x] Confirm no server, network, database, authentication, cloud, browser
+  persistence, Publishing, or Disposition Tracking behavior exists.
+- [x] Confirm generated artifacts, raw exports, and durable data are not staged.
+
+Release hygiene:
+
+- [x] Confirm the changelog, release notes, and release-readiness record exist.
+- [x] Confirm governing and operational documentation agree on delivered and
+  deferred scope.
+- [ ] Confirm the working tree is clean after the final release commit.
+- [ ] Create annotated tag `v0.11.0` at the final release commit.
+- [ ] Push `main` and the tag.
+- [ ] Publish the GitHub Release from `docs/RELEASE_NOTES_v0.11.0.md`.
+- [ ] Verify the release is not a draft/prerelease and is marked latest.
+
+Known follow-up:
+
+- v0.12.0 adds Collection Intelligence.
+- v0.13.0 adds richer advisory Decision Support.
+- v0.14.0 adds Publishing, and v0.15.0 adds final Disposition Tracking.
+
 ## v0.10.0
 
 Pre-release checks:
@@ -36,8 +98,8 @@ Release hygiene:
 
 Known follow-up:
 
-- v0.11.0 adds Library Explorer and Action Center.
-- v0.12.0 adds reviewed monthly refresh and freshness orchestration.
+- v0.11.0 adds the Steward Workspace.
+- v0.12.0 adds Collection Intelligence.
 - Durable location mapping, manual reconciliation editing, condition, and
   disposition workflows remain deferred.
 
@@ -88,9 +150,8 @@ Release hygiene:
 Known follow-up:
 
 - v0.10.0 adds Libib physical-inventory integration.
-- v0.11.0 adds the Library Explorer and Action Center.
-- v0.12.0 adds automated monthly refresh orchestration and a reviewed durable
-  freshness model.
+- v0.11.0 adds the Steward Workspace.
+- v0.12.0 adds Collection Intelligence.
 - Sold/completed evidence, shipping-inclusive prices, currency conversion, and
   automated eBay match confidence remain deferred.
 

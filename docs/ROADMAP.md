@@ -15,7 +15,7 @@ belongs in release notes, the changelog, and architecture documentation.
 
 ## Current Product Baseline
 
-Through v0.10.0, Library Valuation has established:
+Through v0.11.0, Library Valuation has established:
 
 - a durable catalog and acquisition history derived from Amazon imports;
 - research prioritization and collector-owned review state;
@@ -26,10 +26,15 @@ Through v0.10.0, Library Valuation has established:
 - explicit handling of unresolved identity and audit exceptions;
 - safe preview and explicit publication with deterministic previews, atomic
   rollback, and idempotent repeat processing; and
-- an inventory review workbook for collector and steward review.
+- an inventory review workbook for collector and steward review;
+- a shared, versioned Steward Presentation Model;
+- a generated, deterministic, local-first, read-only Steward Workspace centered
+  on a book-first Library with details and supporting evidence; and
+- atomic generation of inventory summaries, review workbooks, and the
+  registered-report workspace.
 
 The detailed record is maintained in [the changelog](../CHANGELOG.md),
-[v0.10.0 release notes](RELEASE_NOTES_v0.10.0.md), prior release notes, and the
+[v0.11.0 release notes](RELEASE_NOTES_v0.11.0.md), prior release notes, and the
 architecture documents.
 
 ## Steward Workflow
@@ -101,7 +106,7 @@ evidence, and review capabilities.
 The delivered release established a generated, read-only workspace over a
 shared presentation model. Future workspace evolution is governed by the
 [Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md): books and
-stewardship tasks lead, Explore presents conclusions, Details presents evidence,
+stewardship tasks lead, Library presents conclusions, Details presents evidence,
 and separate pages or reports must provide value beyond search and filtering.
 
 ## Planned Releases

@@ -17,6 +17,7 @@ from typing import Callable, Mapping
 from valuation.inventory_audit import write_inventory_audit_artifacts
 from valuation.libib import parse_libib_csv
 from valuation.libib_catalog import (
+    StrictCatalogRepository,
     catalog_reconciliation_repository_path,
     reconcile_inventory_catalog,
 )
@@ -27,7 +28,11 @@ from valuation.libib_inventory import (
     resolve_libib_import_source,
 )
 from valuation.repositories import ACQUISITION_FIELDNAMES
-from valuation.steward_presentation import RegisteredReport, build_steward_presentation
+from valuation.steward_presentation import (
+    DerivedEvidenceInput,
+    RegisteredReport,
+    build_steward_presentation,
+)
 from valuation.steward_workspace import render_steward_workspace
 
 
@@ -97,6 +102,7 @@ def update_inventory(
     output_dir: str | Path,
     audit_scope: str = "unknown",
     audit_completeness: str = "unknown",
+    market_evidence_summary: str | Path | None = None,
     publish: bool = False,
     now: Callable[[], datetime] | None = None,
 ) -> InventoryWorkflowSummary:
@@ -109,6 +115,15 @@ def update_inventory(
     libib_root = Path(libib_input_dir).resolve()
     data_dir = Path(data_dir).resolve()
     output_dir = Path(output_dir).resolve()
+    market_evidence_path = (
+        Path(market_evidence_summary).resolve()
+        if market_evidence_summary is not None
+        else None
+    )
+    if market_evidence_path is not None and not market_evidence_path.is_file():
+        raise InventoryWorkflowError(
+            f"Market-evidence summary is unavailable: {market_evidence_path}"
+        )
     _validate_destinations(source_file, libib_root, data_dir, output_dir)
     parsed = parse_libib_csv(source_file)
     source_hash = _file_hash(source_file)
@@ -169,8 +184,23 @@ def update_inventory(
                 working_data, import_result.inventory_import_id or ""
             )
             catalog_hash = _file_hash(working_data / "catalog_items.csv")
+            if market_evidence_path is not None:
+                _validate_market_evidence_applicability(
+                    market_evidence_path, working_data / "catalog_items.csv"
+                )
             workspace_presentation = build_steward_presentation(
                 data_dir=working_data,
+                market_evidence=(
+                    DerivedEvidenceInput(
+                        path=market_evidence_path,
+                        catalog_snapshot_sha256="",
+                        schema_version="market_evidence_summary_v1",
+                        generated_at=_market_evidence_generated_at(market_evidence_path),
+                        identity_validated=True,
+                    )
+                    if market_evidence_path is not None
+                    else None
+                ),
                 reports=(
                     RegisteredReport(
                         report_key="inventory_audit_summary",
@@ -207,6 +237,16 @@ def update_inventory(
                 ),
                 generated_at=workspace_generated_at,
             )
+            market_source = next(
+                source
+                for source in workspace_presentation.snapshot.sources
+                if source.source_key == "market_evidence"
+            )
+            if market_evidence_path is not None and market_source.status != "current":
+                raise InventoryWorkflowError(
+                    "Explicit market-evidence summary could not be used safely: "
+                    f"{market_source.explanation}"
+                )
             (staged_output / "steward_workspace.html").write_bytes(
                 render_steward_workspace(workspace_presentation)
             )
@@ -380,6 +420,47 @@ def _acquisition_count(path: Path) -> int:
         if reader.fieldnames != ACQUISITION_FIELDNAMES:
             raise InventoryWorkflowError(f"Unsupported or malformed acquisition repository: {path}")
         return sum(1 for _ in reader)
+
+
+def _validate_market_evidence_applicability(
+    evidence_path: Path, catalog_path: Path
+) -> None:
+    catalog = {
+        row["catalog_item_id"]: row
+        for row in StrictCatalogRepository(catalog_path).load()
+    }
+    with evidence_path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        required = {"catalog_item_id", "isbn_13", "isbn_10"}
+        if reader.fieldnames is None or not required <= set(reader.fieldnames):
+            raise InventoryWorkflowError(
+                "Market-evidence summary lacks required identity fields"
+            )
+        for row in reader:
+            catalog_row = catalog.get(row["catalog_item_id"])
+            if catalog_row is None:
+                raise InventoryWorkflowError(
+                    "Market-evidence summary references an unknown catalog item"
+                )
+            evidence_isbn = row["isbn_13"] or row["isbn_10"]
+            catalog_isbn = catalog_row["isbn13"] or catalog_row["isbn10"]
+            if not evidence_isbn or evidence_isbn != catalog_isbn:
+                raise InventoryWorkflowError(
+                    "Market-evidence summary does not match current catalog identity "
+                    f"{row['catalog_item_id']}"
+                )
+
+
+def _market_evidence_generated_at(evidence_path: Path) -> str:
+    with evidence_path.open(newline="", encoding="utf-8") as handle:
+        values = sorted(
+            {
+                row.get("evidence_generated_at", "")
+                for row in csv.DictReader(handle)
+                if row.get("evidence_generated_at", "")
+            }
+        )
+    return values[-1] if values else ""
 
 
 def _inventory_import_timestamp(data_dir: Path, inventory_import_id: str) -> str:

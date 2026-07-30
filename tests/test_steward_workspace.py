@@ -1,5 +1,9 @@
 import csv
+import html as html_lib
 import hashlib
+import io
+import json
+import re
 import shutil
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -110,19 +114,235 @@ def test_html_is_deterministic_self_contained_and_script_safe(tmp_path):
     assert b"sessionStorage" not in first
 
 
-def test_catalog_only_workspace_has_task_home_explore_and_honest_placeholders(tmp_path):
+def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigation(tmp_path):
     html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
 
-    assert "What would you like to accomplish today?" in html
-    assert 'href="#explore"' in html
-    assert 'href="#recommendations"' in html
-    assert 'href="#reports"' in html
-    assert "Review evidence-backed next steps" in html
-    assert "Every report shown here was registered and checked" in html
-    assert "unavailable" in html
+    assert 'href="#library" data-nav="library">Library</a>' in html
+    assert 'aria-disabled="true" title="Import remains' in html
+    assert 'aria-disabled="true" title="Settings are not available' in html
+    assert 'data-nav="recommendations"' not in html
+    assert 'data-nav="reports"' not in html
+    assert 'node("label", {for: "library-search"}, "Search")' in html
+    assert "Export filtered CSV" in html
+    assert 'grid-template-columns: 1fr;' in html
+    assert "Show next 250" not in html
+    assert "visibleLimit" not in html
+    assert "RESULT_LIMIT" not in html
+    assert "knownLocations" in html
+    assert '"Not Located"' in html
+    assert '"Acquired"' in html
     assert "Read-only" in html
-    assert "does not save" in html
-    assert "decisions or modify the catalog" in html
+    assert "does not save" in html and "preferences" in html
+    assert "localStorage" not in html
+    assert "sessionStorage" not in html
+    assert "Save disposition" not in html
+    assert "Export filtered XLSX" not in html
+    assert "URL.createObjectURL" in html
+    assert 'node("h1", {}, "Library")' not in html
+    assert 'class: "search-row"' in html
+    assert 'class: "filter-row"' in html
+    assert html.index('class: "search-row"') < html.index('class: "filter-row"')
+    assert 'class: "sort-menu"' in html
+    assert 'libraryState.sort === value' in html
+    assert 'libraryState.sortDirection' in html
+    assert "renderBookTable" not in html
+    assert 'Library view' not in html
+    assert '"Estimate available"' in html
+    assert '"No reliable estimate"' in html
+    assert '"Not researched"' in html
+    assert '"cover_url"' not in html
+    assert "cover-placeholder" not in html
+    card_renderer = html.split("function bookCard(book)", 1)[1].split(
+        "function csvCell", 1
+    )[0]
+    assert '"book-title-link"' in card_renderer
+    assert '"View details"' not in card_renderer
+
+
+def test_estimated_value_sort_uses_direction_specific_presented_endpoints(tmp_path):
+    html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+
+    assert 'const leftLow = Number(leftLowRaw);' in html
+    assert 'const leftHigh = Number(leftHighRaw);' in html
+    assert 'const rightLow = Number(rightLowRaw);' in html
+    assert 'const rightHigh = Number(rightHighRaw);' in html
+    assert 'const valueOrder = direction === 1' in html
+    assert '? (leftLow - rightLow) || (leftHigh - rightHigh)' in html
+    assert ': (rightHigh - leftHigh) || (rightLow - leftLow);' in html
+    assert 'return valueOrder' in html
+    assert 'if (leftHasValue !== rightHasValue) return leftHasValue ? -1 : 1;' in html
+    assert 'left.title.localeCompare(right.title)' in html
+    assert 'left.catalog_item_id.localeCompare(right.catalog_item_id)' in html
+    assert 'Number(left.estimated_value)' not in html
+
+    records = [
+        ("2", "9", "Two to Nine", "cat-5"),
+        ("1.94", "1.94", "Single 1.94", "cat-4"),
+        ("1", "5", "One to Five", "cat-3"),
+        ("1", "1", "One to One B", "cat-2"),
+        ("1", "1", "One to One A", "cat-1"),
+        ("12", "20", "Twelve to Twenty", "cat-6"),
+        ("20", "100", "Twenty to One Hundred", "cat-7"),
+        ("187", "553", "Range 187 to 553", "cat-8"),
+        ("186", "224", "Range 186 to 224", "cat-9"),
+        ("183", "247", "Range 183 to 247", "cat-10"),
+        ("178", "247", "Range 178 to 247", "cat-11"),
+        ("176", "176", "Single 176", "cat-12"),
+        ("162", "239", "Range 162 to 239", "cat-13"),
+        ("162", "224", "Range 162 to 224", "cat-14"),
+        ("162", "173", "Range 162 to 173", "cat-15"),
+        ("", "", "Missing B", "cat-17"),
+        ("", "", "Missing A", "cat-16"),
+    ]
+
+    def ordered(*, descending: bool) -> list[tuple[str, str, str, str]]:
+        valued = sorted(
+            (record for record in records if record[0]),
+            key=(
+                (lambda record: (-float(record[1]), -float(record[0]), record[2], record[3]))
+                if descending
+                else (lambda record: (float(record[0]), float(record[1]), record[2], record[3]))
+            ),
+        )
+        missing = sorted(
+            (record for record in records if not record[0]),
+            key=lambda record: (record[2], record[3]),
+        )
+        return [*valued, *missing]
+
+    ascending = ordered(descending=False)
+    descending = ordered(descending=True)
+    assert ascending.index(next(row for row in records if row[2] == "Range 183 to 247")) < (
+        ascending.index(next(row for row in records if row[2] == "Range 186 to 224"))
+    )
+    assert descending.index(next(row for row in records if row[2] == "Range 183 to 247")) < (
+        descending.index(next(row for row in records if row[2] == "Range 186 to 224"))
+    )
+    assert [row[1] for row in ascending if row[0] == "162"] == ["173", "224", "239"]
+    assert [row[1] for row in descending if row[0] == "162"] == ["239", "224", "173"]
+    assert ascending.index(next(row for row in records if row[2] == "Single 1.94")) < (
+        ascending.index(next(row for row in records if row[2] == "Two to Nine"))
+    )
+    assert descending[:-2] != list(reversed(ascending[:-2]))
+    assert [record[3] for record in ascending[:2]] == ["cat-1", "cat-2"]
+    assert [record[3] for record in ascending[-2:]] == ["cat-16", "cat-17"]
+    assert [record[3] for record in descending[-2:]] == ["cat-16", "cat-17"]
+
+
+def test_card_and_filtered_csv_use_distinct_display_and_precise_fields(tmp_path):
+    html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+
+    card_renderer = html.split("function bookCard(book)", 1)[1].split(
+        "function csvCell", 1
+    )[0]
+    export_renderer = html.split("function filteredCsvText(books)", 1)[1].split(
+        "function renderBook", 1
+    )[0]
+    assert "book.resale_market_card_summary" in card_renderer
+    assert '["Estimate Low", "estimated_value_precise_low"]' in export_renderer
+    assert '["Estimate High", "estimated_value_precise_high"]' in export_renderer
+    assert '["Currency", "estimated_value_currency"]' in export_renderer
+    assert '["Resale Market Display", "estimated_value_display"]' in export_renderer
+    assert '["Resale market", "resale_market_summary"]' not in export_renderer
+    assert "for (const book of books)" in export_renderer
+    assert "filteredCsvText(libraryState.visibleBooks)" in export_renderer
+
+
+def test_filtered_csv_contract_preserves_precise_intervals_and_blank_missing_values(
+    tmp_path,
+):
+    model = model_for(
+        tmp_path,
+        [catalog_row("BK000001"), catalog_row("BK000002", isbn13="", isbn10="")],
+    )
+    books = (
+        replace(
+            model.books[0],
+            acquisition_source="Amazon",
+            acquisition_month="2021-02",
+            acquisition_count=1,
+            estimated_value_precise_low="187.09",
+            estimated_value_precise_high="552.93",
+            estimated_value_currency="USD",
+            estimated_value_display="$187–$553",
+        ),
+        replace(
+            model.books[1],
+            estimated_value_precise_low="",
+            estimated_value_precise_high="",
+            estimated_value_currency="",
+            estimated_value_display="",
+        ),
+    )
+    html = render_steward_workspace(replace(model, books=books)).decode()
+    data_match = re.search(
+        r'<script id="workspace-data" type="application/json">(.*?)</script>',
+        html,
+        re.DOTALL,
+    )
+    columns_match = re.search(r"const columns = (\[.*?\]);", html)
+    assert data_match and columns_match
+    rendered_books = json.loads(html_lib.unescape(data_match.group(1)))["books"]
+    columns = json.loads(columns_match.group(1))
+
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream, lineterminator="\r\n", quoting=csv.QUOTE_ALL)
+    writer.writerow([label for label, _ in columns])
+    writer.writerows(
+        [[book.get(key, "") for _, key in columns] for book in rendered_books]
+    )
+    rows = list(csv.DictReader(io.StringIO(stream.getvalue(), newline="")))
+
+    assert list(rows[0]) == [
+        "Catalog ID",
+        "Title",
+        "Author",
+        "ISBN-13",
+            "Publisher",
+            "Location",
+            "Acquisition Source",
+            "Acquisition Month",
+            "Acquisition Count",
+            "Estimate Low",
+        "Estimate High",
+        "Currency",
+        "Resale Market Display",
+        "Disposition",
+    ]
+    assert {
+        key: rows[0][key]
+        for key in (
+            "Acquisition Source",
+            "Acquisition Month",
+            "Acquisition Count",
+            "Estimate Low",
+            "Estimate High",
+            "Currency",
+            "Resale Market Display",
+        )
+    } == {
+        "Acquisition Source": "Amazon",
+        "Acquisition Month": "2021-02",
+        "Acquisition Count": "1",
+        "Estimate Low": "187.09",
+        "Estimate High": "552.93",
+        "Currency": "USD",
+        "Resale Market Display": "$187–$553",
+    }
+    assert all(
+        rows[1][key] == ""
+        for key in (
+            "Acquisition Source",
+            "Acquisition Month",
+            "Estimate Low",
+            "Estimate High",
+            "Currency",
+            "Resale Market Display",
+        )
+    )
+    assert rows[1]["Acquisition Count"] == "0"
+    assert "Resale market" not in rows[0]
+    assert "Acquired" not in rows[0]
 
 
 def test_registered_reports_are_grouped_by_declared_steward_purpose(tmp_path):
@@ -586,7 +806,9 @@ def test_accessibility_foundations_and_progressive_disclosure_are_present(tmp_pa
     assert '<nav aria-label="Primary">' in html
     assert '<main id="main-content" tabindex="-1">' in html
     assert '"aria-live": "polite"' in html
-    assert 'node("label", {for: "explore-search"}, "Search")' in html
+    assert 'node("label", {for: "library-search"}, "Search")' in html
+    assert 'node("details", {class: "sort-menu"})' in html
+    assert '"aria-live": "polite"' in html
     assert 'node("details"' in html
     assert 'node("summary"' in html
     assert "<noscript>" in html
@@ -600,9 +822,9 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert "Purchase records" in html
     assert "Items needing attention" in html
     assert '"Physical copy"' in html
-    assert '"Purchase history"' in html
+    assert '"Acquired"' in html
     assert '"Market research"' in html
-    assert "No purchase record is linked. The book may have come from another source." in html
+    assert "No acquisition record is linked. The book may have come from another source." in html
     assert "A useful first item from up to three different areas needing attention." in html
     assert "All areas needing attention" in html
     assert "About this report" in html
@@ -612,7 +834,7 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert 'detailSection("Technical details"' in html
     assert "Some information is not included or may need review." in html
     assert "What information is affected" in html
-    assert '"aria-describedby": "explore-search-help"' in html
+    assert 'placeholder: "Title, author, ISBN, publisher, or ID"' in html
     assert '"aria-label": `Open ${row.name || row.report_key}`' in html
 
 

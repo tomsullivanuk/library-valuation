@@ -13,6 +13,8 @@ import hashlib
 import json
 from collections import defaultdict
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Sequence
 
@@ -59,6 +61,7 @@ class DerivedEvidenceInput:
     catalog_snapshot_sha256: str = ""
     schema_version: str = ""
     generated_at: str = ""
+    identity_validated: bool = False
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,7 @@ class ObservationView:
     title: str
     creators: str
     publisher: str
+    description: str
     source_collection_label: str
     audit_scope: str
     audit_completeness: str
@@ -269,6 +273,27 @@ class BookView:
     steward_review_id: str
     market_evidence_id: str
     recommendation_ids: tuple[str, ...]
+    description: str
+    copy_count: int
+    location_values: tuple[str, ...]
+    location_status: str
+    location_summary: str
+    purchase_summary: str
+    purchase_date: str
+    acquisition_source: str
+    acquisition_month: str
+    acquisition_count: int
+    resale_market_status: str
+    resale_market_summary: str
+    resale_market_card_summary: str
+    estimated_value_display: str
+    estimated_value: str
+    estimated_value_precise_low: str
+    estimated_value_precise_high: str
+    estimated_value_sort_low: str
+    estimated_value_sort_high: str
+    estimated_value_currency: str
+    disposition: str
 
 
 @dataclass(frozen=True)
@@ -326,6 +351,243 @@ class StewardPresentation:
 class _LoadedDerived:
     source: SourceView
     rows: tuple[dict[str, str], ...]
+
+
+def _book_steward_summaries(
+    *,
+    acquisition_source_status: str,
+    acquisitions: Sequence[AcquisitionView],
+    inventory_source_status: str,
+    holdings: Sequence[Mapping[str, str]],
+    market_source_status: str,
+    market: MarketEvidenceView | None,
+    review_source_status: str,
+    review: StewardReviewView | None,
+) -> dict[str, object]:
+    """Derive privacy-safe conclusions for the book-first Library view."""
+
+    locations: list[str] = []
+    if inventory_source_status != "current":
+        location_status = inventory_source_status
+        location_summary = {
+            "stale": "Location information may be out of date",
+            "incompatible": "Location information cannot be used",
+        }.get(inventory_source_status, "Location information not included")
+    elif not holdings:
+        location_status = "no_physical_copy"
+        location_summary = "Not Located"
+    else:
+        locations = sorted({
+            (
+                row.get("current_location_id", "").strip()
+                or row.get("source_collection_label", "").strip()
+            )
+            for row in holdings
+        } - {""})
+        if not locations:
+            location_status = "not_recorded"
+            location_summary = "Not Located"
+        elif len(locations) == 1:
+            location_status = "confirmed"
+            location_summary = locations[0]
+        else:
+            location_status = "multiple"
+            location_summary = "Multiple locations"
+
+    latest_acquisition = _latest_acquisition(acquisitions)
+    purchase_date = latest_acquisition.order_date if latest_acquisition else ""
+    acquisition_source = (
+        latest_acquisition.source.strip().title() if latest_acquisition else ""
+    )
+    acquisition_month = _acquisition_month(purchase_date)
+    acquisition_count = len(acquisitions)
+    if acquisition_source_status != "current":
+        purchase_summary = {
+            "stale": "Acquisition history may be out of date",
+            "incompatible": "Acquisition history cannot be used",
+        }.get(acquisition_source_status, "Acquisition history not included")
+    elif not acquisitions:
+        purchase_summary = "No acquisition record"
+    elif len(acquisitions) == 1:
+        source = acquisition_source
+        when = _month_year(purchase_date)
+        purchase_summary = " • ".join(value for value in (source, when) if value)
+        if not purchase_summary:
+            purchase_summary = "Acquisition recorded"
+    else:
+        purchase_summary = f"{len(acquisitions)} records"
+        if purchase_date:
+            purchase_summary += f" • latest {_month_year(purchase_date)}"
+
+    estimated_value = ""
+    estimated_value_precise_low = ""
+    estimated_value_precise_high = ""
+    estimated_value_sort_low = ""
+    estimated_value_sort_high = ""
+    estimated_currency = ""
+    resale_card_summary = ""
+    estimated_value_display = ""
+    if market_source_status != "current":
+        resale_status = market_source_status
+        resale_summary = ""
+    elif market is None:
+        resale_status = "not_researched"
+        resale_summary = "Not researched"
+    elif market.evidence_status == "no_market_evidence":
+        resale_status = "not_researched"
+        resale_summary = "Not researched"
+    else:
+        estimated_value = market.likely_mid or market.likely_low or market.likely_high
+        if estimated_value:
+            estimated_currency = market.currency
+            resale_status = "estimate_available"
+            if market.likely_low and market.likely_high:
+                estimated_value_precise_low = market.likely_low
+                estimated_value_precise_high = market.likely_high
+                (
+                    estimated_value_sort_low,
+                    estimated_value_sort_high,
+                ) = _presentation_currency_range_values(
+                    market.likely_low, market.likely_high
+                )
+                resale_summary = (
+                    f"{_currency_prefix(market.currency)}"
+                    f"{market.likely_low}–{market.likely_high}"
+                )
+                resale_card_summary = _rounded_currency_range(
+                    market.likely_low, market.likely_high, market.currency
+                )
+            else:
+                estimated_value_precise_low = estimated_value
+                estimated_value_precise_high = estimated_value
+                presented_value = _presentation_currency_value(estimated_value)
+                estimated_value_sort_low = presented_value
+                estimated_value_sort_high = presented_value
+                resale_summary = f"{_currency_prefix(market.currency)}{estimated_value}"
+                resale_card_summary = (
+                    f"{_currency_prefix(market.currency)}"
+                    f"{_format_presentation_currency_value(presented_value)}"
+                )
+            estimated_value_display = resale_card_summary
+        else:
+            resale_status = "no_reliable_estimate"
+            resale_summary = "No reliable estimate"
+    if not resale_card_summary:
+        resale_card_summary = resale_summary
+
+    return {
+        "location_status": location_status,
+        "location_summary": location_summary,
+        "location_values": tuple(locations),
+        "purchase_summary": purchase_summary,
+        "purchase_date": purchase_date,
+        "acquisition_source": acquisition_source,
+        "acquisition_month": acquisition_month,
+        "acquisition_count": acquisition_count,
+        "resale_market_status": resale_status,
+        "resale_market_summary": resale_summary,
+        "resale_market_card_summary": resale_card_summary,
+        "estimated_value_display": estimated_value_display,
+        "estimated_value": estimated_value,
+        "estimated_value_precise_low": estimated_value_precise_low,
+        "estimated_value_precise_high": estimated_value_precise_high,
+        "estimated_value_sort_low": estimated_value_sort_low,
+        "estimated_value_sort_high": estimated_value_sort_high,
+        "estimated_value_currency": estimated_currency,
+        "disposition": (
+            review.disposition
+            if review and review.disposition
+            else (
+                "undecided"
+                if review_source_status == "current"
+                else "information_not_included"
+            )
+        ),
+    }
+
+
+def _month_year(value: str) -> str:
+    if not value:
+        return ""
+    try:
+        return datetime.strptime(value[:10], "%Y-%m-%d").strftime("%b %Y")
+    except ValueError:
+        return value
+
+
+def _parsed_acquisition_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _latest_acquisition(
+    acquisitions: Sequence[AcquisitionView],
+) -> AcquisitionView | None:
+    if not acquisitions:
+        return None
+    dated = [
+        (parsed, row.acquisition_id, row.acquisition_reference, row)
+        for row in acquisitions
+        if (parsed := _parsed_acquisition_datetime(row.order_date)) is not None
+    ]
+    if dated:
+        return max(dated, key=lambda item: item[:3])[3]
+    return max(
+        acquisitions,
+        key=lambda row: (row.acquisition_id, row.acquisition_reference),
+    )
+
+
+def _acquisition_month(value: str) -> str:
+    parsed = _parsed_acquisition_datetime(value)
+    return parsed.strftime("%Y-%m") if parsed else ""
+
+
+def _currency_prefix(currency: str) -> str:
+    return {
+        "USD": "$",
+        "GBP": "£",
+        "EUR": "€",
+        "CAD": "CA$",
+        "AUD": "A$",
+    }.get(currency.upper(), f"{currency} " if currency else "")
+
+
+def _presentation_currency_value(value: str) -> str:
+    try:
+        numeric_value = Decimal(value)
+    except InvalidOperation:
+        return value
+    rounded = numeric_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return format(rounded, "f")
+
+
+def _presentation_currency_range_values(low: str, high: str) -> tuple[str, str]:
+    return _presentation_currency_value(low), _presentation_currency_value(high)
+
+
+def _format_presentation_currency_value(value: str) -> str:
+    try:
+        numeric_value = Decimal(value)
+    except InvalidOperation:
+        return value
+    return format(numeric_value, ",f")
+
+
+def _rounded_currency_range(low: str, high: str, currency: str) -> str:
+    presented_low, presented_high = _presentation_currency_range_values(low, high)
+    prefix = _currency_prefix(currency)
+    return (
+        f"{prefix}{_format_presentation_currency_value(presented_low)}–"
+        f"{prefix}{_format_presentation_currency_value(presented_high)}"
+    )
 
 
 def build_steward_presentation(
@@ -438,10 +700,15 @@ def build_steward_presentation(
     acquisitions_by_catalog = _group_ids(
         acquisition_views, "catalog_item_id", "acquisition_reference"
     )
+    acquisition_rows_by_catalog: defaultdict[str, list[AcquisitionView]] = defaultdict(list)
+    for acquisition in acquisition_views:
+        acquisition_rows_by_catalog[acquisition.catalog_item_id].append(acquisition)
     holdings_by_catalog: defaultdict[str, list[str]] = defaultdict(list)
+    holding_rows_by_catalog: defaultdict[str, list[dict[str, str]]] = defaultdict(list)
     for row in holding_rows:
         if row["catalog_item_id"]:
             holdings_by_catalog[row["catalog_item_id"]].append(row["holding_id"])
+            holding_rows_by_catalog[row["catalog_item_id"]].append(row)
     assessment_by_catalog = {row.catalog_item_id: row for row in assessment_views}
     review_by_catalog = {row.catalog_item_id: row for row in review_views}
     market_by_catalog = {row.catalog_item_id: row for row in market_views}
@@ -457,6 +724,16 @@ def build_steward_presentation(
         decision_views,
         recommendations_by_entity,
     )
+    observations_by_id = {
+        observation.inventory_observation_id: observation
+        for observation in observation_views
+    }
+    descriptions_by_catalog: defaultdict[str, list[str]] = defaultdict(list)
+    for holding in holding_rows:
+        catalog_item_id = holding["catalog_item_id"]
+        observation = observations_by_id.get(holding["latest_inventory_observation_id"])
+        if catalog_item_id and observation and observation.description:
+            descriptions_by_catalog[catalog_item_id].append(observation.description)
     books = tuple(
         BookView(
             catalog_item_id=row["catalog_item_id"],
@@ -501,6 +778,28 @@ def build_steward_presentation(
             ),
             recommendation_ids=tuple(
                 sorted(recommendations_by_entity[("catalog_item", row["catalog_item_id"])])
+            ),
+            description=(
+                sorted(
+                    set(descriptions_by_catalog[row["catalog_item_id"]]),
+                    key=lambda value: (-len(value), value),
+                )[0]
+                if descriptions_by_catalog[row["catalog_item_id"]]
+                else ""
+            ),
+            copy_count=sum(
+                int(holding.get("copies", "") or "1")
+                for holding in holding_rows_by_catalog[row["catalog_item_id"]]
+            ),
+            **_book_steward_summaries(
+                acquisition_source_status=acquisition_source.status,
+                acquisitions=acquisition_rows_by_catalog[row["catalog_item_id"]],
+                inventory_source_status=inventory["source"].status,
+                holdings=holding_rows_by_catalog[row["catalog_item_id"]],
+                market_source_status=market.source.status,
+                market=market_by_catalog.get(row["catalog_item_id"]),
+                review_source_status=review_source.status,
+                review=review_by_catalog.get(row["catalog_item_id"]),
             ),
         )
         for row in sorted(catalog_rows, key=lambda item: item["catalog_item_id"])
@@ -691,6 +990,7 @@ def _inventory_views(
             title=row["raw_title"],
             creators=row["raw_creators"],
             publisher=row["raw_publisher"],
+            description=_json_object_string(row["raw_evidence_json"], "description"),
             source_collection_label=row["source_collection_label"],
             audit_scope=row["audit_scope"],
             audit_completeness=row["audit_completeness"],
@@ -1084,12 +1384,15 @@ def _load_derived(
             ),
             (),
         )
-    status = "current" if source.catalog_snapshot_sha256 == catalog_hash else "stale"
-    explanation = (
-        "Derived evidence matches the catalog snapshot."
-        if status == "current"
-        else "Derived evidence catalog snapshot is absent or does not match."
-    )
+    if source.catalog_snapshot_sha256 == catalog_hash:
+        status = "current"
+        explanation = "Derived evidence matches the catalog snapshot."
+    elif source.identity_validated:
+        status = "current"
+        explanation = "Explicit evidence identities were validated against the current catalog."
+    else:
+        status = "stale"
+        explanation = "Derived evidence catalog snapshot is absent or does not match."
     return _LoadedDerived(
         SourceView(
             source_key=source_key,
@@ -1196,6 +1499,17 @@ def _json_strings(value: str) -> tuple[str, ...]:
     if not isinstance(decoded, list) or any(not isinstance(item, str) for item in decoded):
         raise StewardPresentationError("Invalid JSON list in validated source")
     return tuple(decoded)
+
+
+def _json_object_string(value: str, field: str) -> str:
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise StewardPresentationError("Invalid JSON object in validated source") from exc
+    if not isinstance(decoded, dict):
+        raise StewardPresentationError("Invalid JSON object in validated source")
+    result = decoded.get(field, "")
+    return result if isinstance(result, str) else ""
 
 
 def _split_codes(value: str) -> tuple[str, ...]:

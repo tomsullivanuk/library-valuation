@@ -12,6 +12,7 @@ import valuation.inventory_workflow as workflow
 from library_pipeline import main
 from valuation.inventory_workflow import DURABLE_REPOSITORY_NAMES, InventoryWorkflowError, update_inventory
 from valuation.libib_catalog import StrictCatalogRepository
+from valuation.market_evidence_summary import MARKET_EVIDENCE_SUMMARY_FIELDNAMES
 from valuation.repositories import ACQUISITION_FIELDNAMES, CATALOG_ITEMS_FIELDNAMES
 
 
@@ -119,6 +120,65 @@ def test_preview_is_default_complete_and_does_not_mutate_durable_state(tmp_path)
     assert 'href: row.public_path' in workspace
 
 
+def test_explicit_established_market_evidence_is_integrated_without_discovery(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    market_path = tmp_path / "established_market_evidence.csv"
+    row = {field: "" for field in MARKET_EVIDENCE_SUMMARY_FIELDNAMES}
+    row.update(
+        catalog_item_id="BK000001",
+        isbn_13="9780306406157",
+        isbn_10="0306406152",
+        evidence_status="observed_listings",
+        likely_mid="25",
+        currency="USD",
+    )
+    with market_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MARKET_EVIDENCE_SUMMARY_FIELDNAMES)
+        writer.writeheader()
+        writer.writerow(row)
+
+    before = state_bytes(data_dir)
+    update_inventory(
+        source,
+        libib_input_dir=libib_root,
+        data_dir=data_dir,
+        output_dir=output_dir,
+        audit_scope="Study",
+        audit_completeness="partial_scope",
+        market_evidence_summary=market_path,
+        now=lambda: NOW,
+    )
+
+    presentation = embedded_json(
+        (output_dir / "steward_workspace.html").read_text(encoding="utf-8"),
+        "workspace-data",
+    )
+    book = next(row for row in presentation["books"] if row["catalog_item_id"] == "BK000001")
+    assert next(
+        source for source in presentation["snapshot"]["sources"]
+        if source["source_key"] == "market_evidence"
+    )["status"] == "current"
+    assert book["resale_market_status"] == "estimate_available"
+    assert book["resale_market_summary"] == "$25"
+    assert state_bytes(data_dir) == before
+
+
+def test_missing_explicit_market_evidence_fails_before_workflow_mutation(tmp_path):
+    source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
+    before = state_bytes(data_dir)
+
+    with pytest.raises(InventoryWorkflowError, match="summary is unavailable"):
+        update_inventory(
+            source,
+            libib_input_dir=libib_root,
+            data_dir=data_dir,
+            output_dir=output_dir,
+            market_evidence_summary=tmp_path / "missing.csv",
+        )
+
+    assert state_bytes(data_dir) == before
+
+
 def test_two_fresh_previews_have_identical_summaries_ids_and_artifacts(tmp_path):
     source, libib_root, data_dir, output_dir = setup_workflow(tmp_path)
     before = state_bytes(data_dir)
@@ -203,10 +263,10 @@ def test_generated_workspace_supports_steward_acceptance_tasks(tmp_path):
     }
     assert sources["market_evidence"] == "unavailable"
     assert sources["research_candidates"] == "unavailable"
-    assert 'href="#explore"' in workspace
-    assert 'href="#recommendations"' in workspace
-    assert 'href="#reports"' in workspace
-    assert "This workspace is read-only" in workspace
+    assert 'href="#library" data-nav="library"' in workspace
+    assert 'node("label", {for: "library-search"}, "Search")' in workspace
+    assert "Export filtered CSV" in workspace
+    assert "Read-only" in workspace
 
 
 def test_single_audit_area_directory_is_an_explicit_supported_input(tmp_path):

@@ -115,20 +115,30 @@ Items move from this backlog into the Roadmap when they are selected for a relea
   import behavior without inferring disposition from absence.
 - [x] Follow the reviewed sequence in `RELEASE_PLAN_v0.10.0.md`.
 
-## v0.11.0 Library Explorer and Action Center
+## v0.11.0 Steward Workspace
 
-- [ ] Define one generated presentation model for both static pages.
-- [ ] Build the searchable/filterable Library Explorer.
-- [ ] Build the next-action-focused Action Center.
-- [ ] Prevent either presentation from recalculating valuation semantics.
+- [x] Define one shared, versioned Steward Presentation Model.
+- [x] Build the searchable, filterable, book-first Library experience.
+- [x] Build evidence-backed, explainable Recommendations queues.
+- [x] Build a curated, explicitly registered Reports experience.
+- [x] Integrate workspace generation atomically with the inventory workflow.
+- [x] Preserve domain ownership instead of recalculating matching, assessment,
+  reconciliation, or market-evidence semantics in presentation code.
+- [ ] Complete supported-browser release acceptance.
+- [ ] Add cover imagery only through an approved, provenance-preserving
+  metadata source and cache workflow.
+- [ ] Add page count after it has an explicit normalized or durable
+  presentation source; do not infer it from unpreserved Libib fields.
 
-## v0.12.0 Automated Monthly Refresh Workflow
+## v0.12.0 Collection Intelligence
 
-- [ ] Design one refresh command over Amazon, optional Libib, incremental market
-  checks, evidence summaries, web outputs, and a run report.
-- [ ] Design configurable freshness/retry policies and manual overrides.
-- [ ] Define durable collection-state/provenance needs without promoting raw or
-  detailed generated artifacts by accident.
+- [ ] Add subject, classification, author, publisher, period, and language
+  analysis where authoritative evidence supports it.
+- [ ] Identify coherent scholarly, thematic, and family-significant collections.
+- [ ] Detect duplicate, edition, incomplete-set, and multi-volume questions.
+- [ ] Surface collection-level opportunities without inferring disposition.
+- [ ] Preserve refresh orchestration as deferred infrastructure until a defined
+  stewardship outcome requires it.
 
 ---
 

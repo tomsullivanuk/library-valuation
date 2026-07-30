@@ -2,10 +2,11 @@
 
 ## v0.11.0 — Steward Workspace
 
-**Status:** PR1 design, PR2 shared presentation-model implementation, PR3
-workspace shell and Explore implementation, PR4 Recommendations, and PR5
-Reports are complete. PR6 workflow integration and acceptance is complete and
-awaiting review.
+**Status:** PR1 design through PR6 workflow integration and PR6A
+steward-experience polish are complete. Baseline supported-browser acceptance
+passed against real inventory data. PR6B establishes the canonical long-term
+workspace design principles. PR7 release documentation is implemented; a
+focused browser regression remains the release gate.
 
 ## 1. Release Theme
 
@@ -55,15 +56,13 @@ system of record or hiding the evidence behind its answers.
 By the end of v0.11.0, the Steward can:
 
 - open one generated workspace locally;
-- choose among Explore, Recommendations, and Reports from a task-oriented home
-  screen;
-- search and filter the catalog and its physical holdings;
+- begin directly in a book-first Library;
+- search, filter, sort, and browse the catalog and its physical holdings;
 - inspect bibliographic, acquisition, inventory, research, and market context
   through progressive disclosure;
-- identify existing evidence-backed review tasks and understand why they
-  surfaced;
+- understand steward-facing conclusions and open their supporting evidence;
 - distinguish current, stale, and unavailable evidence;
-- locate appropriate existing reports without browsing project directories;
+- export the current filtered Library results as CSV;
 - reach technical provenance when needed; and
 - understand that recommendations are advisory and the workspace is read-only.
 
@@ -73,8 +72,7 @@ Version 0.11.0 includes:
 
 - a versioned, generated Steward Presentation Model;
 - a deterministic, self-contained static HTML workspace;
-- a task-oriented home screen;
-- Explore, Recommendations, and Reports experiences;
+- a book-first Library experience with one concise card-list presentation;
 - stable links among books, holdings, recommendations, evidence, and reports;
 - integration with existing strict durable repositories and validated
   projections;
@@ -119,8 +117,8 @@ Version 0.11.0 will not:
 4. Presentation construction is separate from HTML rendering.
 5. Domain components own matching, reconciliation, assessment, evidence
    aggregation, and current-decision resolution.
-6. Explore, Recommendations, and Reports consume one snapshot and cannot
-   calculate conflicting meanings independently.
+6. Library and Details consume one snapshot and cannot calculate conflicting
+   meanings independently.
 7. Required durable state fails closed; missing optional evidence degrades
    explicitly.
 8. “Unavailable,” “stale,” “unknown,” “none,” and “zero” remain distinct.
@@ -139,18 +137,10 @@ Version 0.11.0 will not:
 
 ## 8. Product Structure
 
-The opening screen should ask:
-
-> What would you like to accomplish today?
-
-The three primary experiences are:
-
-- **Explore:** Find books and inspect catalog, holding, acquisition, inventory,
-  research, market, confidence, and provenance context.
-- **Recommendations:** Review existing evidence-backed next-step queues without
-  confusing generated guidance with steward decisions.
-- **Reports:** Find current supported artifacts by purpose and audience rather
-  than by filename or pipeline.
+The opening screen is **Library**, a dense book-first view for searching,
+filtering, sorting, and browsing current conclusions. **Details** explains the
+evidence and provenance supporting those conclusions. Import and Settings are
+named in primary navigation but remain unavailable in this read-only release.
 
 The release-specific behavior and presentation contract are recorded below.
 Long-term interface decisions are governed by the
@@ -357,6 +347,62 @@ markup, keyboard/focus foundations, hash routes, and task flows are validated
 through deterministic artifact and DOM-contract tests. Manual supported-browser
 acceptance of the generated local file remains a release-readiness check.
 
+### PR6C — Library-Centered Read-Only Workspace
+
+**Purpose:** Align the generated workspace with the Steward's book-first mental
+model without introducing a write-back or preference repository.
+
+**Implemented contract:** Library replaces Home and Explore as the default
+primary experience. The primary navigation names Library, Import, and Settings;
+Import and Settings are clearly unavailable in this read-only release rather
+than opening placeholder workflows. Library provides one search, compact
+Acquired, Resale Market, and actual-location filters, deterministic reversible
+sorting, complete filtered rendering, detail links, and a privacy-allowlisted
+export of the current filtered results as CSV. The sole Library presentation is
+one shallow horizontal book card per row rather than a tile dashboard or
+embedded spreadsheet. Cards summarize location, acquisition source and month,
+resale-market evidence, current disposition, publication context, and
+multiple-copy counts. Details continues to expose supporting evidence,
+provenance, and the explicitly allowlisted Libib description when present.
+
+Disposition remains a displayed conclusion, not an editable control. Durable
+preferences, disposition
+write-back, and filtered XLSX export are deferred because they require an
+explicit persistence and publication design; PR6C introduces none. Libib
+exports contain neither a cover-image field nor a durable page-count field.
+Cover retrieval and page-count enrichment therefore remain deferred rather than
+introducing a new external metadata workflow or changing durable observation
+evidence in this refinement.
+
+The final PR6C refinement corrects the actual-workspace market boundary:
+`update-inventory` accepts an explicit established market-evidence summary,
+validates its catalog/ISBN identities against the proposed catalog, and passes
+it to the existing presentation contract. Nothing under `output/` is
+discovered. Missing or incompatible explicit evidence fails closed. Books with
+an established range show the estimate; researched books without a usable
+range show `No reliable estimate`; and books absent from an otherwise current
+summary show `Not researched`.
+
+Estimated-value sorting follows the numeric values presented on cards. The
+presentation contract emits normalized low and high sort endpoints using the
+same nearest-whole-unit, half-up rounding as card text for ranges, single
+values, and sub-unit values; a single displayed value supplies both endpoints.
+Complete ranges repeat the currency symbol or identifier on each endpoint.
+Sorting then uses presented low then high for low-to-high order. High-to-low
+order uses presented high descending then low descending; title and catalog
+identity remain ascending ties, and missing estimates remain last. Details
+evidence remains unrounded. Filtered CSV output provides precise numeric
+`Estimate Low` and `Estimate High` interval columns, canonical `Currency`, and
+a separate rounded `Resale Market Display` matching the Library card. Single
+and incomplete estimates duplicate the precise scalar across both endpoints;
+missing estimates leave all four fields blank.
+
+Filtered CSV acquisition fields are similarly structured: `Acquisition Source`
+and `Acquisition Month` (`YYYY-MM`) describe the same latest acquisition,
+selected by its parsed timestamp with a stable identity tie-breaker, while
+`Acquisition Count` reports the total records. Missing acquisitions use blank
+source and month with count `0`; the concise Library-card summary is unchanged.
+
 ### PR7 — Documentation and Release Readiness
 
 **Purpose:** Prepare v0.11.0 for release without adding product behavior.
@@ -404,10 +450,10 @@ on visual approval.
 
 ### Product
 
-- The opening screen asks what the Steward wants to accomplish.
-- Explore, Recommendations, and Reports are the primary experiences.
+- The opening screen is the searchable, filterable Library.
+- Library presents conclusions and Details presents supporting evidence.
 - The workspace uses progressive disclosure and human language.
-- The three experiences present consistent facts from one snapshot.
+- All views present consistent facts from one snapshot.
 - Existing evidence-backed next steps are useful without claiming unsupported
   strategy or value precision.
 - The current Steward completes all acceptance tasks without needing repository

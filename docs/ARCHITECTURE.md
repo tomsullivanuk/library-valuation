@@ -5,23 +5,20 @@
 Library Valuation is an open, reproducible system for cataloging, analyzing,
 valuing, and supporting decisions about scholarly and personal libraries.
 
-The current implementation focuses on building a privacy-conscious book catalog
-from Amazon order-history exports and enriching those rows with bibliographic
-metadata. The long-term project is broader: help identify which books deserve
-individual research, which books may be sold individually or as collections,
-which books are unlikely to justify resale effort, and which books should be
-retained for historical or family reasons.
+The current implementation combines a privacy-conscious catalog, acquisition
+history, physical inventory, reconciliation, market evidence, review artifacts,
+and a generated read-only Steward Workspace. These capabilities support the
+broader mission defined in the Product Vision: help a Steward understand a
+substantial personal library and make evidence-backed decisions without
+unnecessary financial or time-related regret.
 
 The project should preserve evidence and minimize manual effort. Human judgment
 belongs in review and decision points, not in hand-editing generated outputs.
 
-The post-v0.8.0 direction separates four concerns into staged releases: a
-resumable full-library eBay baseline, Libib physical-inventory context, a shared
-presentation model serving Library Explorer and Action Center, and incremental
-monthly orchestration. Detailed listing artifacts can remain generated, but
-safe resume and later refresh will require deliberately scoped collection state
-and provenance. v0.9.0 defined only its minimum checkpoint state and did not
-prematurely finalize the longer-term durable schema.
+Generated artifacts do not become canonical state. Durable repositories,
+accepted decisions, and source provenance remain authoritative; presentation
+models and artifacts are reproducible projections. Future infrastructure should
+be introduced only when a defined stewardship outcome requires it.
 
 The v0.10.0 design treats Libib as physical-inventory evidence, not catalog
 authority. `catalog_item_id` remains the intellectual/catalog key and
@@ -834,6 +831,51 @@ during workspace construction, rendering, or any artifact replacement restores
 published durable and generated state through the existing workflow rollback
 boundary. Preview still mutates no durable repository; `--publish` remains the
 only durable authorization.
+
+The first client now opens directly to a book-first Library view. Steward-facing
+location, acquisition, resale-market, and disposition summaries are deterministic,
+privacy-allowlisted presentation fields derived from the same model; they are
+not new durable state or domain decisions. Search, filters, sorting, card/table
+selection, session-only result expansion, and filtered CSV export run locally
+over that model. Explicitly allowlisted Libib descriptions may flow from
+immutable observation evidence into book Details; arbitrary raw-evidence keys
+remain inaccessible. Library renders the complete filtered card list; CSV
+export supplies the spreadsheet-oriented path. The renderer has no alternate
+table state, paging state, disposition editor, durable preference store,
+browser persistence, or filtered XLSX generator.
+
+Established market evidence enters this workflow only through an explicit file
+argument; the workflow never discovers a summary under `output/`. Every
+evidence catalog identity must still exist in the proposed catalog and carry
+the same ISBN identity. This permits an established partial summary to remain
+applicable when a Libib preview proposes additional catalog items, while the
+new items correctly remain `not_researched`. Missing, malformed, or mismatched
+explicit evidence fails before artifact publication.
+
+Library estimated-value sorting follows the numeric values presented on cards.
+The presentation model centrally emits the normalized low and high endpoints
+before currency formatting. Every displayed estimate uses nearest-whole-unit,
+half-up rounding, including single values and sub-unit values; an incomplete
+range uses the displayed scalar for both sort endpoints. Complete card ranges
+repeat the currency symbol or identifier on both endpoints. Sorting compares
+presented low, presented high, title, and catalog identity for low-to-high
+order. High-to-low order instead compares presented high descending and then
+presented low descending, answering which books have the highest potential
+estimate; title and catalog identity remain ascending deterministic ties.
+Missing estimates remain last in either direction. Details continue to use the
+unrounded evidence. Filtered CSV export projects precise numeric `Estimate Low`
+and `Estimate High` interval endpoints plus their canonical `Currency`;
+complete evidence uses its original endpoints and a single or incomplete
+estimate duplicates the established precise scalar. `Resale Market Display`
+separately matches the rounded card text, and missing estimates leave all four
+export fields blank.
+
+The filtered export also replaces the combined acquisition summary with
+structured `Acquisition Source`, `Acquisition Month`, and `Acquisition Count`.
+Source and month come from the same latest acquisition selected by its parsed
+timestamp, with durable acquisition identity as a deterministic tie; month is
+exported as `YYYY-MM`. Count is the total number of acquisition records.
+Books without acquisitions export blank source and month with count `0`.
 
 ## Testing Expectations
 

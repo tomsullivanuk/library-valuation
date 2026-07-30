@@ -2299,6 +2299,11 @@ def build_parser() -> argparse.ArgumentParser:
     inventory_parser.add_argument("--output-dir", type=Path, default=Path("output"))
     inventory_parser.add_argument("--audit-scope", default="unknown")
     inventory_parser.add_argument(
+        "--market-evidence-summary",
+        type=Path,
+        help="Explicit established market-evidence summary for the workspace",
+    )
+    inventory_parser.add_argument(
         "--audit-completeness",
         choices=("complete_scope", "partial_scope", "unknown"),
         default="unknown",
@@ -2526,6 +2531,7 @@ def main(argv: list[str] | None = None) -> int:
                     output_dir=args.output_dir,
                     audit_scope=args.audit_scope,
                     audit_completeness=args.audit_completeness,
+                    market_evidence_summary=args.market_evidence_summary,
                     publish=args.publish,
                 )
             except (InventoryWorkflowError, ValueError) as error:
