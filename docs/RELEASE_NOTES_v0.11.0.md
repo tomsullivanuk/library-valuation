@@ -40,13 +40,30 @@ plain descriptions of physical copies, purchase history, market research,
 review needs, report readiness, and unavailable information. Technical
 identifiers and source details remain available when the Steward asks for them.
 
+Library-card estimated values use nearest-whole-currency-unit,
+`ROUND_HALF_UP` presentation semantics: `$1.94` displays as `$2`, and
+`$12.49–$15.99` displays as `$12–$16`. Complete ranges repeat the currency
+marker on both endpoints, including `$162–$173`, `£71–£82`, and
+`CHF 12–CHF 16`.
+
+Estimated-value sorting follows those displayed numeric endpoints. Low to high
+prioritizes the displayed lower endpoint; high to low prioritizes the displayed
+upper endpoint. High-to-low is intentionally not the exact reverse of
+low-to-high because the two directions answer different stewardship questions.
+
 Filtered Library CSV exports provide precise numeric `Estimate Low` and
 `Estimate High` intervals, canonical `Currency`, and a separate `Resale Market
-Display` matching the rounded card. The structured columns remain suitable for
-sorting and analysis without discarding the convenient human-readable value.
-The same export separates the latest acquisition's source and `YYYY-MM` month
-from the total acquisition-record count, replacing the former combined
-`Acquired` text field while leaving card summaries unchanged.
+Display` matching the rounded card. `Estimate Low` and `Estimate High` preserve
+precise numeric evidence; `Resale Market Display` preserves the steward-facing
+rounded presentation. The structured columns remain suitable for sorting and
+analysis without discarding the convenient human-readable value.
+
+The same export replaces the former combined `Acquired` field with
+`Acquisition Source`, `Acquisition Month`, and `Acquisition Count`.
+`Acquisition Source` is the source of the latest acquisition, `Acquisition
+Month` is that acquisition's month in `YYYY-MM` format, and `Acquisition Count`
+is the total acquisition records for the catalog item. Library-card acquisition
+summaries remain unchanged.
 
 ### Integrated Inventory Workflow
 
@@ -121,5 +138,5 @@ hand-edit generated output as canonical state.
 - Publishing is planned for v0.14.0 and Disposition Tracking for v0.15.0.
 - The application does not become a marketplace, CRM, payment, shipping,
   accounting, lending, reading-tracker, or general library-management system.
-- Baseline supported-browser acceptance passed. The approved PR6A presentation
-  polish requires one focused browser regression before the release is tagged.
+- Final supported-browser acceptance, including the approved PR6C Library and
+  filtered-CSV refinements, passed before release.
