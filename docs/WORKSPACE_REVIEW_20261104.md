@@ -23,7 +23,7 @@ and all raw inventory/reconciliation evidence.
   Remove redundant status labels and generic attention banners. Link specific
   related tasks, and keep technical provenance under About this data/record.
 - Add a saved disposition selector. Initial choices: unassigned, Keep, Sell,
-  Donate, Gift, Recycle and Undecided. A disposition is an intention, not evidence
+  Gift / Donate, Recycle and Undecided. A disposition is an intention, not evidence
   that disposal has occurred; assigning it must not alter physical presence.
 - Combine outstanding book checks and meaningful current recommendations in
   Action Items. Separate optional research from book checks, default to open book
@@ -63,3 +63,15 @@ main desktop content with Import; retain a compact gutter on small screens. Make
 Clear an intrinsically sized, shorter button rather than a stretched grid column.
 Search also covers the description displayed in book details. Remove the vague ID
 prompt; internal catalog, holding and acquisition IDs remain searchable for lookup.
+
+## Detail and disposition follow-up
+
+Match Clear to the actual rendered dropdown height, including Safari's native
+controls. Match the book-detail title's smaller size and green color to Library
+cards. Combine Gift and Donate into one Gift / Donate option. Display older gift
+and donate decisions under that combined choice without rewriting their records;
+explicit saves retain the prior value in decision history.
+
+Future work: add selection of multiple Library records and a bulk disposition
+update. Keep individual-record editing. Bulk editing is recorded as a future
+capability, not part of this revision.

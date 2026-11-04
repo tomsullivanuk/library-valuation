@@ -943,3 +943,11 @@ def test_library_search_finds_description_text(tmp_path):
     assert "publisher, or ID" not in html
     assert "Your library workspace" not in html
     assert 'class: "clear-filters"' in html
+
+
+def test_filter_clear_matches_native_select_and_book_title_matches_card_style(tmp_path):
+    html=render_steward_workspace(model_for(tmp_path,[catalog_row()])).decode()
+    assert 'clearButton.style.height = `${filterSelect.getBoundingClientRect().height}px`' in html
+    assert 'libraryFilterObserver.disconnect()' in html
+    assert '.detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark);' in html
+    assert '"Gift / Donate"' in html

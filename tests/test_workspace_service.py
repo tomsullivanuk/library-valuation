@@ -72,7 +72,7 @@ def test_disposition_preserves_other_review_fields_and_can_be_cleared(tmp_path):
     old = dict.fromkeys(repo.fieldnames,'')
     old.update(catalog_item_id='BK000001', review_notes='Preserve my notes', workflow_state='research', created_at='2020-01-01')
     repo.save([old])
-    store.update(dict(kind='disposition', id='BK000001', value='donate', revision=0))
+    store.update(dict(kind='disposition', id='BK000001', value='gift_donate', revision=0))
     row = repo.load()[0]
     for key in ('review_notes','workflow_state','created_at'):
         assert row[key] == old[key]
@@ -187,3 +187,20 @@ def test_background_start_reuses_only_the_matching_workspace(tmp_path, monkeypat
     service.start_background(tmp_path/'data',tmp_path/'output',8765)
     assert service.workspace_id(tmp_path/'data')!=service.workspace_id(tmp_path/'other')
     with pytest.raises(ValueError):service.start_background(tmp_path/'data',tmp_path/'output',0)
+
+
+def test_combined_gift_donate_choice_preserves_legacy_decisions(tmp_path):
+    store=store_for(tmp_path)
+    repo=CollectorReviewRepository(store.data_dir/'collector_reviews.csv')
+    old=dict.fromkeys(repo.fieldnames,'')
+    old.update(catalog_item_id='BK000001',disposition='gift',review_notes='For family')
+    repo.save([old]);before=repo.path.read_bytes()
+    state=store.snapshot()
+    assert state['dispositions']['BK000001']=='gift_donate'
+    assert 'gift_donate' in state['disposition_choices']
+    assert 'gift' not in state['disposition_choices'] and 'donate' not in state['disposition_choices']
+    assert repo.path.read_bytes()==before
+    store.update(dict(kind='disposition',id='BK000001',value='gift_donate',revision=0))
+    assert repo.load()[0]['disposition']=='gift_donate'
+    assert repo.load()[0]['review_notes']=='For family'
+    assert store.read()['events'][0]['previous']=='gift'

@@ -31,7 +31,7 @@ from valuation.repositories import CollectorReviewRepository, COLLECTOR_REVIEW_F
 from valuation.steward_presentation import build_steward_presentation, DerivedEvidenceInput, RegisteredReport
 from valuation.steward_workspace import build_recommendation_queues, render_steward_workspace
 
-DISPOSITIONS = ("", "keep", "sell", "donate", "gift", "recycle", "undecided")
+DISPOSITIONS = ("", "keep", "sell", "gift_donate", "recycle", "undecided")
 STATUSES = ("open", "complete", "deferred", "dismissed")
 ACTION_LABELS = {
     "manual_market_research_needed": "Research the resale market",
@@ -181,7 +181,7 @@ class WorkspaceStore:
             observed.update(self.model.completed_inventory.unresolved_observation_ids)
             titles = {" ".join(unicodedata.normalize("NFKC", o.title).casefold().split()) for o in self.model.observations if o.inventory_observation_id in observed and o.title.strip()}
             return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
-                dispositions={r["catalog_item_id"]: r["disposition"] for r in reviews},
+                dispositions={r["catalog_item_id"]: ("gift_donate" if r["disposition"] in {"gift", "donate"} else r["disposition"]) for r in reviews},
                 disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles))
 
     @contextmanager

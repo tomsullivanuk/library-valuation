@@ -629,8 +629,10 @@ _DOCUMENT = r"""<!doctype html>
     .clear-filters {
       justify-self: start;
       width: auto;
-      min-height: 2rem;
-      padding: .2rem .7rem;
+      min-height: 0;
+      height: 1.5rem;
+      line-height: 1;
+      padding: 0 .7rem;
       font-size: .9rem;
     }
     .library-actions {
@@ -761,6 +763,7 @@ _DOCUMENT = r"""<!doctype html>
       border: 1px solid var(--brand);
     }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
+    .detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark); margin-bottom: .35rem; }
     dl {
       display: grid;
       grid-template-columns: minmax(9rem, auto) 1fr;
@@ -843,6 +846,7 @@ _DOCUMENT = r"""<!doctype html>
     let actionFilter = "open";
     let actionCategory = "Book checks";
     let actionLimit = 50;
+    let libraryFilterObserver = null;
     const main = document.getElementById("main-content");
     const index = {
       books: new Map(DATA.books.map(row => [row.catalog_item_id, row])),
@@ -870,7 +874,10 @@ _DOCUMENT = r"""<!doctype html>
       for (const child of children) if (child) parent.append(child);
       return parent;
     }
-    function clear() { main.replaceChildren(); }
+    function clear() {
+      if (libraryFilterObserver) { libraryFilterObserver.disconnect(); libraryFilterObserver = null; }
+      main.replaceChildren();
+    }
     function valueOrUnknown(value) { return value || "Not recorded"; }
     function human(value) {
       if (!value) return "Unknown";
@@ -1129,9 +1136,11 @@ _DOCUMENT = r"""<!doctype html>
       for (const h of DATA.holdings) if (completedInventory.holding_ids.includes(h.holding_id)) ids.add(h.latest_inventory_observation_id);
       return new Set(DATA.observations.filter(o => ids.has(o.inventory_observation_id) && o.title.trim()).map(o => o.title.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim())).size;
     }
+    function dispositionValue(value) { return ["gift", "donate"].includes(value) ? "gift_donate" : value; }
+    function dispositionText(value) { return dispositionValue(value) === "gift_donate" ? "Gift / Donate" : human(value); }
     function dispositionLabel(book) {
       const value = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
-      return value && value !== "information_not_included" ? human(value) : "";
+      return value && value !== "information_not_included" ? dispositionText(value) : "";
     }
     async function connectWorkspace() {
       const footer = document.getElementById("save-status");
@@ -1165,10 +1174,10 @@ _DOCUMENT = r"""<!doctype html>
       const form = node("form");
       const label = node("label", {}, "Disposition ");
       const select = node("select", {"aria-label":"Disposition"});
-      const choices = workspaceState.disposition_choices || ["", "keep", "sell", "donate", "gift", "recycle", "undecided"];
-      const saved = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
+      const choices = [...(workspaceState.disposition_choices || ["", "keep", "sell", "gift_donate", "recycle", "undecided"])];
+      const saved = dispositionValue(Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition);
       if (saved && !choices.includes(saved) && saved !== "information_not_included") choices.push(saved);
-      for (const value of choices) append(select, node("option", {value}, value ? human(value) : "Not assigned"));
+      for (const value of choices) append(select, node("option", {value}, value ? dispositionText(value) : "Not assigned"));
       select.value = saved === "information_not_included" ? "" : saved;
       const button = node("button", {type:"submit"}, "Save disposition"); button.disabled = !workspaceState.connected;
       const status = node("p", {role:"status", "aria-live":"polite"}, workspaceState.connected ? "" : "Open the local workspace to save a disposition.");
@@ -1296,6 +1305,11 @@ _DOCUMENT = r"""<!doctype html>
       append(actions, sort, count, exportButton);
       const results = node("div", {id: "library-results"});
       append(main, controls, actions, results);
+      const filterSelect = market.querySelector("select");
+      const matchFilterHeight = () => { clearButton.style.height = `${filterSelect.getBoundingClientRect().height}px`; };
+      libraryFilterObserver = new ResizeObserver(matchFilterHeight);
+      libraryFilterObserver.observe(filterSelect);
+      matchFilterHeight();
 
       function update() {
         if (reportScope) libraryState.scope = controls.querySelector("#library-scope").value;
