@@ -413,3 +413,6 @@ Known follow-up:
 - Show book evidence directly and relocate technical context to About this data.
 - Add a local workspace service with saved dispositions and Complete/Defer/Dismiss/
   Reopen actions, dated deferral, answers, revision checks and decision history.
+
+- Fix local workspace availability after a chat/launcher closes: background mode
+  starts a macOS user service, verifies readiness and reuses the running workspace.

@@ -52,5 +52,6 @@ existing ignore rules. Maintain application code, tests and these decisions in
 GitHub. Unrelated files in `outputs/family-thank-you` are outside this change.
 
 Double-click `Open Library.command` to start the local service and open the Library.
-Keep its window open while browsing; closing it stops the service without removing
-saved decisions. If the service is already running, the launcher opens it.
+The service runs in the background, so the launcher window can be closed. If the
+service is already running, the launcher reuses it. Reopen it after restarting the
+computer; saved decisions remain in place.

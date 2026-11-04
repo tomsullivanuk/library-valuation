@@ -839,8 +839,8 @@ contains only the remaining format checks.
 ### Everyday workspace
 
 Run `.venv/bin/python -m valuation.workspace_service` and open
-[the local Library](http://127.0.0.1:8765). Keep that process running while using
-the workspace; restart the same command after restarting the computer. Library
+[the local Library](http://127.0.0.1:8765). Add `--background` to keep the service running independently of the launcher.
+Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
 views. Action Items combines physical book checks with optional research and saves
 Complete, Defer, Dismiss, Reopen and answers/notes. Select a disposition in book
@@ -852,5 +852,6 @@ completed task does not automatically change an ISBN or assert a disposal. See
 [the agreed workspace review](docs/WORKSPACE_REVIEW_20261104.md) for the full scope.
 
 Double-click `Open Library.command` to start the local service and open the Library.
-Keep its window open while browsing; closing it stops the service without removing
-saved decisions. If the service is already running, the launcher opens it.
+The service runs in the background, so the launcher window can be closed. If the
+service is already running, the launcher reuses it. Reopen it after restarting the
+computer; saved decisions remain in place.

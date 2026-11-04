@@ -12,6 +12,9 @@ import hashlib
 import io
 import json
 import secrets
+import subprocess
+import sys
+import time
 import threading
 import unicodedata
 from contextlib import contextmanager
@@ -20,6 +23,8 @@ from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, unquote
+from urllib.request import urlopen
+from urllib.error import URLError
 
 from valuation.completed_inventory import publish_files
 from valuation.repositories import CollectorReviewRepository, COLLECTOR_REVIEW_FIELDNAMES
@@ -175,7 +180,7 @@ class WorkspaceStore:
             observed = {h.latest_inventory_observation_id for h in self.model.holdings if h.holding_id in self.model.completed_inventory.holding_ids}
             observed.update(self.model.completed_inventory.unresolved_observation_ids)
             titles = {" ".join(unicodedata.normalize("NFKC", o.title).casefold().split()) for o in self.model.observations if o.inventory_observation_id in observed and o.title.strip()}
-            return dict(revision=state["revision"], token=self.token, actions=actions,
+            return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
                 dispositions={r["catalog_item_id"]: r["disposition"] for r in reviews},
                 disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles))
 
@@ -303,12 +308,72 @@ def make_server(store, port=8765):
     return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
+def workspace_id(data_dir):
+    return hashlib.sha256(str(Path(data_dir).resolve()).encode()).hexdigest()
+
+
+def service_ready(port, data_dir):
+    try:
+        with urlopen(f"http://127.0.0.1:{port}/api/state", timeout=1) as response:
+            return json.load(response).get("workspace_id") == workspace_id(data_dir)
+    except (URLError, OSError, ValueError):
+        return False
+
+
+def start_background(data_dir, output_dir, port):
+    """Start independently of the caller's terminal/session and wait for readiness."""
+    if not 1 <= port <= 65535:
+        raise ValueError("Background mode requires a fixed port between 1 and 65535")
+    data_dir, output_dir = Path(data_dir).resolve(), Path(output_dir).resolve()
+    if service_ready(port, data_dir):
+        return
+    output_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / "workspace-service.log"
+    command = [sys.executable, "-m", "valuation.workspace_service",
+               "--data-dir", str(data_dir), "--output-dir", str(output_dir), "--port", str(port)]
+    project_root = Path(__file__).resolve().parent.parent
+    process = None
+    label = "local.library-valuation." + workspace_id(data_dir)[:12] + "." + str(port)
+    if sys.platform == "darwin":
+        # launchd owns the child: chat/terminal process cleanup cannot stop it.
+        subprocess.run(["/bin/launchctl", "remove", label],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        subprocess.run(["/bin/launchctl", "submit", "-l", label,
+                        "-o", str(log_path), "-e", str(log_path), "--",
+                        "/usr/bin/env", "PYTHONPATH=" + str(project_root), *command], check=True)
+    else:
+        with log_path.open("ab") as log:
+            process = subprocess.Popen(command, cwd=project_root,
+                stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                start_new_session=True)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        if service_ready(port, data_dir):
+            return
+        if process is not None and process.poll() is not None:
+            raise RuntimeError(f"The library could not start. Details: {log_path}")
+        time.sleep(0.2)
+    if process is not None:
+        process.terminate()
+    else:
+        subprocess.run(["/bin/launchctl", "remove", label], check=False)
+    raise RuntimeError(f"The library did not start in time. Details: {log_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data-dir", type=Path, default=Path("data"))
     parser.add_argument("--output-dir", type=Path, default=Path("output"))
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--background", action="store_true", help="Keep the local service running after the launcher closes")
     args = parser.parse_args()
+    if args.background:
+        try:
+            start_background(args.data_dir, args.output_dir, args.port)
+        except (ValueError, RuntimeError, OSError) as error:
+            parser.exit(1, str(error) + "\n")
+        print(f"Library workspace: http://127.0.0.1:{args.port}", flush=True)
+        return
     server = make_server(WorkspaceStore(args.data_dir, args.output_dir), args.port)
     print(f"Library workspace: http://127.0.0.1:{server.server_port}", flush=True)
     try:

@@ -979,3 +979,8 @@ Application code is versioned independently of private local data and artifacts.
 Outstanding physical checks are derived from the durable follow-up review receipt
 and current identity decisions. Generated checklist CSVs are exports, not the source
 of task definitions, so replacing or removing reports cannot erase open tasks.
+
+The double-click launcher uses `workspace_service --background`: macOS owns the child through a user-level launchd job (other systems use a
+separate session), with disconnected input and a local log. Closing the launcher
+or an agent session does not stop it. Startup probes the workspace identity and
+waits for readiness; a second launch reuses the existing service.

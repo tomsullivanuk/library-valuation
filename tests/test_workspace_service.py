@@ -160,3 +160,30 @@ def test_outstanding_checks_come_from_durable_review_not_generated_csv(tmp_path)
     store.update(dict(kind='action',id=task['id'],fingerprint=task['fingerprint'],status='complete',revision=0))
     rebuilt=WorkspaceStore(data,out,model=model)
     assert next(t for t in rebuilt.snapshot()['actions'] if t['id']==task['id'])['status']=='complete'
+
+
+def test_macos_background_service_is_owned_by_launchd(tmp_path, monkeypatch):
+    import valuation.workspace_service as service
+    calls=[]
+    answers=iter([False,True])
+    monkeypatch.setattr(service,'service_ready',lambda *args:next(answers))
+    monkeypatch.setattr(service.sys,'platform','darwin')
+    monkeypatch.setattr(service.subprocess,'run',lambda args,**kwargs:calls.append(args))
+    service.start_background(tmp_path/'data',tmp_path/'output',8765)
+    assert calls[0][:2]==['/bin/launchctl','remove']
+    submit=calls[1]
+    assert submit[:2]==['/bin/launchctl','submit']
+    assert '/usr/bin/env' in submit
+    assert any(arg.startswith('PYTHONPATH=') for arg in submit)
+    assert 'valuation.workspace_service' in submit
+    assert '--background' not in submit
+    assert str((tmp_path/'data').resolve()) in submit
+
+
+def test_background_start_reuses_only_the_matching_workspace(tmp_path, monkeypatch):
+    import valuation.workspace_service as service
+    monkeypatch.setattr(service,'service_ready',lambda *args:True)
+    monkeypatch.setattr(service.subprocess,'run',lambda *args,**kwargs:pytest.fail('Should reuse the running service'))
+    service.start_background(tmp_path/'data',tmp_path/'output',8765)
+    assert service.workspace_id(tmp_path/'data')!=service.workspace_id(tmp_path/'other')
+    with pytest.raises(ValueError):service.start_background(tmp_path/'data',tmp_path/'output',0)
