@@ -1297,7 +1297,7 @@ _DOCUMENT = r"""<!doctype html>
         libraryState.visibleBooks = books;
         results.replaceChildren();
         const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
-        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "book" : "books"}${filtered ? " match" : ""}`;
+        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
         if (!books.length) {
           append(results, node("p", {class: "empty"}, "No books match these filters."));
           return;

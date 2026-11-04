@@ -923,3 +923,9 @@ def test_everyday_workspace_details_and_actions_are_direct_and_script_safe(tmp_p
     assert 'acquisition-filter' not in html
     assert 'physically inventoried entries still need identification' not in html
     assert '"Complete"' in html and '"Dismiss"' in html and '"Defer"' in html
+
+
+def test_library_result_count_labels_catalog_records(tmp_path):
+    html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+    assert '${books.length === 1 ? "catalog record" : "catalog records"}' in html
+    assert '${books.length === 1 ? "book" : "books"}' not in html
