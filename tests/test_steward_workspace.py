@@ -136,7 +136,7 @@ def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigati
     assert "Open the local workspace to save" in html
     assert "localStorage" not in html
     assert "sessionStorage" not in html
-    assert "Save disposition" in html
+    assert 'node("button", {type:"submit"}, "Save")' in html
     assert "Export filtered XLSX" not in html
     assert "URL.createObjectURL" in html
     assert 'node("h1", {}, "Library")' not in html
@@ -918,7 +918,7 @@ def test_everyday_workspace_details_and_actions_are_direct_and_script_safe(tmp_p
     assert 'detailSection("Evidence"' not in book
     assert 'Technical provenance' not in book
     assert 'dispositionEditor(book)' in book
-    assert '"Acquisition history"' in book and 'a.item_price' in book
+    assert '"Acquisition history"' in book and 'acquisitionFacts(a)' in book
     assert 'book.isbn13 || book.isbn10' in html
     assert 'acquisition-filter' not in html
     assert 'physically inventoried entries still need identification' not in html
@@ -961,3 +961,13 @@ def test_disposition_editor_has_one_visible_heading_and_inline_controls(tmp_path
     assert '"aria-label":"Disposition"' in editor
     assert 'append(form, select, button, status)' in editor
     assert '.disposition-editor select { width: auto;' in html
+
+
+def test_save_matches_dropdown_size_and_acquisition_history_is_concise(tmp_path):
+    html=render_steward_workspace(model_for(tmp_path,[catalog_row()])).decode()
+    assert 'button.style.width = `${rect.width}px`' in html
+    assert 'button.style.height = `${rect.height}px`' in html
+    assert 'dispositionObserver.disconnect()' in html
+    assert '"amazon" ? "Amazon" : a.source' in html
+    assert 'minimumFractionDigits:Number.isInteger(amount) ? 0 : 2' in html
+    assert 'if (Number(a.quantity) !== 1) facts.push(["Subtotal"' in html

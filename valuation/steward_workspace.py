@@ -770,7 +770,7 @@ _DOCUMENT = r"""<!doctype html>
       margin-bottom: .75rem;
     }
     .disposition-editor select { width: auto; min-width: 10rem; max-width: 100%; }
-    .disposition-editor button { flex: 0 0 auto; }
+    .disposition-editor button { flex: 0 0 auto; min-height: 0; padding: 0 .7rem; line-height: 1; }
     .disposition-editor [role="status"] { flex-basis: 100%; margin: 0; }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
     .detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark); margin-bottom: .35rem; }
@@ -857,6 +857,7 @@ _DOCUMENT = r"""<!doctype html>
     let actionCategory = "Book checks";
     let actionLimit = 50;
     let libraryFilterObserver = null;
+    let dispositionObserver = null;
     const main = document.getElementById("main-content");
     const index = {
       books: new Map(DATA.books.map(row => [row.catalog_item_id, row])),
@@ -886,6 +887,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     function clear() {
       if (libraryFilterObserver) { libraryFilterObserver.disconnect(); libraryFilterObserver = null; }
+      if (dispositionObserver) { dispositionObserver.disconnect(); dispositionObserver = null; }
       main.replaceChildren();
     }
     function valueOrUnknown(value) { return value || "Not recorded"; }
@@ -1180,6 +1182,21 @@ _DOCUMENT = r"""<!doctype html>
       } catch (error) { status.textContent = error.message; }
       finally { button.disabled = !workspaceState.connected; }
     }
+    function acquisitionCost(value, currency) {
+      if (value == null || String(value).trim() === "" || !Number.isFinite(Number(value))) return "Not recorded";
+      const amount = Number(value);
+      if (!currency) return String(value);
+      try {
+        return new Intl.NumberFormat("en-US", {style:"currency", currency,
+          minimumFractionDigits:Number.isInteger(amount) ? 0 : 2, maximumFractionDigits:2}).format(amount);
+      } catch (_) { return `${currency} ${value}`; }
+    }
+    function acquisitionFacts(a) {
+      const source = a.source.trim().toLocaleLowerCase() === "amazon" ? "Amazon" : a.source;
+      const facts = [["Source", source], ["Date", a.order_date.slice(0, 10)], ["Quantity", a.quantity], ["Cost per copy", acquisitionCost(a.item_price, a.currency)]];
+      if (Number(a.quantity) !== 1) facts.push(["Subtotal", acquisitionCost(a.item_subtotal, a.currency)]);
+      return facts;
+    }
     function dispositionEditor(book) {
       const form = node("form", {class:"disposition-editor"});
       const select = node("select", {"aria-label":"Disposition"});
@@ -1188,9 +1205,15 @@ _DOCUMENT = r"""<!doctype html>
       if (saved && !choices.includes(saved) && saved !== "information_not_included") choices.push(saved);
       for (const value of choices) append(select, node("option", {value}, value ? dispositionText(value) : "Not assigned"));
       select.value = saved === "information_not_included" ? "" : saved;
-      const button = node("button", {type:"submit"}, "Save disposition"); button.disabled = !workspaceState.connected;
+      const button = node("button", {type:"submit"}, "Save"); button.disabled = !workspaceState.connected;
       const status = node("p", {role:"status", "aria-live":"polite"}, workspaceState.connected ? "" : "Open the local workspace to save a disposition.");
       append(form, select, button, status);
+      const matchDispositionSize = () => {
+        const rect = select.getBoundingClientRect();
+        if (rect.width > 0) { button.style.width = `${rect.width}px`; button.style.height = `${rect.height}px`; }
+      };
+      dispositionObserver = new ResizeObserver(matchDispositionSize);
+      dispositionObserver.observe(select);
       form.addEventListener("submit", async event => { event.preventDefault(); await saveWorkspace({kind:"disposition", id:book.catalog_item_id, value:select.value}, status, button); });
       return form;
     }
@@ -1437,7 +1460,7 @@ _DOCUMENT = r"""<!doctype html>
       if (!book.acquisition_ids.length) append(main, node("p", {}, "No acquisition record is linked. The book may have come from another source."));
       for (const ref of book.acquisition_ids) {
         const a = index.acquisitions.get(ref);
-        if (a) append(main, definitionList([["Source", a.source], ["Date", a.order_date.slice(0, 10)], ["Quantity", a.quantity], ["Cost per copy", a.item_price ? `${a.currency} ${a.item_price}` : "Not recorded"], ["Subtotal", a.item_subtotal ? `${a.currency} ${a.item_subtotal}` : "Not recorded"]]));
+        if (a) append(main, definitionList(acquisitionFacts(a)));
       }
       append(main, node("h2", {}, "Research priority"));
       const assessment = index.assessments.get(book.assessment_id);

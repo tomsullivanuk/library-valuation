@@ -79,3 +79,9 @@ capability, not part of this revision.
 The detail disposition editor uses one visible section heading, a compact dropdown
 and an adjacent Save disposition button. Retain the accessible field name and put
 save feedback below the controls; allow wrapping on narrow screens.
+
+Shorten the individual disposition button to Save and match the dropdown’s rendered
+width and height. Acquisition history capitalizes Amazon and formats recorded
+currencies with symbols (USD 35 becomes $35; fractional cents remain visible).
+Omit the redundant subtotal for quantity one; retain it for multiple/unknown copies.
+Exact amounts remain unchanged in the acquisition records.
