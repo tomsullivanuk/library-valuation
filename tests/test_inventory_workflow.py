@@ -266,7 +266,7 @@ def test_generated_workspace_supports_steward_acceptance_tasks(tmp_path):
     assert 'href="#library" data-nav="library"' in workspace
     assert 'node("label", {for: "library-search"}, "Search")' in workspace
     assert "Export filtered CSV" in workspace
-    assert "Read-only" in workspace
+    assert "offline view" in workspace
 
 
 def test_single_audit_area_directory_is_an_explicit_supported_input(tmp_path):

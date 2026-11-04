@@ -11,12 +11,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Sequence
+
+from valuation.completed_inventory import CompletedInventoryScope, resolve_completed_inventory
 
 from valuation.inventory_audit import (
     InventoryAuditPresentation,
@@ -102,6 +105,8 @@ class AcquisitionView:
     order_date: str
     quantity: str
     currency: str
+    item_price: str = ""
+    item_subtotal: str = ""
 
 
 @dataclass(frozen=True)
@@ -332,6 +337,7 @@ class StewardPresentation:
     market_evidence: tuple[MarketEvidenceView, ...]
     recommendations: tuple[RecommendationView, ...]
     reports: tuple[ReportView, ...]
+    completed_inventory: CompletedInventoryScope = CompletedInventoryScope()
 
     def to_json_bytes(self) -> bytes:
         """Return canonical deterministic bytes for future clients and tests."""
@@ -379,11 +385,13 @@ def _book_steward_summaries(
     else:
         locations = sorted({
             (
-                row.get("current_location_id", "").strip()
-                or row.get("source_collection_label", "").strip()
+                row.get("source_collection_label", "").strip()
+                or row.get("current_location_id", "").strip()
             )
             for row in holdings
         } - {""})
+        locations = sorted({re.sub(r"^Box\s+", "", value, flags=re.I) for value in locations},
+                           key=lambda value: tuple((0, int(part)) if part.isdigit() else (1, part.casefold()) for part in re.split(r"(\d+)", value)))
         if not locations:
             location_status = "not_recorded"
             location_summary = "Not Located"
@@ -392,7 +400,7 @@ def _book_steward_summaries(
             location_summary = locations[0]
         else:
             location_status = "multiple"
-            location_summary = "Multiple locations"
+            location_summary = ", ".join(locations)
 
     latest_acquisition = _latest_acquisition(acquisitions)
     purchase_date = latest_acquisition.order_date if latest_acquisition else ""
@@ -418,6 +426,17 @@ def _book_steward_summaries(
         purchase_summary = f"{len(acquisitions)} records"
         if purchase_date:
             purchase_summary += f" • latest {_month_year(purchase_date)}"
+
+    if latest_acquisition and acquisition_source_status == "current":
+        try:
+            amount = Decimal(latest_acquisition.item_price)
+            if amount.is_finite() and amount >= 0:
+                rounded = amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                currency = latest_acquisition.currency.strip()
+                prefix = {"USD": "$", "GBP": "£", "EUR": "€"}.get(currency, (currency + " ") if currency else "")
+                purchase_summary += f" • {prefix}{rounded:,.0f}"
+        except (InvalidOperation, ValueError):
+            pass
 
     estimated_value = ""
     estimated_value_precise_low = ""
@@ -498,7 +517,7 @@ def _book_steward_summaries(
             review.disposition
             if review and review.disposition
             else (
-                "undecided"
+                ""
                 if review_source_status == "current"
                 else "information_not_included"
             )
@@ -597,6 +616,7 @@ def build_steward_presentation(
     research_candidates: DerivedEvidenceInput | None = None,
     reports: Sequence[RegisteredReport] = (),
     generated_at: str = "",
+    completed_inventory_declaration: Mapping | None = None,
 ) -> StewardPresentation:
     """Build the deterministic shared presentation without writing any files."""
 
@@ -805,6 +825,14 @@ def build_steward_presentation(
         for row in sorted(catalog_rows, key=lambda item: item["catalog_item_id"])
     )
 
+    completed_inventory = resolve_completed_inventory(data_dir, completed_inventory_declaration)
+    if completed_inventory.completed:
+        sources.append(SourceView(
+            source_key="completed_inventory", authority="steward_declaration", status="current",
+            row_count=completed_inventory.source_entries,
+            content_sha256=hashlib.sha256(json.dumps(asdict(completed_inventory), sort_keys=True).encode()).hexdigest(),
+            schema_version="completed_inventory_v1", generated_at="",
+            explanation="Steward declared these explicit source imports a completed physical inventory."))
     source_views = tuple(sorted(sources, key=lambda item: item.source_key))
     warnings = tuple(
         f"{source.source_key}: {source.explanation}"
@@ -830,6 +858,7 @@ def build_steward_presentation(
             sources=source_views,
             warnings=warnings,
         ),
+        completed_inventory=completed_inventory,
         collection=collection,
         books=books,
         holdings=holding_views,
@@ -930,6 +959,8 @@ def _acquisition_views(
                 order_date=row["order_date"],
                 quantity=row["quantity"],
                 currency=row["currency"],
+                item_price=row["item_price"],
+                item_subtotal=row["item_subtotal"],
             )
         )
     return tuple(views)

@@ -108,8 +108,8 @@ def test_html_is_deterministic_self_contained_and_script_safe(tmp_path):
     assert b"</script><script>PRIVATE" not in first
     assert b"\\u003c/script\\u003e" in first
     assert b"https://" not in first
-    assert b"http://" not in first
-    assert b"fetch(" not in first
+    assert b"http://127.0.0.1:8765" in first
+    assert b'fetch("/api/state"' in first
     assert b"localStorage" not in first
     assert b"sessionStorage" not in first
 
@@ -119,9 +119,10 @@ def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigati
 
     assert 'href="#library" data-nav="library">Library</a>' in html
     assert 'aria-disabled="true" title="Import remains' in html
-    assert 'aria-disabled="true" title="Settings are not available' in html
+    assert 'href="#settings" data-nav="settings"' in html
     assert 'data-nav="recommendations"' not in html
-    assert 'data-nav="reports"' not in html
+    assert 'data-nav="reports"' in html
+    assert 'data-nav="actions"' in html
     assert 'node("label", {for: "library-search"}, "Search")' in html
     assert "Export filtered CSV" in html
     assert 'grid-template-columns: 1fr;' in html
@@ -131,11 +132,11 @@ def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigati
     assert "knownLocations" in html
     assert '"Not Located"' in html
     assert '"Acquired"' in html
-    assert "Read-only" in html
-    assert "does not save" in html and "preferences" in html
+    assert "offline view" in html
+    assert "Open the local workspace to save" in html
     assert "localStorage" not in html
     assert "sessionStorage" not in html
-    assert "Save disposition" not in html
+    assert "Save disposition" in html
     assert "Export filtered XLSX" not in html
     assert "URL.createObjectURL" in html
     assert 'node("h1", {}, "Library")' not in html
@@ -568,7 +569,7 @@ def test_inventory_state_renders_holdings_and_reconciliation_deep_links(tmp_path
     assert model.observations[0].inventory_observation_id in html
     assert model.decisions[0].decision_id in html
     assert f'holding/{model.holdings[0].holding_id}' in html
-    assert "`holding/${encodeURIComponent(id)}`" in html
+    assert '"Physical copies"' in html
     assert tuple(queue.queue_key for queue in build_recommendation_queues(model)) == (
         "physical_identity",
         "location",
@@ -821,7 +822,7 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert "Physical copies recorded" in html
     assert "Purchase records" in html
     assert "Items needing attention" in html
-    assert '"Physical copy"' in html
+    assert '"Physical copies"' in html
     assert '"Acquired"' in html
     assert '"Market research"' in html
     assert "No acquisition record is linked. The book may have come from another source." in html
@@ -882,3 +883,43 @@ def test_real_catalog_scale_stays_within_static_artifact_budget(tmp_path):
     assert len(model.books) == 3014
     assert len(artifact) < 5_000_000
     assert artifact.count(b'"catalog_item_id":') == 3014
+
+
+def test_completed_inventory_preserves_history_but_limits_recommendations(tmp_path):
+    from valuation.completed_inventory import CompletedInventoryScope
+    model = model_for(tmp_path, [catalog_row(), catalog_row('BK000002', title='Historical')])
+    historical = RecommendationView(
+        recommendation_id='history', source_kind='research_candidate', entity_type='catalog_item',
+        entity_id='BK000002', suggested_action='Research', explanation='Old purchase', confidence='low',
+        reason_codes=(), evidence_references=(), source_reference='fixture', advisory=True,
+    )
+    model = replace(model, completed_inventory=CompletedInventoryScope(
+        completed=True, source_entries=1, source_copies=2, catalog_item_ids=('BK000001',)),
+        recommendations=(historical,))
+    assert len(model.books) == 2
+    assert query_explore(model) == ('BK000001',)
+    assert query_explore(model, ExploreQuery(collection_scope='history')) == ('BK000002',)
+    assert len(query_explore(model, ExploreQuery(collection_scope='all'))) == 2
+    assert not any(q.recommendations for q in build_recommendation_queues(model))
+    html = render_steward_workspace(model).decode()
+    assert 'Physically inventoried books' in html
+    assert 'Historical records' in html
+    assert 'completedInventory.completed ? "present"' in html
+    assert '"Historical"' in html
+    assert 'purchase history is preserved' in html
+
+
+def test_everyday_workspace_details_and_actions_are_direct_and_script_safe(tmp_path):
+    model=model_for(tmp_path,[catalog_row()])
+    html=render_steward_workspace(model,action_items=[dict(id='a',title='</script><script>bad</script>')]).decode()
+    assert '</script><script>bad' not in html
+    book=html.split('function renderBook(',1)[1].split('function renderHolding(',1)[0]
+    assert 'Steward context' not in book
+    assert 'detailSection("Evidence"' not in book
+    assert 'Technical provenance' not in book
+    assert 'dispositionEditor(book)' in book
+    assert '"Acquisition history"' in book and 'a.item_price' in book
+    assert 'book.isbn13 || book.isbn10' in html
+    assert 'acquisition-filter' not in html
+    assert 'physically inventoried entries still need identification' not in html
+    assert '"Complete"' in html and '"Dismiss"' in html and '"Defer"' in html

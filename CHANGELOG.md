@@ -403,3 +403,13 @@ Known follow-up:
 - Add metadata refresh, override, and staleness policy.
 - Consider a one-time migration helper for older Open Library caches that still
   live under `output/`.
+
+## Unreleased — everyday Library and Action Items
+
+- Refresh the completed Libib inventory without removing purchase history.
+- Review inventory identities with evidence-preserving manual decisions and follow-ups.
+- Focus Library on physical books, with Libib locations, preferred ISBN and rounded
+  latest purchase cost. Move historical/all-record browsing to Reports.
+- Show book evidence directly and relocate technical context to About this data.
+- Add a local workspace service with saved dispositions and Complete/Defer/Dismiss/
+  Reopen actions, dated deferral, answers, revision checks and decision history.

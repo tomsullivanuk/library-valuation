@@ -1225,3 +1225,47 @@ observations. Zero denominators are emitted as zero rather than divided.
 The summary exposes the catalog-eligible denominator and the neutral
 `not_yet_audited` and `outside_audit_scope` counts directly rather than requiring
 reviewers to derive them from a rate or infer them from absence.
+
+### Completed Inventory Declaration
+
+`data/completed_inventory.json` is a schema-v1, project-owned steward declaration
+with `assertion=completed_physical_inventory`, an absence policy that excludes
+non-present records from the active library while preserving history, and an
+explicit list of immutable source SHA-256 hashes, exact collection labels, entry
+counts, and copy counts. It references accepted imports; it does not replace
+holdings, modify acquisition history, or record disposition. No private paths
+or raw source fields are needed. The read-only presentation derives active
+catalog links and unresolved observations from this declared snapshot.
+
+The optional `empty_collections` list in a completed-inventory declaration
+records collection labels, verified header-only source hashes, and zero entry
+and copy counts. Separate empty collections can share the same file hash; they
+create no synthetic observations, holdings, or duplicate import identities.
+
+### Reviewed inventory identities
+
+Assisted review uses existing append-only physical and catalog reconciliation
+decisions with manual origin and supersession links. Evidence and follow-up
+questions are retained in decision explanations. Source-backed catalog creation
+may retain blank ISBNs and publication year with medium confidence; acceptance
+identifies the observed book without asserting a particular priced edition.
+Identifier corrections are applied through reviewed links/new catalog identities,
+never by rewriting the raw source observation. Review plans bind to source and
+repository hashes and are retained with the generated review ledger. Purchase
+history remains independent of current physical presence.
+
+### Workspace action decisions
+
+`workspace_actions.json` has schema_version 1, a monotonic revision, an actions map
+keyed by stable task ID, and append-only events. Each action stores status (open,
+complete, deferred, dismissed), deferred_until, note, task fingerprint and updated_at.
+Physical check IDs derive from inventory observation IDs; recommendation IDs retain
+the existing source identity. If task content changes, the view treats its prior
+status as open while preserving old events. Completing a task does not resolve or
+edit its underlying inventory/catalog evidence. Dispositions remain in
+`collector_reviews.csv`, preserving other review fields, with their changes also
+recorded in the workspace event history. Blank is unassigned, distinct from an
+explicit Undecided choice. Neither intent nor task completion asserts disposal.
+Acquisition views additionally expose exact item_price and item_subtotal (no order
+IDs or addresses); summaries round the latest unit price half-up to a whole unit
+of its recorded currency.
