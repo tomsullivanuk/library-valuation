@@ -129,11 +129,12 @@ def test_location_uses_libib_collection_and_lists_every_location():
 def test_distinct_titles_are_counted_from_inventory_not_catalog(tmp_path):
     from valuation.completed_inventory import CompletedInventoryScope
     model=model_with_inventory(tmp_path)
-    original=model.observations[0]
+    original=next(o for o in model.observations if o.inventory_observation_id==model.holdings[0].latest_inventory_observation_id)
     same=replace(original, inventory_observation_id='same-title', title='  '+original.title.upper()+'  ')
     model=replace(model, observations=(*model.observations,same), completed_inventory=CompletedInventoryScope(completed=True,holding_ids=tuple(h.holding_id for h in model.holdings),unresolved_observation_ids=('same-title',)))
     store=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model)
-    expected=len({' '.join(o.title.casefold().split()) for o in model.observations})
+    selected={h.latest_inventory_observation_id for h in model.holdings}|{'same-title'}
+    expected=len({' '.join(o.title.casefold().split()) for o in model.observations if o.inventory_observation_id in selected})
     assert store.snapshot()['distinct_titles']==expected
     assert len(model.observations)>expected
 
@@ -145,3 +146,17 @@ def test_two_service_instances_reject_stale_saves(tmp_path):
     with pytest.raises(RuntimeError):
         second.update(dict(kind='disposition',id='BK000001',value='sell',revision=0))
     assert second.snapshot()['dispositions']['BK000001']=='keep'
+
+
+def test_outstanding_checks_come_from_durable_review_not_generated_csv(tmp_path):
+    model=model_with_inventory(tmp_path)
+    oid=model.holdings[0].latest_inventory_observation_id
+    data=tmp_path/'data';out=tmp_path/'output'
+    (data/'inventory_followup_reviews.json').write_text(json.dumps(dict(schema_version=1,reviews=[dict(status='physical_check_required',inventory_observation_id=oid,title='Reviewed book',question='Check the binding',collection='Box 1',bibliographic_evidence='Both ISBNs on copyright page')])))
+    store=WorkspaceStore(data,out,model=model)
+    assert not (out/'physical_book_checks.csv').exists()
+    assert any(task['id']=='book-check:'+oid for task in store.actions)
+    task=next(task for task in store.actions if task['id']=='book-check:'+oid)
+    store.update(dict(kind='action',id=task['id'],fingerprint=task['fingerprint'],status='complete',revision=0))
+    rebuilt=WorkspaceStore(data,out,model=model)
+    assert next(t for t in rebuilt.snapshot()['actions'] if t['id']==task['id'])['status']=='complete'

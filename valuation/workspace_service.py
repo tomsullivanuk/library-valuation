@@ -109,11 +109,45 @@ def build_actions(model, checks):
     return actions
 
 
+def load_book_checks(data_dir, model):
+    """Read canonical reviewed follow-ups and current identity questions.
+
+    Generated CSVs are exports of these records, not the task source of truth.
+    """
+    data_dir = Path(data_dir)
+    checks = {}
+    receipt = data_dir / "inventory_followup_reviews.json"
+    if receipt.exists():
+        saved = json.loads(receipt.read_text())
+        if saved.get("schema_version") != 1:
+            raise ValueError("Unsupported inventory follow-up review schema")
+        for row in saved["reviews"]:
+            if row["status"] == "physical_check_required":
+                checks[row["inventory_observation_id"]] = dict(
+                    inventory_observation_id=row["inventory_observation_id"],
+                    title=row["title"], question=row["question"], collection=row["collection"],
+                    bibliographic_evidence=row.get("bibliographic_evidence", ""))
+    observations = {o.inventory_observation_id:o for o in model.observations}
+    unresolved = set(model.completed_inventory.unresolved_observation_ids)
+    for decision in model.decisions:
+        oid = decision.inventory_observation_id
+        if decision.is_current and oid in unresolved and "Steward input needed:" in decision.explanation:
+            observation = observations[oid]
+            evidence, question = decision.explanation.split("Steward input needed:", 1)
+            checks[oid] = dict(inventory_observation_id=oid, title=observation.title,
+                question=question.strip(), collection=observation.source_collection_label,
+                bibliographic_evidence=evidence.strip())
+    import re
+    return sorted(checks.values(), key=lambda row:(
+        tuple((0, int(part)) if part.isdigit() else (1, part.casefold())
+              for part in re.split(r"(\d+)", row["collection"])), row["title"].casefold()))
+
+
 class WorkspaceStore:
     def __init__(self, data_dir, output_dir, *, model=None):
         self.data_dir, self.output_dir = Path(data_dir), Path(output_dir)
         self.model = model or load_model(self.data_dir, self.output_dir)
-        self.actions = build_actions(self.model, _rows(self.output_dir / "physical_book_checks.csv"))
+        self.actions = build_actions(self.model, load_book_checks(self.data_dir, self.model))
         self.lock = threading.RLock()
         self.token = secrets.token_urlsafe(32)
 
@@ -238,7 +272,7 @@ def make_server(store, port=8765):
                 with store.lock:
                     model = load_model(store.data_dir, store.output_dir)
                     store.model = model
-                    store.actions = build_actions(model, _rows(store.output_dir / "physical_book_checks.csv"))
+                    store.actions = build_actions(model, load_book_checks(store.data_dir, model))
                 return self.send(200, render_steward_workspace(model, action_items=store.actions), "text/html; charset=utf-8")
             allowed = {r.public_path: r for r in store.model.reports if r.public_path}
             if path.lstrip("/") in allowed:

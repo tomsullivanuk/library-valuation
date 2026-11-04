@@ -975,3 +975,7 @@ retains decisions. Requests require the local Host/Origin and a per-process toke
 static serving permits only registered reports, not the data directory or backups.
 Browser storage is not authoritative. Offline generated HTML disables saving.
 Application code is versioned independently of private local data and artifacts.
+
+Outstanding physical checks are derived from the durable follow-up review receipt
+and current identity decisions. Generated checklist CSVs are exports, not the source
+of task definitions, so replacing or removing reports cannot erase open tasks.

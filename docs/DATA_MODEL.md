@@ -1269,3 +1269,7 @@ explicit Undecided choice. Neither intent nor task completion asserts disposal.
 Acquisition views additionally expose exact item_price and item_subtotal (no order
 IDs or addresses); summaries round the latest unit price half-up to a whole unit
 of its recorded currency.
+
+Outstanding physical checks are derived from the durable follow-up review receipt
+and current identity decisions. Generated checklist CSVs are exports, not the source
+of task definitions, so replacing or removing reports cannot erase open tasks.
