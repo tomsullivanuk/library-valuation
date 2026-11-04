@@ -55,3 +55,11 @@ Double-click `Open Library.command` to start the local service and open the Libr
 The service runs in the background, so the launcher window can be closed. If the
 service is already running, the launcher reuses it. Reopen it after restarting the
 computer; saved decisions remain in place.
+
+## Further header and search review
+
+Remove the upper-right tagline. Align the brand with the Library tab text and the
+main desktop content with Import; retain a compact gutter on small screens. Make
+Clear an intrinsically sized, shorter button rather than a stretched grid column.
+Search also covers the description displayed in book details. Remove the vague ID
+prompt; internal catalog, holding and acquisition IDs remain searchable for lookup.

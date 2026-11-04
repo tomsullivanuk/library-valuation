@@ -835,7 +835,7 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert 'detailSection("Technical details"' in html
     assert "Some information is not included or may need review." in html
     assert "What information is affected" in html
-    assert 'placeholder: "Title, author, ISBN, publisher, or ID"' in html
+    assert 'placeholder: "Title, author, ISBN, publisher, or description"' in html
     assert '"aria-label": `Open ${row.name || row.report_key}`' in html
 
 
@@ -929,3 +929,17 @@ def test_library_result_count_labels_catalog_records(tmp_path):
     html = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
     assert '${books.length === 1 ? "catalog record" : "catalog records"}' in html
     assert '${books.length === 1 ? "book" : "books"}' not in html
+
+
+def test_library_search_finds_description_text(tmp_path):
+    model = model_for(tmp_path, [catalog_row()])
+    model = replace(model, books=(replace(model.books[0], description="A study of elusive neutrinos"),))
+    assert query_explore(model, ExploreQuery(search="ELUSIVE NEUTRINOS")) == ("BK000001",)
+    assert query_explore(model, ExploreQuery(search="unmentioned phrase")) == ()
+    html = render_steward_workspace(model).decode()
+    search_client = html.split("const searchable = [", 1)[1].split("];", 1)[0]
+    assert "book.description" in search_client
+    assert "Title, author, ISBN, publisher, or description" in html
+    assert "publisher, or ID" not in html
+    assert "Your library workspace" not in html
+    assert 'class: "clear-filters"' in html

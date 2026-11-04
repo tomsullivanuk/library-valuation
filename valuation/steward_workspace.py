@@ -458,6 +458,7 @@ def _matches_book(
         book.title,
         book.author,
         book.publisher,
+        book.description,
         *book.holding_ids,
         *book.acquisition_ids,
     )
@@ -497,6 +498,8 @@ _DOCUMENT = r"""<!doctype html>
       --warning-bg: #fff2d6;
       --focus: #1b6fc2;
       --shadow: 0 1px 2px rgba(32, 37, 31, .05);
+      --page-gutter: clamp(1rem, 4vw, 3rem);
+      --content-inset: calc(var(--page-gutter) + 6.6rem);
     }
     * { box-sizing: border-box; }
     body {
@@ -525,26 +528,24 @@ _DOCUMENT = r"""<!doctype html>
     header {
       background: white;
       color: var(--ink);
-      padding: .6rem clamp(1rem, 4vw, 3rem);
+      padding: .6rem calc(var(--page-gutter) + .85rem);
       border-bottom: 1px solid var(--line);
     }
     .brand {
       display: flex;
       align-items: baseline;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 1rem;
-      max-width: 86rem;
-      margin: auto;
+      margin: 0;
     }
     .brand strong { font-family: Georgia, serif; font-size: 1.15rem; }
-    .read-only { font-size: .88rem; }
     nav {
       position: sticky;
       top: 0;
       z-index: 5;
       display: flex;
       gap: .25rem;
-      padding: .3rem clamp(1rem, 4vw, 3rem);
+      padding: .3rem var(--page-gutter);
       overflow-x: auto;
       background: var(--surface);
       border-bottom: 1px solid var(--line);
@@ -555,6 +556,7 @@ _DOCUMENT = r"""<!doctype html>
       text-decoration: none;
       white-space: nowrap;
     }
+    nav a:first-child { flex: 0 0 5.5rem; }
     nav a[aria-current="page"] {
       background: var(--brand);
       color: white;
@@ -566,10 +568,10 @@ _DOCUMENT = r"""<!doctype html>
       cursor: not-allowed;
     }
     main {
-      max-width: 86rem;
+      max-width: 100rem;
       min-height: 60vh;
-      margin: auto;
-      padding: .65rem clamp(1rem, 4vw, 3rem) 2rem;
+      margin: 0;
+      padding: .65rem var(--page-gutter) 2rem var(--content-inset);
     }
     h1, h2, h3 { font-family: Georgia, serif; line-height: 1.2; }
     h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin-top: 0; }
@@ -619,9 +621,17 @@ _DOCUMENT = r"""<!doctype html>
     .search-row { max-width: 50rem; }
     .filter-row {
       display: grid;
-      grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+      grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
       gap: .55rem;
       align-items: end;
+    }
+    .filter-row.report-filters { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
+    .clear-filters {
+      justify-self: start;
+      width: auto;
+      min-height: 2rem;
+      padding: .2rem .7rem;
+      font-size: .9rem;
     }
     .library-actions {
       display: flex;
@@ -779,12 +789,13 @@ _DOCUMENT = r"""<!doctype html>
     }
     @media (max-width: 70rem) {
       .controls { grid-template-columns: repeat(2, minmax(12rem, 1fr)); }
-      .filter-row { grid-template-columns: repeat(3, minmax(10rem, 1fr)); }
+      .filter-row { grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto; }
     }
     @media (max-width: 42rem) {
       .brand, .results-header, .detail-heading { display: block; }
       .controls { grid-template-columns: 1fr; }
-      .filter-row { grid-template-columns: 1fr; }
+      .filter-row, .filter-row.report-filters { grid-template-columns: 1fr; }
+      main { padding-left: var(--page-gutter); }
       .library-card { grid-template-columns: 1fr; }
       .library-actions .export-action { margin-left: 0; }
       dl { grid-template-columns: 1fr; }
@@ -802,7 +813,6 @@ _DOCUMENT = r"""<!doctype html>
   <header>
     <div class="brand">
       <strong>Library Valuation</strong>
-      <span class="read-only">Your library workspace</span>
     </div>
   </header>
   <nav aria-label="Primary">
@@ -1063,7 +1073,7 @@ _DOCUMENT = r"""<!doctype html>
       if (!state.search) return true;
       const searchable = [
         book.catalog_item_id, book.isbn13, book.isbn10, book.title, book.author,
-        book.publisher, ...book.holding_ids, ...book.acquisition_ids
+        book.publisher, book.description, ...book.holding_ids, ...book.acquisition_ids
       ].join(" ").toLocaleLowerCase();
       return searchable.includes(state.search);
     }
@@ -1221,7 +1231,7 @@ _DOCUMENT = r"""<!doctype html>
       const search = node("input", {
         id: "library-search",
         type: "search",
-        placeholder: "Title, author, ISBN, publisher, or ID",
+        placeholder: "Title, author, ISBN, publisher, or description",
         autocomplete: "off"
       });
       search.value = libraryState.search;
@@ -1236,9 +1246,10 @@ _DOCUMENT = r"""<!doctype html>
       })[value] || statusLabel(value));
       const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right, undefined, {numeric:true}));
       const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
-      const clearButton = node("button", {type: "button"}, "Clear");
+      const clearButton = node("button", {type: "button", class: "clear-filters"}, "Clear");
       if (completedInventory.completed) {
         if (reportScope) {
+          filterRow.classList.add("report-filters");
           const scope = selectControl("library-scope", "Report collection", ["present", "history"], value => ({present: "Physically inventoried books", history: "Historical records"})[value]);
           scope.querySelector("option").textContent = "All records including history";
           scope.querySelector("select").value = reportScope === "all" ? "" : reportScope;
