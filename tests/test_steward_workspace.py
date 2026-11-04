@@ -951,3 +951,13 @@ def test_filter_clear_matches_native_select_and_book_title_matches_card_style(tm
     assert 'libraryFilterObserver.disconnect()' in html
     assert '.detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark);' in html
     assert '"Gift / Donate"' in html
+
+
+def test_disposition_editor_has_one_visible_heading_and_inline_controls(tmp_path):
+    html=render_steward_workspace(model_for(tmp_path,[catalog_row()])).decode()
+    editor=html.split('function dispositionEditor(book)',1)[1].split('function actionStatus',1)[0]
+    assert 'class:"disposition-editor"' in editor
+    assert 'node("label"' not in editor
+    assert '"aria-label":"Disposition"' in editor
+    assert 'append(form, select, button, status)' in editor
+    assert '.disposition-editor select { width: auto;' in html

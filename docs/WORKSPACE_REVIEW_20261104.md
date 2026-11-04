@@ -75,3 +75,7 @@ explicit saves retain the prior value in decision history.
 Future work: add selection of multiple Library records and a bulk disposition
 update. Keep individual-record editing. Bulk editing is recorded as a future
 capability, not part of this revision.
+
+The detail disposition editor uses one visible section heading, a compact dropdown
+and an adjacent Save disposition button. Retain the accessible field name and put
+save feedback below the controls; allow wrapping on narrow screens.

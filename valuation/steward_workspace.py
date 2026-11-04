@@ -762,6 +762,16 @@ _DOCUMENT = r"""<!doctype html>
       color: var(--brand-dark);
       border: 1px solid var(--brand);
     }
+    .disposition-editor {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .55rem;
+      margin-bottom: .75rem;
+    }
+    .disposition-editor select { width: auto; min-width: 10rem; max-width: 100%; }
+    .disposition-editor button { flex: 0 0 auto; }
+    .disposition-editor [role="status"] { flex-basis: 100%; margin: 0; }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
     .detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark); margin-bottom: .35rem; }
     dl {
@@ -1171,8 +1181,7 @@ _DOCUMENT = r"""<!doctype html>
       finally { button.disabled = !workspaceState.connected; }
     }
     function dispositionEditor(book) {
-      const form = node("form");
-      const label = node("label", {}, "Disposition ");
+      const form = node("form", {class:"disposition-editor"});
       const select = node("select", {"aria-label":"Disposition"});
       const choices = [...(workspaceState.disposition_choices || ["", "keep", "sell", "gift_donate", "recycle", "undecided"])];
       const saved = dispositionValue(Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition);
@@ -1181,7 +1190,7 @@ _DOCUMENT = r"""<!doctype html>
       select.value = saved === "information_not_included" ? "" : saved;
       const button = node("button", {type:"submit"}, "Save disposition"); button.disabled = !workspaceState.connected;
       const status = node("p", {role:"status", "aria-live":"polite"}, workspaceState.connected ? "" : "Open the local workspace to save a disposition.");
-      append(label, select); append(form, label, button, status);
+      append(form, select, button, status);
       form.addEventListener("submit", async event => { event.preventDefault(); await saveWorkspace({kind:"disposition", id:book.catalog_item_id, value:select.value}, status, button); });
       return form;
     }
