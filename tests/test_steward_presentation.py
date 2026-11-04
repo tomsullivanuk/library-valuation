@@ -808,3 +808,14 @@ def test_synthetic_real_catalog_scale_is_supported(tmp_path):
     assert len(model.books) == 3014
     assert model.books[0].catalog_item_id == "BK000001"
     assert model.books[-1].catalog_item_id == "BK003014"
+
+
+def test_research_reasons_explain_recorded_points_without_rescoring():
+    from valuation.steward_presentation import _plain_research_reasons
+    text=_plain_research_reasons('missing_oclc:+5; scholarly_lc_subject:+10; university_press:+15')
+    assert text==('A library catalog identifier is missing, making edition matching harder (+5 points); '
+                  'Its library subject classification suggests scholarly interest (+10 points); '
+                  'Published by a university press (+15 points)')
+    assert _plain_research_reasons('university_press:+7')=='Published by a university press (+7 points)'
+    assert _plain_research_reasons('', 'Existing explanation')=='Existing explanation'
+    assert _plain_research_reasons('future_signal:+4')=='Future signal (+4 points)'

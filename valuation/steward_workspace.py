@@ -1462,9 +1462,9 @@ _DOCUMENT = r"""<!doctype html>
         const a = index.acquisitions.get(ref);
         if (a) append(main, definitionList(acquisitionFacts(a)));
       }
-      append(main, node("h2", {}, "Research priority"));
+      append(main, node("h2", {}, "Research priority"), node("p", {class:"muted"}, "A higher score suggests more reason to research this book. Points reflect scholarly interest, age, repeat purchases, and missing or uncertain catalog details. This is not a price estimate or a rarity rating."));
       const assessment = index.assessments.get(book.assessment_id);
-      if (assessment) append(main, definitionList([["Priority", assessment.priority_band], ["Score", assessment.priority_score], ["Why", assessment.signal_summary], ["Assessed", assessment.assessed_at.slice(0, 10)]]));
+      if (assessment) append(main, definitionList([["Priority", human(assessment.priority_band)], ["Score", `${assessment.priority_score} research points`], ["Why", assessment.signal_explanation], ["Assessed", assessment.assessed_at.slice(0, 10)]]));
       else append(main, node("p", {}, "Not assessed."));
       append(main, node("h2", {}, "Market research"));
       const market = index.market.get(book.market_evidence_id);
@@ -1535,7 +1535,7 @@ _DOCUMENT = r"""<!doctype html>
         ["Priority band", row.priority_band],
         ["Priority score", row.priority_score],
         ["Signal count", row.signal_count],
-        ["Signal summary", row.signal_summary],
+        ["Why", row.signal_explanation],
         ["Assessment status", row.assessment_status],
         ["Assessed at", row.assessed_at]
       ]));

@@ -85,3 +85,8 @@ width and height. Acquisition history capitalizes Amazon and formats recorded
 currencies with symbols (USD 35 becomes $35; fractional cents remain visible).
 Omit the redundant subtotal for quantity one; retain it for multiple/unknown copies.
 Exact amounts remain unchanged in the acquisition records.
+
+Research priority is an additive attention score, not a percentage, price, or rarity
+rating. Display plain-English reasons with their recorded point contributions in
+book details and assessment views; retain raw codes and the original assessment.
+The display must not recalculate old scores using newer configuration weights.

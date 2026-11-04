@@ -124,6 +124,7 @@ class AssessmentView:
     assessment_status: str
     acquisition_snapshot_hash: str
     metadata_snapshot_hash: str
+    signal_explanation: str = ""
 
 
 @dataclass(frozen=True)
@@ -357,6 +358,30 @@ class StewardPresentation:
 class _LoadedDerived:
     source: SourceView
     rows: tuple[dict[str, str], ...]
+
+
+
+def _plain_research_reasons(summary: str, fallback: str = "") -> str:
+    """Explain recorded signal points without rescoring the assessment."""
+    labels = {
+        "old_publication_year": "An older publication date warrants a closer look",
+        "university_press": "Published by a university press",
+        "specialist_publisher": "Published by a specialist or scholarly publisher",
+        "missing_lcc": "A library subject classification is missing",
+        "missing_oclc": "A library catalog identifier is missing, making edition matching harder",
+        "scholarly_lc_subject": "Its library subject classification suggests scholarly interest",
+        "multiple_acquisitions": "Multiple purchase records warrant checking for duplicates or replacements",
+        "low_metadata_confidence": "Some bibliographic details are incomplete or uncertain",
+    }
+    reasons = []
+    for part in summary.split(";"):
+        match = re.fullmatch(r"\s*([a-z_]+):([+-]?\d+)\s*", part)
+        if not match:
+            continue
+        code, points = match.groups()
+        label = labels.get(code, code.replace("_", " ").capitalize())
+        reasons.append(f"{label} ({int(points):+d} points)")
+    return "; ".join(reasons) or fallback or "No research reasons were recorded."
 
 
 def _book_steward_summaries(
@@ -685,6 +710,7 @@ def build_steward_presentation(
             signal_count=row["research_signal_count"],
             signal_codes=row["research_signal_codes"],
             signal_summary=row["research_signal_summary"],
+            signal_explanation=_plain_research_reasons(row["research_signal_summary"], row["research_signal_explanations"]),
             model_version=row["research_model_version"],
             config_hash=row["research_config_hash"],
             assessed_at=row["assessed_at"],
