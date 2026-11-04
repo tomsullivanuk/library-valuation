@@ -303,6 +303,7 @@ class BookView:
     estimated_value_sort_high: str
     estimated_value_currency: str
     disposition: str
+    usable_market_estimate: bool = False
 
 
 @dataclass(frozen=True)
@@ -531,6 +532,11 @@ def _book_steward_summaries(
         "acquisition_source": acquisition_source,
         "acquisition_month": acquisition_month,
         "acquisition_count": acquisition_count,
+        "usable_market_estimate": (
+            resale_status == "estimate_available" and bool(estimated_currency)
+            and market is not None and market.market_confidence in {
+                "high_confidence_market_evidence", "moderate_confidence_market_evidence"}
+        ),
         "resale_market_status": resale_status,
         "resale_market_summary": resale_summary,
         "resale_market_card_summary": resale_card_summary,

@@ -984,3 +984,16 @@ The double-click launcher uses `workspace_service --background`: macOS owns the 
 separate session), with disconnected input and a local log. Closing the launcher
 or an agent session does not stop it. Startup probes the workspace identity and
 waits for readiness; a second launch reuses the existing service.
+
+### Market-aware task planning
+
+The shared BookView projects `usable_market_estimate` from applicable recorded
+prices/currency and high/moderate market confidence. This does not alter or reprice
+the evidence: thin/ambiguous numeric ranges remain in the market view. Ordinary
+book details no longer show the old research-priority score. The local service
+replaces generic research-candidate/fallback prompts with one concrete estimate
+research task per unpriced/unsupported physical catalog record, unless an existing
+book check already supplies the required next step. Tasks explain why/how and
+provide encoded manual-search links; no price lookup is run during generation.
+Extra guidance is excluded from physical-check fingerprints so answered questions
+keep their status. Earlier recommendation events and raw assessments are retained.

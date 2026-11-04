@@ -22,7 +22,7 @@ from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit, unquote
+from urllib.parse import urlsplit, unquote, urlencode
 from urllib.request import urlopen
 from urllib.error import URLError
 
@@ -68,12 +68,70 @@ def load_model(data_dir, output_dir):
         market_evidence=DerivedEvidenceInput(market, identity_validated=True) if market.exists() else None)
 
 
+def estimate_research_action(book, market):
+    """Describe the specific evidence gap and an executable manual next step."""
+    from valuation.abebooks import lookup_attempt
+    isbn = book.isbn13 or book.isbn10
+    query = isbn or " ".join(part for part in (book.title, book.author) if part)
+    search = f"Search ISBN {isbn}" if isbn else f"Search by title and author: {query}"
+    compare = "Match the edition, publisher, binding and condition; compare prices in the same currency. Record useful asking prices, listing links and the date in Answer or note."
+    confidence = market.market_confidence if market and market.status == "current" else ""
+    if not book.title and not isbn:
+        action = "Identify the book before searching for prices"
+        reason = "Neither an ISBN nor a title is recorded, so a useful market search cannot be made."
+        step = "Read the title and copyright pages or barcode. Record the title, author, publisher, year, binding and any ISBN in Answer or note."
+    elif confidence == "ambiguous_edition_match":
+        action = "Check the edition match in the market listings"
+        reason = "Asking prices exist, but the listings may be for a different edition or condition."
+        step = search + ". Check the ISBN, publisher, year and binding against this copy before using a listing's price. " + compare
+    elif confidence == "thin_market_evidence":
+        action = "Find more comparable asking-price listings"
+        reason = "Too few usable listings support a dependable estimate."
+        step = search + " on AbeBooks and eBay and look for additional comparable copies. " + compare
+    elif confidence == "mixed_currency_evidence":
+        action = "Compare market listings in the same currency"
+        reason = "The recorded listings use different currencies and do not support a directly comparable range."
+        step = search + ". Find comparable listings priced in one currency rather than combining their amounts. " + compare
+    elif confidence == "unknown_market_confidence":
+        action = "Check the asking-price evidence and unusual prices"
+        reason = "The recorded evidence is too uncertain to support a dependable estimate."
+        step = search + ". Check unusually high or low listings for different editions, sets, signed copies or condition differences. " + compare
+    elif confidence == "price_unavailable_evidence":
+        action = "Find comparable copies with visible asking prices"
+        reason = "The existing evidence does not contain usable asking prices."
+        step = search + " and find listings with a visible price. " + compare
+    elif confidence == "source_unavailable":
+        action = "Retry the unavailable market search"
+        reason = "The market source was unavailable during the recorded lookup."
+        step = search + " on AbeBooks and eBay. " + compare
+    elif not isbn:
+        action = "Research comparable copies by title and publisher"
+        reason = "No usable estimate is recorded, and there is no ISBN to use for an exact search."
+        step = search + ". Use the recorded publisher and any edition details to narrow the results; older books may have no ISBN. Confirm the copyright page or binding only if the edition remains unclear. " + compare
+    else:
+        action = "Find comparable asking prices for this ISBN"
+        reason = "No usable market estimate is recorded for this book."
+        step = search + " on AbeBooks and eBay. " + compare
+    links = []
+    if query:
+        strategy = "isbn13" if book.isbn13 else "isbn10" if book.isbn10 else "title_author"
+        links = [dict(label="Search AbeBooks", url=lookup_attempt(strategy, query, title=book.title, author=book.author)["url"]),
+                 dict(label="Search eBay", url="https://www.ebay.com/sch/i.html?" + urlencode({"_nkw":query}))]
+    return dict(id="estimate-research:"+book.catalog_item_id, title=book.title,
+        action=action, category="Estimate research", location=book.location_summary,
+        evidence=market.review_reason_display if market and market.status == "current" else "",
+        reason=reason, next_step=step, search_links=links,
+        catalog_item_id=book.catalog_item_id, route="book/"+book.catalog_item_id)
+
+
 def build_actions(model, checks):
     """Merge concrete book checks and current recommendations without duplicates."""
     actions = []
     scope = model.completed_inventory
     current_obs = set(scope.unresolved_observation_ids)
     current_obs.update(h.latest_inventory_observation_id for h in model.holdings if h.holding_id in scope.holding_ids)
+    books = {book.catalog_item_id: book for book in model.books}
+    markets = {row.catalog_item_id: row for row in model.market_evidence}
     by_obs = {h.latest_inventory_observation_id: h for h in model.holdings}
     covered = set()
     for row in checks:
@@ -87,9 +145,26 @@ def build_actions(model, checks):
             evidence=row.get("bibliographic_evidence", ""),
             catalog_item_id=holding.catalog_item_id if holding else "",
             route="book/" + holding.catalog_item_id if holding and holding.catalog_item_id else "observation/" + oid))
+    covered_books = {action["catalog_item_id"] for action in actions if action["catalog_item_id"]}
+    for action in actions:
+        book = books.get(action["catalog_item_id"])
+        if book and not book.usable_market_estimate:
+            action["next_step"] = "Record the answer to this specific book check first. Then use the confirmed ISBN, or title/publisher/binding if there is no ISBN, to compare copies on AbeBooks and eBay. Record comparable prices, links and the date in Answer or note."
+    for book in model.books:
+        if scope.completed and book.catalog_item_id not in scope.catalog_item_ids:
+            continue
+        if book.usable_market_estimate or book.catalog_item_id in covered_books:
+            continue
+        actions.append(estimate_research_action(book, markets.get(book.catalog_item_id)))
     for queue in build_recommendation_queues(model):
         for rec in queue.recommendations:
             holding = None
+            if rec.source_kind == "research_candidate":
+                continue  # Old generic research scores do not define executable tasks.
+            if rec.source_kind == "market_evidence":
+                book = books.get(rec.entity_id)
+                if book and not book.usable_market_estimate:
+                    continue  # Replaced by one specific next step, or the existing book check.
             # A newly inventoried book is a fact, not by itself work to be done.
             if rec.source_kind == "inventory_newly_discovered" or rec.suggested_action in {"no_action_needed", "market_evidence_sufficient"}:
                 continue
@@ -107,10 +182,13 @@ def build_actions(model, checks):
                 category="Optional research" if rec.source_kind == "market_evidence" else queue.title,
                 location="",
                 evidence=rec.explanation.replace("_", " "),
-                catalog_item_id=rec.entity_id if rec.entity_type == "catalog_item" else "",
+                catalog_item_id=rec.entity_id if rec.entity_type == "catalog_item" else holding.catalog_item_id if holding else "",
                 route=rec.primary_route))
     for action in actions:
-        action["fingerprint"] = hashlib.sha256(json.dumps(action, sort_keys=True).encode()).hexdigest()
+        # Added guidance must not reopen an unchanged physical question already answered.
+        identity = {k:v for k,v in action.items() if not (
+            action["id"].startswith("book-check:") and k in {"next_step", "reason", "search_links"})}
+        action["fingerprint"] = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return actions
 
 

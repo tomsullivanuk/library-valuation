@@ -1222,6 +1222,8 @@ _DOCUMENT = r"""<!doctype html>
       return task.status || "open";
     }
     function renderActions(selectedId = "") {
+      const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
+      if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
       clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
       if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
       const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
@@ -1238,6 +1240,13 @@ _DOCUMENT = r"""<!doctype html>
       for (const task of tasks.slice(0, actionLimit)) {
         const card = node("article", {class:"panel"});
         append(card, node("h2", {}, task.title), node("p", {class:"muted"}, `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, task.action));
+        if (task.reason) append(card, definitionList([["Why", task.reason]]));
+        if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+        if (task.search_links?.length) {
+          const searches = node("div", {class:"card-actions"});
+          for (const link of task.search_links) append(searches, node("a", {href:link.url, target:"_blank", rel:"noopener noreferrer", class:"button-link secondary"}, link.label));
+          append(card, searches);
+        }
         if (task.evidence) append(card, detailSection("Recorded evidence", node("p", {}, task.evidence)));
         const noteLabel = node("label", {}, "Answer or note "); const note = node("textarea", {rows:"2", "aria-label":`Answer or note for ${task.title}`}); note.value = task.note || ""; append(noteLabel, note);
         const dateLabel = node("label", {}, "Defer until "); const until = node("input", {type:"date", "aria-label":`Defer until for ${task.title}`}); until.value = task.deferred_until || ""; append(dateLabel, until);
@@ -1462,18 +1471,14 @@ _DOCUMENT = r"""<!doctype html>
         const a = index.acquisitions.get(ref);
         if (a) append(main, definitionList(acquisitionFacts(a)));
       }
-      append(main, node("h2", {}, "Research priority"), node("p", {class:"muted"}, "A higher score suggests more reason to research this book. Points reflect scholarly interest, age, repeat purchases, and missing or uncertain catalog details. This is not a price estimate or a rarity rating."));
-      const assessment = index.assessments.get(book.assessment_id);
-      if (assessment) append(main, definitionList([["Priority", human(assessment.priority_band)], ["Score", `${assessment.priority_score} research points`], ["Why", assessment.signal_explanation], ["Assessed", assessment.assessed_at.slice(0, 10)]]));
-      else append(main, node("p", {}, "Not assessed."));
       append(main, node("h2", {}, "Market research"));
       const market = index.market.get(book.market_evidence_id);
       if (market) append(main, definitionList([["Estimate", book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
       else append(main, node("p", {}, "Not researched."));
       const tasks = workspaceState.actions.filter(task => task.catalog_item_id === bookId);
       if (tasks.length) {
-        append(main, node("h2", {}, "Action items"));
-        for (const task of tasks) append(main, routeLink(`${task.action} — ${actionStatus(task)}`, `actions/${encodeURIComponent(task.id)}`));
+        append(main, node("h2", {}, book.usable_market_estimate ? "Action items" : "Next steps"));
+        for (const task of tasks) append(main, routeLink(`${task.action} — ${human(actionStatus(task))}`, `actions/${encodeURIComponent(task.id)}`));
       }
       append(main, routeLink("About this record", `about/${encodeURIComponent(bookId)}`));
     }

@@ -971,3 +971,13 @@ def test_save_matches_dropdown_size_and_acquisition_history_is_concise(tmp_path)
     assert '"amazon" ? "Amazon" : a.source' in html
     assert 'minimumFractionDigits:Number.isInteger(amount) ? 0 : 2' in html
     assert 'if (Number(a.quantity) !== 1) facts.push(["Subtotal"' in html
+
+
+def test_book_details_replace_legacy_priority_with_actionable_next_steps(tmp_path):
+    html=render_steward_workspace(model_for(tmp_path,[catalog_row()])).decode()
+    detail=html.split('function renderBook(',1)[1].split('function renderHolding(',1)[0]
+    assert '"Research priority"' not in detail
+    assert 'research points' not in detail
+    assert 'book.usable_market_estimate ? "Action items" : "Next steps"' in detail
+    assert '["Why", task.reason]' in html and '["Next step", task.next_step]' in html
+    assert 'task.search_links' in html

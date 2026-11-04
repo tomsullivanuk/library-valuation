@@ -204,3 +204,82 @@ def test_combined_gift_donate_choice_preserves_legacy_decisions(tmp_path):
     assert repo.load()[0]['disposition']=='gift_donate'
     assert repo.load()[0]['review_notes']=='For family'
     assert store.read()['events'][0]['previous']=='gift'
+
+
+def market_fixture(confidence='moderate_confidence_market_evidence'):
+    from valuation.steward_presentation import MarketEvidenceView
+    return MarketEvidenceView('market:BK000001','BK000001','current','observed_listings',
+        'AbeBooks','3',confidence,'10','15','20','USD','market_evidence_sufficient','',
+        '2026-11-04','test')
+
+
+@pytest.mark.parametrize('confidence,usable',[
+    ('high_confidence_market_evidence',True),('moderate_confidence_market_evidence',True),
+    ('thin_market_evidence',False),('ambiguous_edition_match',False),('unknown_market_confidence',False)])
+def test_usable_estimate_requires_supported_matches_not_just_numbers(confidence,usable):
+    base=dict(acquisition_source_status='current',acquisitions=[],inventory_source_status='current',holdings=[],
+        market_source_status='current',market=market_fixture(confidence),review_source_status='current',review=None)
+    result=_book_steward_summaries(**base)
+    assert result['usable_market_estimate'] is usable
+    assert result['resale_market_status']=='estimate_available'  # Original asking prices are preserved.
+    assert not _book_steward_summaries(**dict(base,market_source_status='stale'))['usable_market_estimate']
+    assert not _book_steward_summaries(**dict(base,market=replace(base['market'],currency='')))['usable_market_estimate']
+
+
+def test_unpriced_book_has_executable_search_and_usable_book_has_no_score_task(tmp_path):
+    from urllib.parse import parse_qs,urlsplit
+    from valuation.steward_presentation import RecommendationView
+    model=model_for(tmp_path,[catalog_row()]);book=model.books[0]
+    rec=RecommendationView('old-score','research_candidate','assessment','catalog_item','BK000001',
+        'Review research candidate','missing_oclc:+5','low',(),())
+    model=replace(model,recommendations=(rec,))
+    actions=build_actions(model,[])
+    assert len(actions)==1
+    task=actions[0]
+    assert task['id']=='estimate-research:BK000001'
+    assert 'ISBN '+book.isbn13 in task['next_step']
+    assert 'Record useful asking prices' in task['next_step']
+    assert 'OCLC' not in task['reason'] and 'purchase' not in task['reason']
+    assert parse_qs(urlsplit(task['search_links'][0]['url']).query)['isbn']==[book.isbn13]
+    usable=replace(model,books=(replace(book,usable_market_estimate=True),))
+    assert build_actions(usable,[])==[]
+
+
+@pytest.mark.parametrize('confidence,word',[
+    ('thin_market_evidence','additional comparable copies'),
+    ('ambiguous_edition_match','before using'),
+    ('mixed_currency_evidence','one currency'),
+    ('unknown_market_confidence','signed copies'),
+    ('source_unavailable','AbeBooks and eBay')])
+def test_estimate_tasks_follow_the_evidence_gap(tmp_path,confidence,word):
+    from valuation.workspace_service import estimate_research_action
+    model=model_for(tmp_path,[catalog_row()])
+    task=estimate_research_action(model.books[0],market_fixture(confidence))
+    assert word in task['next_step']
+    assert task['reason'] and task['category']=='Estimate research'
+
+
+def test_existing_book_check_remains_single_task_and_keeps_its_fingerprint(tmp_path):
+    import hashlib
+    model=model_with_inventory(tmp_path);holding=model.holdings[0]
+    check=dict(inventory_observation_id=holding.latest_inventory_observation_id,title='Check book',
+        question='Which binding is this?',collection='Box 1')
+    actions=build_actions(model,[check])
+    task=next(t for t in actions if t['id'].startswith('book-check:'))
+    assert 'Record the answer' in task['next_step']
+    assert not any(t['id']=='estimate-research:'+holding.catalog_item_id for t in actions)
+    previous={k:v for k,v in task.items() if k not in {'next_step','fingerprint'}}
+    assert task['fingerprint']==hashlib.sha256(json.dumps(previous,sort_keys=True).encode()).hexdigest()
+
+
+def test_estimate_research_uses_title_when_no_isbn_and_excludes_history(tmp_path):
+    from valuation.workspace_service import estimate_research_action
+    from valuation.completed_inventory import CompletedInventoryScope
+    from urllib.parse import urlsplit,parse_qs
+    model=model_for(tmp_path,[catalog_row(),catalog_row('BK000002',title='Historical book')])
+    no_isbn=replace(model.books[0],isbn13='',isbn10='')
+    task=estimate_research_action(no_isbn,None)
+    assert 'older books may have no ISBN' in task['next_step']
+    assert parse_qs(urlsplit(task['search_links'][0]['url']).query)['tn']==[no_isbn.title]
+    scoped=replace(model,completed_inventory=CompletedInventoryScope(completed=True,catalog_item_ids=('BK000001',)))
+    assert [t['catalog_item_id'] for t in build_actions(scoped,[])]==['BK000001']

@@ -95,3 +95,25 @@ Market research Confidence, Evidence status and Notes use plain-English explanat
 in book details and the market detail view. Translate every part of combined notes
 and retain the source codes, asking-price limitations and original research dates.
 Do not change estimates or rerun market queries as part of a wording change.
+
+## Market-aware next steps (supersedes the earlier score display)
+
+Remove Research priority from the ordinary book view. Books with usable market
+estimates need no generic score-based research task. Keep historical assessments
+for technical/reporting use. A usable estimate has recorded prices and currency,
+current applicable evidence and high/moderate market confidence. Thin or ambiguous
+asking-price ranges remain visible as evidence but still need specific review.
+
+For books without a usable estimate, Action Items explains the evidence gap and
+gives executable instructions with AbeBooks/eBay search links. Select the task
+from the actual gap: no lookup, too few listings, uncertain edition, unusual prices,
+mixed currencies, missing prices or an unavailable source. Older books can be
+researched by title/author/publisher without requiring an ISBN or OCLC identifier.
+A missing OCLC number or repeat purchase history alone is not a task.
+
+Reuse an existing physical book check when it addresses the blocker, adding guidance
+for the subsequent market comparison instead of a duplicate task. Guidance alone
+does not reopen an unchanged answered book check. Retain all saved action history,
+market evidence and original assessments. Research links open manual searches;
+record findings in the task note. Completing a task does not automatically change
+an estimate or catalog identity.

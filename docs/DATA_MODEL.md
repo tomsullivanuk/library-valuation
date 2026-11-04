@@ -1273,3 +1273,10 @@ of its recorded currency.
 Outstanding physical checks are derived from the durable follow-up review receipt
 and current identity decisions. Generated checklist CSVs are exports, not the source
 of task definitions, so replacing or removing reports cannot erase open tasks.
+
+BookView's derived `usable_market_estimate` distinguishes a supported estimate from
+merely having numerical asking prices. Estimate-research actions have stable IDs
+`estimate-research:<catalog_item_id>`, a reason, practical next_step and fixed-host
+search_links. Physical checks may gain explanatory next_step text without changing
+their existing decision fingerprint. These are projections; no catalog, acquisition,
+physical-inventory, assessment or market-evidence records are rewritten.

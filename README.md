@@ -855,3 +855,10 @@ Double-click `Open Library.command` to start the local service and open the Libr
 The service runs in the background, so the launcher window can be closed. If the
 service is already running, the launcher reuses it. Reopen it after restarting the
 computer; saved decisions remain in place.
+
+Action Items now includes **Estimate research**: concrete next steps and search
+links for physical books without supported estimates. Existing book checks remain
+the next step where an edition/binding question blocks research. Generic research
+scores are retained in the underlying assessment records but removed from book
+details. Save findings in the task's answer/note; completing it records progress
+without silently changing the catalog or estimate.
