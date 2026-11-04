@@ -1468,7 +1468,7 @@ _DOCUMENT = r"""<!doctype html>
       else append(main, node("p", {}, "Not assessed."));
       append(main, node("h2", {}, "Market research"));
       const market = index.market.get(book.market_evidence_id);
-      if (market) append(main, definitionList([["Estimate", book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.market_confidence], ["Evidence status", market.evidence_status], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
+      if (market) append(main, definitionList([["Estimate", book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
       else append(main, node("p", {}, "Not researched."));
       const tasks = workspaceState.actions.filter(task => task.catalog_item_id === bookId);
       if (tasks.length) {
@@ -1569,14 +1569,14 @@ _DOCUMENT = r"""<!doctype html>
       heading("Market evidence summary", id);
       append(main, definitionList([
         ["Freshness", human(row.status)],
-        ["Evidence status", human(row.evidence_status)],
+        ["Evidence status", row.evidence_status_display || human(row.evidence_status)],
         ["Observed sources", row.observed_sources],
         ["Listings", row.listing_count],
-        ["Confidence", human(row.market_confidence)],
+        ["Confidence", row.confidence_display || human(row.market_confidence)],
         ["Likely range", [row.likely_low, row.likely_mid, row.likely_high].filter(Boolean).join(" / ")],
         ["Currency", row.currency],
         ["Existing review guidance", row.review_recommendation],
-        ["Reason", row.review_reason]
+        ["Notes", row.review_reason_display || human(row.review_reason)]
       ]));
       append(main, detailSection("Technical provenance", definitionList([
         ["Generated at", row.generated_at],

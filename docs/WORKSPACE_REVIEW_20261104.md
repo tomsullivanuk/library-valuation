@@ -90,3 +90,8 @@ Research priority is an additive attention score, not a percentage, price, or ra
 rating. Display plain-English reasons with their recorded point contributions in
 book details and assessment views; retain raw codes and the original assessment.
 The display must not recalculate old scores using newer configuration weights.
+
+Market research Confidence, Evidence status and Notes use plain-English explanations
+in book details and the market detail view. Translate every part of combined notes
+and retain the source codes, asking-price limitations and original research dates.
+Do not change estimates or rerun market queries as part of a wording change.

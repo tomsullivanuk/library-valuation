@@ -819,3 +819,14 @@ def test_research_reasons_explain_recorded_points_without_rescoring():
     assert _plain_research_reasons('university_press:+7')=='Published by a university press (+7 points)'
     assert _plain_research_reasons('', 'Existing explanation')=='Existing explanation'
     assert _plain_research_reasons('future_signal:+4')=='Future signal (+4 points)'
+
+
+def test_market_labels_are_plain_english_and_preserve_combined_reasons():
+    from valuation.steward_presentation import _plain_market_text
+    assert _plain_market_text('moderate_confidence_market_evidence').startswith('Moderate —')
+    assert _plain_market_text('observed_listings')=='Seller asking-price listings were recorded.'
+    assert 'below the threshold' in _plain_market_text('usable_market_evidence_below_sale_review_threshold')
+    text=_plain_market_text('thin_market_evidence_requires_manual_research;fragile_asking_price_evidence')
+    assert 'Too few usable listings' in text and 'Unusually high or low asking prices' in text
+    assert 'different edition' in _plain_market_text('ambiguous_edition_match')
+    assert _plain_market_text('future_market_label')=='Future market label'

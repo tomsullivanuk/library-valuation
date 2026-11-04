@@ -228,6 +228,9 @@ class MarketEvidenceView:
     review_reason: str
     generated_at: str
     model_version: str
+    confidence_display: str = ""
+    evidence_status_display: str = ""
+    review_reason_display: str = ""
 
 
 @dataclass(frozen=True)
@@ -1151,6 +1154,39 @@ def _holding_views(
     )
 
 
+
+def _plain_market_text(value: str) -> str:
+    """Translate recorded market labels without changing evidence or estimates."""
+    labels = {
+        "high_confidence_market_evidence": "High — several well-matched listings support the estimate.",
+        "moderate_confidence_market_evidence": "Moderate — reasonably matched listings support an estimate, with some uncertainty.",
+        "thin_market_evidence": "Limited — fewer than three usable listings were recorded.",
+        "ambiguous_edition_match": "Uncertain — the listings may describe a different edition or condition.",
+        "mixed_currency_evidence": "Uncertain — the listings use different currencies.",
+        "price_unavailable_evidence": "Uncertain — usable asking prices were not recorded.",
+        "unknown_market_confidence": "Uncertain — the listings do not support a dependable confidence rating.",
+        "observed_listings": "Seller asking-price listings were recorded.",
+        "no_market_evidence": "No usable market listings were recorded.",
+        "source_unavailable": "The market source was unavailable when researched.",
+        "no_query": "No market search was recorded.",
+        "usable_market_evidence_below_sale_review_threshold": "Comparable asking prices are available, but the estimated range is below the threshold used to suggest a sale review.",
+        "asking_price_range_meets_initial_sale_review_threshold": "The asking-price range is high enough to consider reviewing this book for sale.",
+        "uncertain_market_evidence_requires_manual_research": "The market evidence is uncertain and needs further research.",
+        "thin_market_evidence_requires_manual_research": "Too few usable listings were found; further research is needed.",
+        "asking_price_unavailable_requires_manual_research": "Usable asking prices are missing; further research is needed.",
+        "mixed_currency_evidence_requires_manual_research": "The listings use different currencies and need manual comparison.",
+        "fragile_asking_price_evidence": "Unusually high or low asking prices can substantially affect the estimate.",
+        "ambiguous_edition_or_condition_match": "Check whether the listings match this book's edition and condition.",
+        "market_evidence_unavailable_low_research_priority": "No usable market evidence is available; the existing research assessment gives this book low priority.",
+        "market_evidence_unavailable_medium_research_priority": "No usable market evidence is available; the existing research assessment gives this book medium priority for further research.",
+        "market_evidence_unavailable_high_research_priority": "No usable market evidence is available; the existing research assessment gives this book high priority for further research.",
+        "insufficient_metadata_for_market_lookup": "The title or author details need checking before a useful market search can be made.",
+        "no_review_rule_triggered": "The recorded evidence does not suggest an additional review task.",
+    }
+    parts = [part.strip() for part in value.split(";") if part.strip()]
+    return " ".join(labels.get(part, part.replace("_", " ").capitalize()) for part in parts) or "Not recorded."
+
+
 def _market_views(market: _LoadedDerived) -> tuple[MarketEvidenceView, ...]:
     return tuple(
         MarketEvidenceView(
@@ -1161,6 +1197,9 @@ def _market_views(market: _LoadedDerived) -> tuple[MarketEvidenceView, ...]:
             observed_sources=row["observed_source_names"],
             listing_count=row["listing_count"],
             market_confidence=row["market_confidence"],
+            confidence_display=_plain_market_text(row["market_confidence"]),
+            evidence_status_display=_plain_market_text(row["evidence_status"]),
+            review_reason_display=_plain_market_text(row["review_reason"]),
             likely_low=row["likely_low"],
             likely_mid=row["likely_mid"],
             likely_high=row["likely_high"],
