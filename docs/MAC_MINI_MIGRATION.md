@@ -1,8 +1,8 @@
 # Mac Mini migration runbook
 
 Status: Mac Mini is the sole production host as of November 5, 2026. System
-startup and daily snapshot services are installed and healthy. Final reboot
-acceptance remains pending; do not claim fully unattended recovery until tested.
+startup and daily snapshot services are installed and healthy. Pre-login reboot
+recovery has passed. Pre-login off-device iCloud upload remains unresolved.
 Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
 
 ## Preparation completed on the laptop
@@ -135,12 +135,26 @@ adding snapshot coverage and the migrated-source write guard.
   retries after interruption and starts in the laptop user's login session.
 - `Open Library.command` detects the archived-source marker and opens the remote
   library through that connection instead of starting the old local server.
-- Remaining acceptance: reboot the Mini, do not log in locally, verify the system
-  service starts, the laptop connection recovers, and backups complete or clearly
-  report that iCloud synchronization is waiting for a user/cloud session. Then
-  verify an independent cloud-synced final-state recovery copy.
+- Reboot acceptance passed: console owner remained root (no graphical user login),
+  the system library service started, the laptop connection recovered and its
+  workspace identity matched. The backup daemon completed with exit code 0.
+- The earlier service-created final-state snapshot independently synced to the
+  laptop and all 3,981 member hashes passed. After reboot without login, the new
+  snapshot exists locally on the Mini but has not appeared on the laptop. No
+  graphical user domain or per-user iCloud sync process was running during the
+  check. Pre-login off-device backup upload is therefore not established; do not
+  report the local archive as a completed cloud backup. Choose a user-session
+  arrangement or an additional unattended backup destination before closing this
+  operational gap. Automatic login has not been enabled.
 
 The private installation artifacts and transfer receipts are retained on the
 Mini outside Git. Credentials remain omitted from backup archives. Existing
 source credentials will need a separate secure transfer and destination API
 verification before milestone 2 starts external valuation collection.
+
+## Latest recovery test: November 5, 2026
+
+A normal owner-initiated restart was tested without subsequent graphical login.
+This verifies service startup across reboot; an actual mains-power interruption
+was not performed. Restart-after-power-failure is configured. The remaining issue
+is cloud upload of newly created snapshots before login, not library availability.
