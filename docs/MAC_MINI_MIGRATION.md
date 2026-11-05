@@ -1,8 +1,8 @@
 # Mac Mini migration runbook
 
-Status: destination rehearsal verified November 5, 2026. Production cutover,
-startup installation and reboot recovery remain pending. Final transfer preparation
-has paused the laptop workspace; do not restart its archived service.
+Status: Mac Mini is the sole production host as of November 5, 2026. System
+startup and daily snapshot services are installed and healthy. Final reboot
+acceptance remains pending; do not claim fully unattended recovery until tested.
 Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
 
 ## Preparation completed on the laptop
@@ -122,3 +122,25 @@ state and explicitly removing the guard only after reconciling that state.
 
 Validation: 605 tests passed on both laptop and Apple-silicon destination after
 adding snapshot coverage and the migrated-source write guard.
+
+## Cutover and access verified
+
+- Final frozen snapshot restored and verified against all 3,941 file hashes.
+- System library service is running as the owner account; backup service completed
+  successfully with exit code 0 and a dated verified snapshot in iCloud Drive.
+- Laptop local service is stopped and the migrated-source guard is enabled.
+- A user LaunchAgent on the laptop maintains an SSH loopback forward to the Mini.
+  The usual `http://127.0.0.1:8765/` URL now resolves to the Mini workspace; its
+  API workspace identity was checked against the destination. The connection
+  retries after interruption and starts in the laptop user's login session.
+- `Open Library.command` detects the archived-source marker and opens the remote
+  library through that connection instead of starting the old local server.
+- Remaining acceptance: reboot the Mini, do not log in locally, verify the system
+  service starts, the laptop connection recovers, and backups complete or clearly
+  report that iCloud synchronization is waiting for a user/cloud session. Then
+  verify an independent cloud-synced final-state recovery copy.
+
+The private installation artifacts and transfer receipts are retained on the
+Mini outside Git. Credentials remain omitted from backup archives. Existing
+source credentials will need a separate secure transfer and destination API
+verification before milestone 2 starts external valuation collection.
