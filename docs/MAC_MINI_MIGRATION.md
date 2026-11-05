@@ -1,7 +1,7 @@
 # Mac Mini migration runbook
 
-Status: source preparation completed November 5, 2026; destination connection and
-startup requirements pending. No destination restore or production cutover yet.
+Status: destination rehearsal verified November 5, 2026. Production cutover,
+startup installation and reboot recovery remain pending.
 Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
 
 ## Preparation completed on the laptop
@@ -13,10 +13,33 @@ Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
   2,687 holding rows and 4,504 observations. These repository counts differ from
   the Library’s active-record, physical-copy and distinct-title counts.
 - Root credential files, transient state, and the existing virtual environment
-  are excluded. The snapshot remains on the source laptop; it is not yet an
-  independent backup, a destination restore, or the final cutover snapshot.
+  are excluded. A preparation copy has been restored and verified on the destination. It is
+  not the final cutover snapshot.
 - No saved workspace-actions or reviewed-estimates file existed in the source
   data directory at snapshot time. Preserve them in the final transfer if created.
+
+## Destination rehearsal results
+
+- SSH key access verified; destination is Apple silicon with macOS 27.0.1 and
+  approximately 274 GiB free. Host and account details remain private.
+- Recreated an isolated Python 3.14.5 environment from pinned dependencies.
+- Restored and hash-verified all 3,941 private snapshot files. All 603 tests and
+  compilation passed on the destination.
+- A temporary loopback HTTP smoke test passed against the restored records:
+  2,727 physical copies, 2,565 active catalog records, 2,521 distinct titles,
+  1,250 actions. The temporary server was stopped afterward. No production
+  service or second production writer was enabled.
+- iCloud Drive was selected for dated archive backups, with the live working
+  repositories kept outside the sync folder. The preparation archive and manifest
+  were copied into iCloud Drive and their local checksums verified. The independently
+  synced laptop copy also passed archive checksum and all 3,941 member hashes.
+  Recurring backup scheduling and a final-state recovery check remain pending.
+- FileVault is enabled. Automatic startup is requested, but the cold-boot unlock
+  requirement must be settled before declaring unattended recovery operational.
+  Do not disable FileVault as an implicit migration step.
+- No Time Machine destination is configured. iCloud Drive sync is not a full
+  system backup; use distinct dated snapshots and verify recovery, rather than
+  synchronizing the writable repositories directly.
 
 ## Preparation
 
