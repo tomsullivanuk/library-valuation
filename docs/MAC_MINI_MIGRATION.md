@@ -1,7 +1,8 @@
 # Mac Mini migration runbook
 
 Status: destination rehearsal verified November 5, 2026. Production cutover,
-startup installation and reboot recovery remain pending.
+startup installation and reboot recovery remain pending. Final transfer preparation
+has paused the laptop workspace; do not restart its archived service.
 Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
 
 ## Preparation completed on the laptop
@@ -34,9 +35,11 @@ Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
   were copied into iCloud Drive and their local checksums verified. The independently
   synced laptop copy also passed archive checksum and all 3,941 member hashes.
   Recurring backup scheduling and a final-state recovery check remain pending.
-- FileVault is enabled. Automatic startup is requested, but the cold-boot unlock
-  requirement must be settled before declaring unattended recovery operational.
-  Do not disable FileVault as an implicit migration step.
+- Fully unattended cold-boot recovery was selected. The owner explicitly approved
+  disabling FileVault and completed that change; destination status was verified
+  off before startup preparation. The machine already has system sleep disabled
+  and restart-after-power-failure enabled. Actual cold-boot recovery still needs
+  verification.
 - No Time Machine destination is configured. iCloud Drive sync is not a full
   system backup; use distinct dated snapshots and verify recovery, rather than
   synchronizing the writable repositories directly.
@@ -93,3 +96,29 @@ Classify any additional working directories before transfer.
 
 Migration is complete only after the acceptance gate in the roadmap is met.
 Family publication and the whole-library valuation run follow this milestone.
+
+## Startup and backup implementation
+
+The prepared system LaunchDaemons run the library and daily snapshot command as
+the destination account, not root. Only their plist installation requires owner
+administrator authentication. The application remains bound to loopback; use SSH
+forwarding for laptop administration. System service logs are private to the
+account under `~/Library/Logs/LibraryValuation/`.
+
+`operations/library_backup.py` takes the workspace write lock, archives canonical
+state, imports, evidence, configuration and recovery code, verifies every member,
+and publishes a dated snapshot into a separate destination folder. Transient
+files, root credentials, virtual environments, prior migration archives and
+symlinks are excluded. Existing snapshots are retained; monitor iCloud capacity
+and agree a retention policy before pruning any recovery points. Validate an
+independently synced copy periodically. iCloud synchronization may wait for the
+account's cloud session/network; a successful local archive is not proof of upload.
+
+After cutover, `data/production_moved.json` on the laptop prevents its workspace
+from starting or saving. It must never be copied to the destination. This guard
+does not disable unrelated command-line import tools; do not run production jobs
+against the archived laptop repositories. Rollback requires preserving newer Mini
+state and explicitly removing the guard only after reconciling that state.
+
+Validation: 605 tests passed on both laptop and Apple-silicon destination after
+adding snapshot coverage and the migrated-source write guard.
