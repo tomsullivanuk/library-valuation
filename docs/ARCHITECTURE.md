@@ -900,3 +900,117 @@ As the system grows, tests should also cover:
 Network-dependent behavior should be isolated behind clients that can be tested
 with fixtures or cached responses. Core catalog, matching, valuation, and
 decision logic should be testable without live network access.
+
+## Completed Physical Inventory Scope
+
+An explicit steward declaration in `data/completed_inventory.json` selects a
+completed snapshot by immutable Libib source hashes, collection labels, entry
+counts, and copy counts. It is separate from the original imports' local audit
+completeness: declaring the whole inventory complete does not rewrite earlier
+partial audits or their observations. `valuation.completed_inventory` validates
+an explicitly supplied manifest against untouched exports and durable evidence.
+
+The shared presentation resolves accepted, verified-present holdings against
+those imports and their current catalog links. The workspace defaults to these
+catalog records. Physically observed entries without an accepted catalog link
+remain visible in a separate identification section, including observations
+without an accepted holding. Multi-copy entries retain their exact quantities.
+Catalog research recommendations outside that scope are excluded, as are
+inventory recommendations for observations outside the completed snapshot.
+
+All catalog, acquisition, observation, and reconciliation history is preserved.
+Records outside the snapshot remain available in the workspace history filter;
+absence means presumed no longer present, never a confirmed donation or sale.
+Unresolved inventory entries can still match historical catalog records.
+The declaration participates in snapshot identity and subsequent workspace
+builds, including inventory previews. Replacing the completed inventory requires
+an explicit new manifest and declaration; later individual partial imports do
+not silently redefine the completed snapshot. Code and manifests must not infer
+an exact disposal, date, or recipient.
+
+### Complete Snapshot Refresh
+
+`valuation.libib_snapshot` stages the full manifest against copies of durable
+repositories and uses the existing inventory import and catalog reconciliation
+components. It validates both new and prior manifest files against untouched
+source hashes. For unchanged legacy rows, a unique original Libib source-entry
+ID, equal identity-bearing fingerprint and equal exact quantity corroborate
+holding continuity across a new folder or renamed collection. Original source
+files supply this evidence; historical observations are never edited to add
+fields. Source IDs refer to source entries, not individual physical copies.
+New explicitly inventoried entries may be represented as distinct holdings or
+quantity groups when the existing physical-evidence checks pass. Conflicting
+identifiers, changed quantities and weak identity remain reviewable.
+
+The batch appends explained physical supersessions, invokes existing catalog
+matching only for current accepted holdings, and publishes the validated
+repositories, declaration and artifacts with rollback. Unchanged source hashes
+reuse prior imports and observations. Header-only empty exports are retained
+as `empty_collections` in the declaration, independently of the import identity
+rule that requires unique source hashes. Declared complete global coverage does
+not rewrite completeness on older partial-scope imports. Purchase and collector
+history is checked byte for byte before publication. Market evidence keeps its
+source dates and is identity-validated against the staged catalog.
+
+### Assisted inventory review
+
+`valuation.inventory_review` applies an explicit per-observation review plan after
+checking its repository hashes, observation fingerprints, superseded decisions,
+and any original-export note evidence. It stages and validates all repositories
+and derived reports before publication. It appends manual decisions while
+preserving raw observations, acquisitions, and existing catalog rows. Source-only
+records carry medium confidence and blank identifiers; they do not inherit market
+evidence from merely similar editions. Unresolved identity questions and optional
+format/location checks have separate reports. Replaying a stale plan is rejected.
+
+### Local workspace decisions
+
+`valuation.workspace_service` supplies a loopback-only HTTP client for the shared
+presentation and renderer. GET rebuilds the view from the durable repositories;
+explicit POST actions save dispositions through the existing collector-review
+repository and action statuses through `workspace_actions.json`. Atomic publication
+rolls back both files on failure. Revision checks reject stale edits, task content
+fingerprints prevent old completions hiding changed questions, and an event history
+retains decisions. Requests require the local Host/Origin and a per-process token;
+static serving permits only registered reports, not the data directory or backups.
+Browser storage is not authoritative. Offline generated HTML disables saving.
+Application code is versioned independently of private local data and artifacts.
+
+Outstanding physical checks are derived from the durable follow-up review receipt
+and current identity decisions. Generated checklist CSVs are exports, not the source
+of task definitions, so replacing or removing reports cannot erase open tasks.
+
+The double-click launcher uses `workspace_service --background`: macOS owns the child through a user-level launchd job (other systems use a
+separate session), with disconnected input and a local log. Closing the launcher
+or an agent session does not stop it. Startup probes the workspace identity and
+waits for readiness; a second launch reuses the existing service.
+
+### Market-aware task planning
+
+The shared BookView projects `usable_market_estimate` from applicable recorded
+prices/currency and high/moderate market confidence. This does not alter or reprice
+the evidence: thin/ambiguous numeric ranges remain in the market view. Ordinary
+book details no longer show the old research-priority score. The local service
+replaces generic research-candidate/fallback prompts with one concrete estimate
+research task per unpriced/unsupported physical catalog record, unless an existing
+book check already supplies the required next step. Tasks explain why/how and
+provide encoded manual-search links; no price lookup is run during generation.
+Extra guidance is excluded from physical-check fingerprints so answered questions
+keep their status. Earlier recommendation events and raw assessments are retained.
+
+### Reviewed estimates from research tasks
+
+`valuation.estimate_reviews` owns validation and the append-only reviewed-estimate
+repository. It stores steward judgments separately from observed asking prices.
+The presentation overlays the latest identity-matching review on BookView's range,
+sort/filter/export values and usability, while retaining the original MarketEvidenceView.
+A book-identity fingerprint covers catalog ID, ISBNs, title, author, publisher and
+year; mismatched reviews remain in history but do not price a changed edition.
+
+An explicit two-step task editor previews the prior/new per-copy ranges, currency,
+date, basis and sources before saving. The local service validates the task, book
+identity, expected revision and preceding estimate, then atomically publishes the
+new estimate and task-completion event. Failure rolls back both. The client applies
+returned range projections immediately; a fresh presentation rebuild applies the
+same durable review after reload/regeneration. Completed estimate tasks are retained
+from saved context for further review; earlier observations and decisions are unchanged.

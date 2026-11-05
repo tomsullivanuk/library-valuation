@@ -11,12 +11,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Mapping, Sequence
+
+from valuation.completed_inventory import CompletedInventoryScope, resolve_completed_inventory
 
 from valuation.inventory_audit import (
     InventoryAuditPresentation,
@@ -102,6 +105,8 @@ class AcquisitionView:
     order_date: str
     quantity: str
     currency: str
+    item_price: str = ""
+    item_subtotal: str = ""
 
 
 @dataclass(frozen=True)
@@ -119,6 +124,7 @@ class AssessmentView:
     assessment_status: str
     acquisition_snapshot_hash: str
     metadata_snapshot_hash: str
+    signal_explanation: str = ""
 
 
 @dataclass(frozen=True)
@@ -222,6 +228,9 @@ class MarketEvidenceView:
     review_reason: str
     generated_at: str
     model_version: str
+    confidence_display: str = ""
+    evidence_status_display: str = ""
+    review_reason_display: str = ""
 
 
 @dataclass(frozen=True)
@@ -294,6 +303,11 @@ class BookView:
     estimated_value_sort_high: str
     estimated_value_currency: str
     disposition: str
+    usable_market_estimate: bool = False
+    reviewed_estimate_id: str = ""
+    reviewed_estimate_date: str = ""
+    reviewed_estimate_note: str = ""
+    reviewed_estimate_sources: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -332,6 +346,7 @@ class StewardPresentation:
     market_evidence: tuple[MarketEvidenceView, ...]
     recommendations: tuple[RecommendationView, ...]
     reports: tuple[ReportView, ...]
+    completed_inventory: CompletedInventoryScope = CompletedInventoryScope()
 
     def to_json_bytes(self) -> bytes:
         """Return canonical deterministic bytes for future clients and tests."""
@@ -351,6 +366,48 @@ class StewardPresentation:
 class _LoadedDerived:
     source: SourceView
     rows: tuple[dict[str, str], ...]
+
+
+
+def project_reviewed_estimate(book: BookView, review) -> BookView:
+    """Overlay a steward judgment without rewriting the observed market evidence."""
+    low, high, currency = review["low"], review["high"], review["currency"]
+    sort_low, sort_high = _presentation_currency_range_values(low, high)
+    display = _rounded_currency_range(low, high, currency)
+    precise_low = format(Decimal(low), ",.2f").removesuffix(".00")
+    precise_high = format(Decimal(high), ",.2f").removesuffix(".00")
+    return replace(book, resale_market_status="estimate_available",
+        resale_market_summary=f"{_currency_prefix(currency)}{precise_low}–{_currency_prefix(currency)}{precise_high}",
+        resale_market_card_summary=display, estimated_value_display=display,
+        estimated_value=low if low==high else "", estimated_value_precise_low=low,
+        estimated_value_precise_high=high, estimated_value_sort_low=sort_low,
+        estimated_value_sort_high=sort_high, estimated_value_currency=currency,
+        usable_market_estimate=True, reviewed_estimate_id=review["review_id"],
+        reviewed_estimate_date=review["researched_on"], reviewed_estimate_note=review["note"],
+        reviewed_estimate_sources=tuple(review["source_urls"]))
+
+
+def _plain_research_reasons(summary: str, fallback: str = "") -> str:
+    """Explain recorded signal points without rescoring the assessment."""
+    labels = {
+        "old_publication_year": "An older publication date warrants a closer look",
+        "university_press": "Published by a university press",
+        "specialist_publisher": "Published by a specialist or scholarly publisher",
+        "missing_lcc": "A library subject classification is missing",
+        "missing_oclc": "A library catalog identifier is missing, making edition matching harder",
+        "scholarly_lc_subject": "Its library subject classification suggests scholarly interest",
+        "multiple_acquisitions": "Multiple purchase records warrant checking for duplicates or replacements",
+        "low_metadata_confidence": "Some bibliographic details are incomplete or uncertain",
+    }
+    reasons = []
+    for part in summary.split(";"):
+        match = re.fullmatch(r"\s*([a-z_]+):([+-]?\d+)\s*", part)
+        if not match:
+            continue
+        code, points = match.groups()
+        label = labels.get(code, code.replace("_", " ").capitalize())
+        reasons.append(f"{label} ({int(points):+d} points)")
+    return "; ".join(reasons) or fallback or "No research reasons were recorded."
 
 
 def _book_steward_summaries(
@@ -379,11 +436,13 @@ def _book_steward_summaries(
     else:
         locations = sorted({
             (
-                row.get("current_location_id", "").strip()
-                or row.get("source_collection_label", "").strip()
+                row.get("source_collection_label", "").strip()
+                or row.get("current_location_id", "").strip()
             )
             for row in holdings
         } - {""})
+        locations = sorted({re.sub(r"^Box\s+", "", value, flags=re.I) for value in locations},
+                           key=lambda value: tuple((0, int(part)) if part.isdigit() else (1, part.casefold()) for part in re.split(r"(\d+)", value)))
         if not locations:
             location_status = "not_recorded"
             location_summary = "Not Located"
@@ -392,7 +451,7 @@ def _book_steward_summaries(
             location_summary = locations[0]
         else:
             location_status = "multiple"
-            location_summary = "Multiple locations"
+            location_summary = ", ".join(locations)
 
     latest_acquisition = _latest_acquisition(acquisitions)
     purchase_date = latest_acquisition.order_date if latest_acquisition else ""
@@ -418,6 +477,17 @@ def _book_steward_summaries(
         purchase_summary = f"{len(acquisitions)} records"
         if purchase_date:
             purchase_summary += f" • latest {_month_year(purchase_date)}"
+
+    if latest_acquisition and acquisition_source_status == "current":
+        try:
+            amount = Decimal(latest_acquisition.item_price)
+            if amount.is_finite() and amount >= 0:
+                rounded = amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                currency = latest_acquisition.currency.strip()
+                prefix = {"USD": "$", "GBP": "£", "EUR": "€"}.get(currency, (currency + " ") if currency else "")
+                purchase_summary += f" • {prefix}{rounded:,.0f}"
+        except (InvalidOperation, ValueError):
+            pass
 
     estimated_value = ""
     estimated_value_precise_low = ""
@@ -484,6 +554,11 @@ def _book_steward_summaries(
         "acquisition_source": acquisition_source,
         "acquisition_month": acquisition_month,
         "acquisition_count": acquisition_count,
+        "usable_market_estimate": (
+            resale_status == "estimate_available" and bool(estimated_currency)
+            and market is not None and market.market_confidence in {
+                "high_confidence_market_evidence", "moderate_confidence_market_evidence"}
+        ),
         "resale_market_status": resale_status,
         "resale_market_summary": resale_summary,
         "resale_market_card_summary": resale_card_summary,
@@ -498,7 +573,7 @@ def _book_steward_summaries(
             review.disposition
             if review and review.disposition
             else (
-                "undecided"
+                ""
                 if review_source_status == "current"
                 else "information_not_included"
             )
@@ -597,6 +672,7 @@ def build_steward_presentation(
     research_candidates: DerivedEvidenceInput | None = None,
     reports: Sequence[RegisteredReport] = (),
     generated_at: str = "",
+    completed_inventory_declaration: Mapping | None = None,
 ) -> StewardPresentation:
     """Build the deterministic shared presentation without writing any files."""
 
@@ -665,6 +741,7 @@ def build_steward_presentation(
             signal_count=row["research_signal_count"],
             signal_codes=row["research_signal_codes"],
             signal_summary=row["research_signal_summary"],
+            signal_explanation=_plain_research_reasons(row["research_signal_summary"], row["research_signal_explanations"]),
             model_version=row["research_model_version"],
             config_hash=row["research_config_hash"],
             assessed_at=row["assessed_at"],
@@ -805,6 +882,24 @@ def build_steward_presentation(
         for row in sorted(catalog_rows, key=lambda item: item["catalog_item_id"])
     )
 
+    from valuation.estimate_reviews import current_reviews, FILE_NAME as ESTIMATE_FILE
+    reviewed = current_reviews(data_dir, books)
+    books = tuple(project_reviewed_estimate(book, reviewed[book.catalog_item_id])
+                  if book.catalog_item_id in reviewed else book for book in books)
+    estimate_path = data_dir / ESTIMATE_FILE
+    if estimate_path.exists():
+        sources.append(SourceView(source_key="reviewed_estimates", authority="steward_review",
+            status="current", row_count=len(reviewed), content_sha256=hashlib.sha256(estimate_path.read_bytes()).hexdigest(),
+            schema_version="reviewed_estimates_v1", generated_at="",
+            explanation="Steward-reviewed ranges; earlier observations and estimate history are preserved."))
+    completed_inventory = resolve_completed_inventory(data_dir, completed_inventory_declaration)
+    if completed_inventory.completed:
+        sources.append(SourceView(
+            source_key="completed_inventory", authority="steward_declaration", status="current",
+            row_count=completed_inventory.source_entries,
+            content_sha256=hashlib.sha256(json.dumps(asdict(completed_inventory), sort_keys=True).encode()).hexdigest(),
+            schema_version="completed_inventory_v1", generated_at="",
+            explanation="Steward declared these explicit source imports a completed physical inventory."))
     source_views = tuple(sorted(sources, key=lambda item: item.source_key))
     warnings = tuple(
         f"{source.source_key}: {source.explanation}"
@@ -830,6 +925,7 @@ def build_steward_presentation(
             sources=source_views,
             warnings=warnings,
         ),
+        completed_inventory=completed_inventory,
         collection=collection,
         books=books,
         holdings=holding_views,
@@ -930,6 +1026,8 @@ def _acquisition_views(
                 order_date=row["order_date"],
                 quantity=row["quantity"],
                 currency=row["currency"],
+                item_price=row["item_price"],
+                item_subtotal=row["item_subtotal"],
             )
         )
     return tuple(views)
@@ -1094,6 +1192,39 @@ def _holding_views(
     )
 
 
+
+def _plain_market_text(value: str) -> str:
+    """Translate recorded market labels without changing evidence or estimates."""
+    labels = {
+        "high_confidence_market_evidence": "High — several well-matched listings support the estimate.",
+        "moderate_confidence_market_evidence": "Moderate — reasonably matched listings support an estimate, with some uncertainty.",
+        "thin_market_evidence": "Limited — fewer than three usable listings were recorded.",
+        "ambiguous_edition_match": "Uncertain — the listings may describe a different edition or condition.",
+        "mixed_currency_evidence": "Uncertain — the listings use different currencies.",
+        "price_unavailable_evidence": "Uncertain — usable asking prices were not recorded.",
+        "unknown_market_confidence": "Uncertain — the listings do not support a dependable confidence rating.",
+        "observed_listings": "Seller asking-price listings were recorded.",
+        "no_market_evidence": "No usable market listings were recorded.",
+        "source_unavailable": "The market source was unavailable when researched.",
+        "no_query": "No market search was recorded.",
+        "usable_market_evidence_below_sale_review_threshold": "Comparable asking prices are available, but the estimated range is below the threshold used to suggest a sale review.",
+        "asking_price_range_meets_initial_sale_review_threshold": "The asking-price range is high enough to consider reviewing this book for sale.",
+        "uncertain_market_evidence_requires_manual_research": "The market evidence is uncertain and needs further research.",
+        "thin_market_evidence_requires_manual_research": "Too few usable listings were found; further research is needed.",
+        "asking_price_unavailable_requires_manual_research": "Usable asking prices are missing; further research is needed.",
+        "mixed_currency_evidence_requires_manual_research": "The listings use different currencies and need manual comparison.",
+        "fragile_asking_price_evidence": "Unusually high or low asking prices can substantially affect the estimate.",
+        "ambiguous_edition_or_condition_match": "Check whether the listings match this book's edition and condition.",
+        "market_evidence_unavailable_low_research_priority": "No usable market evidence is available; the existing research assessment gives this book low priority.",
+        "market_evidence_unavailable_medium_research_priority": "No usable market evidence is available; the existing research assessment gives this book medium priority for further research.",
+        "market_evidence_unavailable_high_research_priority": "No usable market evidence is available; the existing research assessment gives this book high priority for further research.",
+        "insufficient_metadata_for_market_lookup": "The title or author details need checking before a useful market search can be made.",
+        "no_review_rule_triggered": "The recorded evidence does not suggest an additional review task.",
+    }
+    parts = [part.strip() for part in value.split(";") if part.strip()]
+    return " ".join(labels.get(part, part.replace("_", " ").capitalize()) for part in parts) or "Not recorded."
+
+
 def _market_views(market: _LoadedDerived) -> tuple[MarketEvidenceView, ...]:
     return tuple(
         MarketEvidenceView(
@@ -1104,6 +1235,9 @@ def _market_views(market: _LoadedDerived) -> tuple[MarketEvidenceView, ...]:
             observed_sources=row["observed_source_names"],
             listing_count=row["listing_count"],
             market_confidence=row["market_confidence"],
+            confidence_display=_plain_market_text(row["market_confidence"]),
+            evidence_status_display=_plain_market_text(row["evidence_status"]),
+            review_reason_display=_plain_market_text(row["review_reason"]),
             likely_low=row["likely_low"],
             likely_mid=row["likely_mid"],
             likely_high=row["likely_high"],

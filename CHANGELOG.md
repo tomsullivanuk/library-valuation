@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.1 - 2026-11-05
+
+Release focus: the everyday physical-library workspace and saved research decisions.
+
+- Reconcile the completed Libib inventory while preserving purchase history.
+- Simplify Library and book details, search, locations, acquisition costs, and market explanations.
+- Add a local background service, saved Action Items, and individual dispositions.
+- Replace generic research scores with concrete estimate-research tasks.
+- Review and save revised value ranges from tasks with estimate history and guarded persistence.
+- Validate with 603 tests and browser save/restart checks.
+
+See [release notes](docs/RELEASE_NOTES_v0.11.1.md) for migration requirements and limitations.
+
 ## v0.11.0 - 2026-07-26
 
 Release focus: Steward Workspace.
@@ -403,3 +416,20 @@ Known follow-up:
 - Add metadata refresh, override, and staleness policy.
 - Consider a one-time migration helper for older Open Library caches that still
   live under `output/`.
+
+## Unreleased — everyday Library and Action Items
+
+- Refresh the completed Libib inventory without removing purchase history.
+- Review inventory identities with evidence-preserving manual decisions and follow-ups.
+- Focus Library on physical books, with Libib locations, preferred ISBN and rounded
+  latest purchase cost. Move historical/all-record browsing to Reports.
+- Show book evidence directly and relocate technical context to About this data.
+- Add a local workspace service with saved dispositions and Complete/Defer/Dismiss/
+  Reopen actions, dated deferral, answers, revision checks and decision history.
+
+- Fix local workspace availability after a chat/launcher closes: background mode
+  starts a macOS user service, verifies readiness and reuses the running workspace.
+
+- Add review-and-save of revised per-copy ranges directly from Estimate research
+  tasks. Update book displays immediately, complete the task atomically, and retain
+  estimate history and the original asking-price evidence.

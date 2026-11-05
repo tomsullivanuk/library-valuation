@@ -249,3 +249,11 @@ solving observed problems rather than anticipated ones.
 Every release should help the steward answer one question more effectively:
 
 > What is the next best use of my time?
+
+## November 2026 workspace iteration
+
+A local loopback service now adds explicit saved dispositions and action decisions
+to the generated workspace baseline. The agreed scope and acceptance behavior are
+recorded in [the November workspace review](WORKSPACE_REVIEW_20261104.md). Offline
+HTML remains read-only; imports and inventory identity corrections continue through
+the established evidence-preserving workflows.

@@ -28,6 +28,7 @@ class StewardWorkspaceRenderError(ValueError):
 @dataclass(frozen=True)
 class ExploreQuery:
     search: str = ""
+    collection_scope: str = "default"
     inventory_status: str = ""
     acquisition_status: str = ""
     market_evidence_status: str = ""
@@ -190,6 +191,9 @@ def build_recommendation_queues(
     """Organize existing advisory records without creating new domain guidance."""
 
     books = {row.catalog_item_id: row for row in presentation.books}
+    scope = presentation.completed_inventory
+    current_observations = set(scope.unresolved_observation_ids)
+    current_observations.update(h.latest_inventory_observation_id for h in presentation.holdings if h.holding_id in scope.holding_ids)
     holdings = {row.holding_id: row for row in presentation.holdings}
     observations = {
         row.inventory_observation_id: row for row in presentation.observations
@@ -199,6 +203,15 @@ def build_recommendation_queues(
         key: [] for key, _, _ in _QUEUE_DEFINITIONS
     }
     for row in presentation.recommendations:
+        if (presentation.completed_inventory.completed
+                and row.entity_type == "catalog_item"
+                and row.entity_id not in presentation.completed_inventory.catalog_item_ids):
+            continue
+        if scope.completed and (
+            (row.entity_type == "holding" and row.entity_id not in scope.holding_ids)
+            or (row.entity_type == "inventory_observation" and row.entity_id not in current_observations)
+        ):
+            continue
         if row.recommendation_id in seen:
             continue
         seen.add(row.recommendation_id)
@@ -327,16 +340,26 @@ def query_explore(
     """Return deterministic catalog IDs using the Explore client's semantics."""
 
     normalized_search = query.search.strip().casefold()
+    scope = presentation.completed_inventory
+    selected_scope = query.collection_scope
+    if selected_scope == "default":
+        selected_scope = "present" if scope.completed else "all"
+    if selected_scope not in {"present", "history", "all"}:
+        raise ValueError("Unknown collection scope")
+    active_ids = set(scope.catalog_item_ids)
     rows = [
         book
         for book in presentation.books
-        if _matches_book(presentation, book, query, normalized_search)
+        if (selected_scope == "all"
+            or (selected_scope == "present" and book.catalog_item_id in active_ids)
+            or (selected_scope == "history" and book.catalog_item_id not in active_ids))
+        and _matches_book(presentation, book, query, normalized_search)
     ]
     rows.sort(key=lambda book: _book_sort_key(book, query.sort_by))
     return tuple(book.catalog_item_id for book in rows)
 
 
-def render_steward_workspace(presentation: StewardPresentation) -> bytes:
+def render_steward_workspace(presentation: StewardPresentation, *, action_items=()) -> bytes:
     """Render deterministic HTML bytes without reading or writing project state."""
 
     if presentation.snapshot.model_version != PRESENTATION_MODEL_VERSION:
@@ -377,6 +400,7 @@ def render_steward_workspace(presentation: StewardPresentation) -> bytes:
         _DOCUMENT.replace("__WORKSPACE_DATA__", embedded_json)
         .replace("__WORKSPACE_RECOMMENDATIONS__", recommendation_json)
         .replace("__WORKSPACE_REPORTS__", report_json)
+        .replace("__WORKSPACE_ACTIONS__", json.dumps(list(action_items), ensure_ascii=True).replace("<", "\\u003c").replace("&", "\\u0026"))
         .replace("__RENDERER_VERSION__", WORKSPACE_RENDERER_VERSION)
         .encode("utf-8")
     )
@@ -434,6 +458,7 @@ def _matches_book(
         book.title,
         book.author,
         book.publisher,
+        book.description,
         *book.holding_ids,
         *book.acquisition_ids,
     )
@@ -473,6 +498,8 @@ _DOCUMENT = r"""<!doctype html>
       --warning-bg: #fff2d6;
       --focus: #1b6fc2;
       --shadow: 0 1px 2px rgba(32, 37, 31, .05);
+      --page-gutter: clamp(1rem, 4vw, 3rem);
+      --content-inset: calc(var(--page-gutter) + 6.6rem);
     }
     * { box-sizing: border-box; }
     body {
@@ -501,26 +528,24 @@ _DOCUMENT = r"""<!doctype html>
     header {
       background: white;
       color: var(--ink);
-      padding: .6rem clamp(1rem, 4vw, 3rem);
+      padding: .6rem calc(var(--page-gutter) + .85rem);
       border-bottom: 1px solid var(--line);
     }
     .brand {
       display: flex;
       align-items: baseline;
-      justify-content: space-between;
+      justify-content: flex-start;
       gap: 1rem;
-      max-width: 86rem;
-      margin: auto;
+      margin: 0;
     }
     .brand strong { font-family: Georgia, serif; font-size: 1.15rem; }
-    .read-only { font-size: .88rem; }
     nav {
       position: sticky;
       top: 0;
       z-index: 5;
       display: flex;
       gap: .25rem;
-      padding: .3rem clamp(1rem, 4vw, 3rem);
+      padding: .3rem var(--page-gutter);
       overflow-x: auto;
       background: var(--surface);
       border-bottom: 1px solid var(--line);
@@ -531,6 +556,7 @@ _DOCUMENT = r"""<!doctype html>
       text-decoration: none;
       white-space: nowrap;
     }
+    nav a:first-child { flex: 0 0 5.5rem; }
     nav a[aria-current="page"] {
       background: var(--brand);
       color: white;
@@ -542,10 +568,10 @@ _DOCUMENT = r"""<!doctype html>
       cursor: not-allowed;
     }
     main {
-      max-width: 86rem;
+      max-width: 100rem;
       min-height: 60vh;
-      margin: auto;
-      padding: .65rem clamp(1rem, 4vw, 3rem) 2rem;
+      margin: 0;
+      padding: .65rem var(--page-gutter) 2rem var(--content-inset);
     }
     h1, h2, h3 { font-family: Georgia, serif; line-height: 1.2; }
     h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin-top: 0; }
@@ -595,9 +621,19 @@ _DOCUMENT = r"""<!doctype html>
     .search-row { max-width: 50rem; }
     .filter-row {
       display: grid;
-      grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+      grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
       gap: .55rem;
       align-items: end;
+    }
+    .filter-row.report-filters { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
+    .clear-filters {
+      justify-self: start;
+      width: auto;
+      min-height: 0;
+      height: 1.5rem;
+      line-height: 1;
+      padding: 0 .7rem;
+      font-size: .9rem;
     }
     .library-actions {
       display: flex;
@@ -726,7 +762,20 @@ _DOCUMENT = r"""<!doctype html>
       color: var(--brand-dark);
       border: 1px solid var(--brand);
     }
+    .disposition-editor {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .55rem;
+      margin-bottom: .75rem;
+    }
+    .disposition-editor select { width: auto; min-width: 10rem; max-width: 100%; }
+    .disposition-editor button { flex: 0 0 auto; min-height: 0; padding: 0 .7rem; line-height: 1; }
+    .disposition-editor [role="status"] { flex-basis: 100%; margin: 0; }
+    .estimate-editor { display: grid; gap: .6rem; max-width: 48rem; }
+    .estimate-preview button { margin: .4rem .5rem .4rem 0; }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
+    .detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark); margin-bottom: .35rem; }
     dl {
       display: grid;
       grid-template-columns: minmax(9rem, auto) 1fr;
@@ -755,12 +804,13 @@ _DOCUMENT = r"""<!doctype html>
     }
     @media (max-width: 70rem) {
       .controls { grid-template-columns: repeat(2, minmax(12rem, 1fr)); }
-      .filter-row { grid-template-columns: repeat(3, minmax(10rem, 1fr)); }
+      .filter-row { grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto; }
     }
     @media (max-width: 42rem) {
       .brand, .results-header, .detail-heading { display: block; }
       .controls { grid-template-columns: 1fr; }
-      .filter-row { grid-template-columns: 1fr; }
+      .filter-row, .filter-row.report-filters { grid-template-columns: 1fr; }
+      main { padding-left: var(--page-gutter); }
       .library-card { grid-template-columns: 1fr; }
       .library-actions .export-action { margin-left: 0; }
       dl { grid-template-columns: 1fr; }
@@ -778,23 +828,23 @@ _DOCUMENT = r"""<!doctype html>
   <header>
     <div class="brand">
       <strong>Library Valuation</strong>
-      <span class="read-only">Read-only Steward Workspace — changes are not saved</span>
     </div>
   </header>
   <nav aria-label="Primary">
     <a href="#library" data-nav="library">Library</a>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
-    <span aria-disabled="true" title="Settings are not available in this read-only release">Settings</span>
+    <a href="#actions" data-nav="actions">Action Items</a>
+    <a href="#reports" data-nav="reports">Reports</a>
+    <a href="#settings" data-nav="settings">Settings</a>
   </nav>
   <main id="main-content" tabindex="-1"></main>
   <footer>
-    <p>This generated workspace is a view of project evidence. It does not save
-      decisions, preferences, or changes to the catalog, inventory, acquisitions,
-      or reviews. <a href="#about">About this data</a></p>
+    <p id="save-status">Open the local workspace to save decisions. <a href="#about">About this data</a></p>
   </footer>
   <noscript>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
+  <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
   <script id="report-data" type="application/json">__WORKSPACE_REPORTS__</script>
@@ -804,6 +854,13 @@ _DOCUMENT = r"""<!doctype html>
     const DATA = JSON.parse(document.getElementById("workspace-data").textContent);
     const QUEUES = JSON.parse(document.getElementById("recommendation-data").textContent);
     const REPORT_GROUPS = JSON.parse(document.getElementById("report-data").textContent);
+    let workspaceState = {connected:false, revision:0, token:"", dispositions:{}, actions:JSON.parse(document.getElementById("action-data").textContent)};
+    let actionFilter = "open";
+    let actionCategory = "Book checks";
+    let actionLimit = 50;
+    let libraryFilterObserver = null;
+    let dispositionObserver = null;
+    let estimateSaveMessage = "";
     const main = document.getElementById("main-content");
     const index = {
       books: new Map(DATA.books.map(row => [row.catalog_item_id, row])),
@@ -831,7 +888,11 @@ _DOCUMENT = r"""<!doctype html>
       for (const child of children) if (child) parent.append(child);
       return parent;
     }
-    function clear() { main.replaceChildren(); }
+    function clear() {
+      if (libraryFilterObserver) { libraryFilterObserver.disconnect(); libraryFilterObserver = null; }
+      if (dispositionObserver) { dispositionObserver.disconnect(); dispositionObserver = null; }
+      main.replaceChildren();
+    }
     function valueOrUnknown(value) { return value || "Not recorded"; }
     function human(value) {
       if (!value) return "Unknown";
@@ -1017,11 +1078,16 @@ _DOCUMENT = r"""<!doctype html>
       append(label, select);
       return label;
     }
+    const completedInventory = DATA.completed_inventory;
+    const activeCatalogIds = new Set(completedInventory.catalog_item_ids);
     const libraryState = {
+      scope: completedInventory.completed ? "present" : "",
       search: "", acquisition: "", market: "", location: "",
       sort: "title", sortDirection: 1, visibleBooks: []
     };
     function bookMatches(book, state) {
+      if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id)) return false;
+      if (state.scope === "history" && activeCatalogIds.has(book.catalog_item_id)) return false;
       if (state.acquisition && book.acquisition_status !== state.acquisition) return false;
       if (state.market && book.resale_market_status !== state.market) return false;
       if (state.location === "__not_recorded__" && book.location_values.length) return false;
@@ -1029,7 +1095,7 @@ _DOCUMENT = r"""<!doctype html>
       if (!state.search) return true;
       const searchable = [
         book.catalog_item_id, book.isbn13, book.isbn10, book.title, book.author,
-        book.publisher, ...book.holding_ids, ...book.acquisition_ids
+        book.publisher, book.description, ...book.holding_ids, ...book.acquisition_ids
       ].join(" ").toLocaleLowerCase();
       return searchable.includes(state.search);
     }
@@ -1079,7 +1145,194 @@ _DOCUMENT = r"""<!doctype html>
           .localeCompare(rightKey.map(value => String(value).toLocaleLowerCase()).join("\u0000")) * direction;
       };
     }
-    function renderLibrary() {
+    function displayLocation(value) { return String(value || "").replace(/^Box\s+/i, ""); }
+    function distinctTitles() {
+      const ids = new Set(completedInventory.unresolved_observation_ids);
+      for (const h of DATA.holdings) if (completedInventory.holding_ids.includes(h.holding_id)) ids.add(h.latest_inventory_observation_id);
+      return new Set(DATA.observations.filter(o => ids.has(o.inventory_observation_id) && o.title.trim()).map(o => o.title.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim())).size;
+    }
+    function dispositionValue(value) { return ["gift", "donate"].includes(value) ? "gift_donate" : value; }
+    function dispositionText(value) { return dispositionValue(value) === "gift_donate" ? "Gift / Donate" : human(value); }
+    function dispositionLabel(book) {
+      const value = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
+      return value && value !== "information_not_included" ? dispositionText(value) : "";
+    }
+    function applyEstimateUpdates() {
+      for (const [id, values] of Object.entries(workspaceState.estimate_updates || {})) {
+        const book = index.books.get(id);
+        if (book) Object.assign(book, values);
+      }
+    }
+    async function connectWorkspace() {
+      const footer = document.getElementById("save-status");
+      if (!/^https?:$/.test(location.protocol)) {
+        footer.replaceChildren(node("a", {href:"http://127.0.0.1:8765"}, "Open the local workspace to save decisions"), document.createTextNode(" • "), routeLink("About this data", "about"));
+        return;
+      }
+      try {
+        const response = await fetch("/api/state", {cache:"no-store"});
+        if (!response.ok) throw new Error("The local saving service is unavailable.");
+        workspaceState = {...await response.json(), connected:true};
+        applyEstimateUpdates();
+        footer.replaceChildren(document.createTextNode("Decisions are saved in your project records. "), routeLink("About this data", "about"));
+        renderRoute();
+      } catch (error) {
+        footer.textContent = "Saving is unavailable. Open the local workspace service and reload.";
+      }
+    }
+    async function saveWorkspace(change, status, button) {
+      if (!workspaceState.connected) return;
+      button.disabled = true; status.textContent = "Saving…";
+      try {
+        const response = await fetch("/api/state", {method:"POST", headers:{"Content-Type":"application/json", "X-Workspace-Token":workspaceState.token}, body:JSON.stringify({...change, revision:workspaceState.revision})});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "The change could not be saved.");
+        workspaceState = {...result, connected:true};
+        applyEstimateUpdates();
+        status.textContent = "Saved.";
+        return true;
+      } catch (error) { status.textContent = error.message; return false; }
+      finally { button.disabled = !workspaceState.connected; }
+    }
+    function acquisitionCost(value, currency) {
+      if (value == null || String(value).trim() === "" || !Number.isFinite(Number(value))) return "Not recorded";
+      const amount = Number(value);
+      if (!currency) return String(value);
+      try {
+        return new Intl.NumberFormat("en-US", {style:"currency", currency,
+          minimumFractionDigits:Number.isInteger(amount) ? 0 : 2, maximumFractionDigits:2}).format(amount);
+      } catch (_) { return `${currency} ${value}`; }
+    }
+    function acquisitionFacts(a) {
+      const source = a.source.trim().toLocaleLowerCase() === "amazon" ? "Amazon" : a.source;
+      const facts = [["Source", source], ["Date", a.order_date.slice(0, 10)], ["Quantity", a.quantity], ["Cost per copy", acquisitionCost(a.item_price, a.currency)]];
+      if (Number(a.quantity) !== 1) facts.push(["Subtotal", acquisitionCost(a.item_subtotal, a.currency)]);
+      return facts;
+    }
+    function dispositionEditor(book) {
+      const form = node("form", {class:"disposition-editor"});
+      const select = node("select", {"aria-label":"Disposition"});
+      const choices = [...(workspaceState.disposition_choices || ["", "keep", "sell", "gift_donate", "recycle", "undecided"])];
+      const saved = dispositionValue(Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition);
+      if (saved && !choices.includes(saved) && saved !== "information_not_included") choices.push(saved);
+      for (const value of choices) append(select, node("option", {value}, value ? dispositionText(value) : "Not assigned"));
+      select.value = saved === "information_not_included" ? "" : saved;
+      const button = node("button", {type:"submit"}, "Save"); button.disabled = !workspaceState.connected;
+      const status = node("p", {role:"status", "aria-live":"polite"}, workspaceState.connected ? "" : "Open the local workspace to save a disposition.");
+      append(form, select, button, status);
+      const matchDispositionSize = () => {
+        const rect = select.getBoundingClientRect();
+        if (rect.width > 0) { button.style.width = `${rect.width}px`; button.style.height = `${rect.height}px`; }
+      };
+      dispositionObserver = new ResizeObserver(matchDispositionSize);
+      dispositionObserver.observe(select);
+      form.addEventListener("submit", async event => { event.preventDefault(); await saveWorkspace({kind:"disposition", id:book.catalog_item_id, value:select.value}, status, button); });
+      return form;
+    }
+    function estimateEditor(task, note) {
+      const book = index.books.get(task.catalog_item_id);
+      const form = node("form", {class:"panel estimate-editor"});
+      append(form, node("p", {}, "Enter a per-copy value range. Add your research findings above and source links below, then review before saving."));
+      function field(label, element) { const row=node("label", {}, label); append(row,element); append(form,row); return element; }
+      const low=field("Low estimate",node("input", {type:"number",min:"0",step:"0.01",required:"", "aria-label":"Low estimate"}));
+      const high=field("High estimate",node("input", {type:"number",min:"0",step:"0.01",required:"", "aria-label":"High estimate"}));
+      low.value=book.estimated_value_precise_low || ""; high.value=book.estimated_value_precise_high || "";
+      const currency=field("Currency",node("select", {"aria-label":"Estimate currency"}));
+      for (const value of workspaceState.estimate_currencies || ["USD"]) append(currency,node("option",{value},value));
+      currency.value=book.estimated_value_currency || "USD";
+      const researched=field("Research date",node("input", {type:"date",required:"", "aria-label":"Estimate research date"}));
+      researched.value=book.reviewed_estimate_date || new Date().toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
+      const sources=field("Source links (one per line, where available)",node("textarea",{rows:"3", "aria-label":"Estimate source links"}));
+      sources.value=(book.reviewed_estimate_sources || []).join("\n");
+      const review=node("button",{type:"submit"},"Review estimate"); review.disabled=!workspaceState.connected;
+      const preview=node("div", {class:"estimate-preview"}); const status=node("p",{role:"status","aria-live":"polite"});
+      append(form,review,preview,status);
+      form.addEventListener("input",()=>preview.replaceChildren());
+      note.addEventListener("input",()=>preview.replaceChildren());
+      form.addEventListener("submit",event=>{
+        event.preventDefault(); status.textContent="";
+        if (!workspaceState.connected) { status.textContent="Open the local workspace before saving an estimate."; return; }
+        if (!note.value.trim()) { status.textContent="Explain the basis for the estimate in Answer or note above."; note.focus(); return; }
+        if (Number(low.value)>Number(high.value)) { status.textContent="The low estimate must not exceed the high estimate."; return; }
+        const payload={kind:"estimate", id:task.id, fingerprint:task.fingerprint,
+          book_identity:workspaceState.book_identities[book.catalog_item_id],
+          previous_estimate_review_id:book.reviewed_estimate_id || "", reviewed:true,
+          low:low.value, high:high.value, currency:currency.value, researched_on:researched.value,
+          source_urls:sources.value.split(/\n/).map(value=>value.trim()).filter(Boolean), note:note.value};
+        preview.replaceChildren();
+        append(preview,node("h3",{},"Confirm the revised range"),definitionList([
+          ["Book",book.title],["Previous range",book.resale_market_summary],
+          ["Revised range",`${acquisitionCost(low.value,currency.value)}–${acquisitionCost(high.value,currency.value)} per copy`],
+          ["Research date",researched.value],["Source links",payload.source_urls.join("; ") || "None provided"],["Basis",payload.note]]),
+          node("p",{},"Saving updates the book's range and completes this research task. Earlier estimates and source evidence remain in history."));
+        const save=node("button",{type:"button",class:"primary"},"Save estimate and complete task");
+        save.addEventListener("click",async()=>{
+          if (await saveWorkspace(payload,status,save)) { estimateSaveMessage="Revised estimate saved. The book's value range is updated and this research task is complete."; renderActions(task.id); }
+        });
+        const edit=node("button",{type:"button"},"Back to editing"); edit.addEventListener("click",()=>{preview.replaceChildren();low.focus();});
+        append(preview,save,edit);
+      });
+      return form;
+    }
+    function actionStatus(task) {
+      if (task.status === "deferred" && task.deferred_until <= new Date().toLocaleDateString("en-CA", {timeZone:"America/Chicago"})) return "open";
+      return task.status || "open";
+    }
+    function renderActions(selectedId = "") {
+      const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
+      if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
+      clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
+      if (estimateSaveMessage) { append(main,node("p",{role:"status","aria-live":"polite"},estimateSaveMessage)); estimateSaveMessage=""; }
+      if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
+      const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
+      filter.querySelector("select").value = actionFilter;
+      filter.addEventListener("change", () => { actionFilter = filter.querySelector("select").value; renderActions(); });
+      append(main, filter);
+      const category = selectControl("action-category", "Task type", [...new Set(workspaceState.actions.map(t => t.category))], value => value);
+      category.querySelector("select").value = actionCategory;
+      category.addEventListener("change", () => { actionCategory = category.querySelector("select").value; actionLimit = 50; renderActions(); });
+      append(main, category);
+      const tasks = workspaceState.actions.filter(task => selectedId ? task.id === selectedId : (!actionFilter || actionStatus(task) === actionFilter) && (!actionCategory || task.category === actionCategory));
+      append(main, node("p", {role:"status"}, `${tasks.length.toLocaleString()} items`));
+      if (!tasks.length) append(main, node("p", {class:"empty"}, "No items in this view."));
+      for (const task of tasks.slice(0, actionLimit)) {
+        const card = node("article", {class:"panel"});
+        append(card, node("h2", {}, task.title), node("p", {class:"muted"}, `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, task.action));
+        if (task.reason) append(card, definitionList([["Why", task.reason]]));
+        if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+        if (task.search_links?.length) {
+          const searches = node("div", {class:"card-actions"});
+          for (const link of task.search_links) append(searches, node("a", {href:link.url, target:"_blank", rel:"noopener noreferrer", class:"button-link secondary"}, link.label));
+          append(card, searches);
+        }
+        if (task.evidence) append(card, detailSection("Recorded evidence", node("p", {}, task.evidence)));
+        const noteLabel = node("label", {}, "Answer or note "); const note = node("textarea", {rows:"2", "aria-label":`Answer or note for ${task.title}`}); note.value = task.note || ""; append(noteLabel, note);
+        const dateLabel = node("label", {}, "Defer until "); const until = node("input", {type:"date", "aria-label":`Defer until for ${task.title}`}); until.value = task.deferred_until || ""; append(dateLabel, until);
+        append(card, noteLabel, dateLabel);
+        if (task.category === "Estimate research" && index.books.has(task.catalog_item_id)) append(card,detailSection("Review and save a revised estimate",estimateEditor(task,note)));
+        const status = node("p", {role:"status", "aria-live":"polite"});
+        const buttons = node("div", {class:"card-actions"});
+        for (const [value, text] of [["complete","Complete"],["deferred","Defer"],["dismissed","Dismiss"],["open","Reopen"]]) {
+          const button = node("button", {type:"button"}, text); button.disabled = !workspaceState.connected;
+          button.addEventListener("click", async () => { await saveWorkspace({kind:"action", id:task.id, fingerprint:task.fingerprint, status:value, deferred_until:until.value, note:note.value}, status, button); if (status.textContent === "Saved.") { renderActions(selectedId); } });
+          append(buttons, button);
+        }
+        append(card, buttons, status, routeLink("View book or inventory record", task.route));
+        append(main, card);
+      }
+      if (tasks.length > actionLimit) {
+        const more = node("button", {type:"button"}, "Show next 50");
+        more.addEventListener("click", () => { actionLimit += 50; renderActions(selectedId); });
+        append(main, more);
+      }
+    }
+    function renderSettings() {
+      clear(); heading("Settings", "Your workspace and saved decisions");
+      append(main, node("p", {}, workspaceState.connected ? "Saving is connected. Dispositions and action statuses are stored with the project and survive workspace regeneration." : "Saving is disconnected. Start the local workspace service to edit decisions."), node("p", {}, "Library browsing defaults to physically inventoried books. Historical and all-record views are available under Reports."), routeLink("About this data", "about"));
+    }
+
+    function renderLibrary(reportScope = "") {
+      libraryState.scope = reportScope || (completedInventory.completed ? "present" : "");
       clear();
       const controls = node("form", {class: "library-controls", role: "search"});
       const searchRow = node("div", {class: "search-row"});
@@ -1087,23 +1340,34 @@ _DOCUMENT = r"""<!doctype html>
       const search = node("input", {
         id: "library-search",
         type: "search",
-        placeholder: "Title, author, ISBN, publisher, or ID",
+        placeholder: "Title, author, ISBN, publisher, or description",
         autocomplete: "off"
       });
       search.value = libraryState.search;
       append(searchLabel, search);
       append(searchRow, searchLabel);
       const filterRow = node("div", {class: "filter-row"});
-      const acquisition = selectControl("acquisition-filter", "Acquired", statusOptions("acquisition_status"), value => evidenceStatus("acquisition", value));
+
       const market = selectControl("market-filter", "Resale market", statusOptions("resale_market_status"), value => ({
         estimate_available: "Estimate available",
         no_reliable_estimate: "No reliable estimate",
         not_researched: "Not researched"
       })[value] || statusLabel(value));
-      const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right));
+      const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right, undefined, {numeric:true}));
       const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
-      const clearButton = node("button", {type: "button"}, "Clear");
-      append(filterRow, acquisition, market, location, clearButton);
+      const clearButton = node("button", {type: "button", class: "clear-filters"}, "Clear");
+      if (completedInventory.completed) {
+        if (reportScope) {
+          filterRow.classList.add("report-filters");
+          const scope = selectControl("library-scope", "Report collection", ["present", "history"], value => ({present: "Physically inventoried books", history: "Historical records"})[value]);
+          scope.querySelector("option").textContent = "All records including history";
+          scope.querySelector("select").value = reportScope === "all" ? "" : reportScope;
+          append(filterRow, scope);
+        } else {
+          append(controls, node("p", {class: "lede"}, `${completedInventory.source_copies.toLocaleString()} physical books, ${distinctTitles().toLocaleString()} distinct recorded titles`));
+        }
+      }
+      append(filterRow, market, location, clearButton);
       append(controls, searchRow, filterRow);
       const marketSource = DATA.snapshot.sources.find(source => source.source_key === "market_evidence");
       if (marketSource && marketSource.status !== "current") {
@@ -1112,7 +1376,7 @@ _DOCUMENT = r"""<!doctype html>
           node("p", {class: "muted"}, `Resale-market information: ${statusLabel(marketSource.status)}. ${sourceStatusExplanation(marketSource.status)}`)
         );
       }
-      for (const [id, value] of [["acquisition-filter", libraryState.acquisition], ["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
+      for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
       const actions = node("div", {class: "library-actions"});
       const sortNames = {
         title: "Title",
@@ -1141,10 +1405,16 @@ _DOCUMENT = r"""<!doctype html>
       append(actions, sort, count, exportButton);
       const results = node("div", {id: "library-results"});
       append(main, controls, actions, results);
+      const filterSelect = market.querySelector("select");
+      const matchFilterHeight = () => { clearButton.style.height = `${filterSelect.getBoundingClientRect().height}px`; };
+      libraryFilterObserver = new ResizeObserver(matchFilterHeight);
+      libraryFilterObserver.observe(filterSelect);
+      matchFilterHeight();
 
       function update() {
+        if (reportScope) libraryState.scope = controls.querySelector("#library-scope").value;
         libraryState.search = search.value.trim().toLocaleLowerCase();
-        libraryState.acquisition = controls.querySelector("#acquisition-filter").value;
+        libraryState.acquisition = "";
         libraryState.market = controls.querySelector("#market-filter").value;
         libraryState.location = controls.querySelector("#location-filter").value;
         sortSummary.textContent = `Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
@@ -1152,7 +1422,7 @@ _DOCUMENT = r"""<!doctype html>
         libraryState.visibleBooks = books;
         results.replaceChildren();
         const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
-        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "book" : "books"}${filtered ? " match" : ""}`;
+        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
         if (!books.length) {
           append(results, node("p", {class: "empty"}, "No books match these filters."));
           return;
@@ -1166,6 +1436,7 @@ _DOCUMENT = r"""<!doctype html>
       clearButton.addEventListener("click", () => {
         search.value = "";
         for (const select of controls.querySelectorAll("select")) select.value = "";
+        if (reportScope) controls.querySelector("#library-scope").value = "present";
         libraryState.sort = "title";
         libraryState.sortDirection = 1;
         update();
@@ -1193,11 +1464,12 @@ _DOCUMENT = r"""<!doctype html>
         node("p", {class: "muted"}, valueOrUnknown(book.author))
       );
       if (publication) append(identity, node("p", {class: "publication-line"}, publication));
+      if (book.isbn13 || book.isbn10) append(identity, node("p", {class: "publication-line"}, `ISBN ${book.isbn13 || book.isbn10}`));
       if (book.copy_count > 1) append(identity, node("p", {class: "publication-line"}, `${book.copy_count} copies`));
       const conclusionRows = [
         ["Location", book.location_summary],
         ["Acquired", book.purchase_summary],
-        ["Disposition", human(book.disposition)]
+        ["Disposition", dispositionLabel(book)]
       ];
       if (book.resale_market_card_summary) {
         conclusionRows.splice(2, 0, ["Resale market", book.resale_market_card_summary]);
@@ -1232,59 +1504,59 @@ _DOCUMENT = r"""<!doctype html>
       clear();
       append(main, routeLink("← Back to Library", "library"));
       const title = node("div", {class: "detail-heading"});
-      append(title, node("h1", {}, valueOrUnknown(book.title)), node("span", {class: "badge", title: "Stable catalog reference"}, book.catalog_item_id));
+      append(title, node("h1", {}, valueOrUnknown(book.title)), node("span"));
       append(main, title, node("p", {class: "lede"}, valueOrUnknown(book.author)));
+      if (completedInventory.completed && !activeCatalogIds.has(bookId)) append(main, node("p", {class: "notice"}, "Outside the completed physical inventory. Presumed no longer present; purchase history is preserved. An unresolved inventory entry may still match this record. No disposal has been recorded."));
       append(
         main,
         definitionList([
           ["Publisher", book.publisher],
           ["Publication year", book.publication_year],
-          ["ISBN-13", book.isbn13],
-          ["ISBN-10", book.isbn10],
-          ["Physical holdings", String(book.holding_ids.length)]
+          ["ISBN", book.isbn13 || book.isbn10]
         ])
       );
       if (book.description) {
         append(main, node("p", {class: "panel"}, book.description));
       }
-      const context = node("div");
-      append(
-        context,
-        node("p", {}, "These labels describe the information included here. Information that is not included should not be treated as proof that a book or record does not exist."),
-        append(
-          node("div", {class: "badges"}),
-          badge("Physical copy", book.inventory_status, evidenceStatus("inventory", book.inventory_status)),
-          badge("Acquired", book.acquisition_status, evidenceStatus("acquisition", book.acquisition_status)),
-          badge("Research priority", book.assessment_status),
-          badge("Market research", book.market_evidence_status, evidenceStatus("market", book.market_evidence_status))
-        )
-      );
-      if (book.recommendation_ids.length) {
-        append(context, node("p", {class: "notice"}, `${book.recommendation_ids.length} item${book.recommendation_ids.length === 1 ? "" : "s"} need attention for this book.`));
-        append(context, linkList(book.recommendation_ids.map((id, index) => [`Review item ${index + 1}`, `recommendation/${encodeURIComponent(id)}`])));
+      append(main, definitionList([["Location", book.location_summary], ["Copies", String(book.copy_count)], ["Acquired", book.purchase_summary], ["Resale market", book.resale_market_summary]]));
+      append(main, node("h2", {}, "Disposition"), dispositionEditor(book));
+      append(main, node("h2", {}, "Physical copies"));
+      const currentHoldings = book.holding_ids.map(id => index.holdings.get(id)).filter(Boolean).filter(h => !completedInventory.completed || completedInventory.holding_ids.includes(h.holding_id));
+      if (!currentHoldings.length) append(main, node("p", {}, "No current physical copy is linked."));
+      for (const h of currentHoldings) append(main, definitionList([["Location", displayLocation(h.source_collection_label || h.current_location_id)], ["Copies", h.copies], ["Last inventoried", h.last_verified_at.slice(0, 10)]]));
+      append(main, node("h2", {}, "Acquisition history"));
+      if (!book.acquisition_ids.length) append(main, node("p", {}, "No acquisition record is linked. The book may have come from another source."));
+      for (const ref of book.acquisition_ids) {
+        const a = index.acquisitions.get(ref);
+        if (a) append(main, definitionList(acquisitionFacts(a)));
       }
-      append(main, detailSection("Steward context", context, true));
-
-      const evidence = node("div");
-      if (book.holding_ids.length) append(evidence, node("h3", {}, "Physical copies"), linkList(book.holding_ids.map((id, index) => [`View physical copy ${index + 1}`, `holding/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.inventory_status === "unavailable" ? "Physical inventory was not included in this workspace." : "This book is not currently located."));
-      if (book.acquisition_ids.length) append(evidence, node("h3", {}, "Acquisition history"), linkList(book.acquisition_ids.map((id, index) => [`View acquisition record ${index + 1}`, `acquisition/${encodeURIComponent(id)}`])));
-      else append(evidence, node("p", {}, book.acquisition_status === "unavailable" ? "Acquisition history was not included in this workspace." : "No acquisition record is linked. The book may have come from another source."));
-      if (book.assessment_id) append(evidence, node("h3", {}, "Research priority"), linkList([["View research priority", `assessment/${encodeURIComponent(book.assessment_id)}`]]));
-      if (book.market_evidence_id) append(evidence, node("h3", {}, "Market evidence"), linkList([["View market summary", `market/${encodeURIComponent(book.market_evidence_id)}`]]));
-      if (book.steward_review_id) append(evidence, node("h3", {}, "Steward review"), linkList([["View steward review", `review/${encodeURIComponent(book.steward_review_id)}`]]));
-      append(main, detailSection("Evidence", evidence));
-
-      const provenance = node("div");
-      append(
-        provenance,
-        definitionList([
-          ["Catalog item ID", book.catalog_item_id],
-          ["Workspace snapshot", DATA.snapshot.snapshot_id],
-          ["Presentation model", DATA.snapshot.model_version]
-        ])
-      );
-      append(main, detailSection("Technical provenance", provenance));
+      if (book.reviewed_estimate_id) {
+        append(main,node("h2",{},"Your reviewed estimate"),definitionList([["Range",book.resale_market_summary],["Research date",book.reviewed_estimate_date],["Your notes",book.reviewed_estimate_note]]));
+        if (book.reviewed_estimate_sources?.length) {
+          const sources=node("ul",{class:"link-list"});
+          book.reviewed_estimate_sources.forEach((url,index)=>append(sources,append(node("li"),node("a",{href:url,target:"_blank",rel:"noopener noreferrer"},`Research source ${index+1}`))));
+          append(main,sources);
+        }
+        const history=workspaceState.estimate_history?.[bookId] || [];
+        if (history.length) {
+          const entries=node("div");
+          for (const row of [...history].reverse()) append(entries,definitionList([
+            ["Range",`${acquisitionCost(row.low,row.currency)}–${acquisitionCost(row.high,row.currency)}`],
+            ["Research date",row.researched_on],["Saved",row.saved_at.slice(0,10)],["Notes",row.note],
+            ["Sources",(row.source_urls || []).join("; ") || "None provided"]]));
+          append(main,detailSection("Estimate history",entries));
+        }
+      }
+      append(main, node("h2", {}, "Market research"));
+      const market = index.market.get(book.market_evidence_id);
+      if (market) append(main, definitionList([[book.reviewed_estimate_id ? "Original asking-price range" : "Estimate", book.reviewed_estimate_id ? (market.likely_low && market.likely_high ? `${acquisitionCost(market.likely_low,market.currency)}–${acquisitionCost(market.likely_high,market.currency)}` : acquisitionCost(market.likely_mid || market.likely_low || market.likely_high,market.currency)) : book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
+      else append(main, node("p", {}, "Not researched."));
+      const tasks = workspaceState.actions.filter(task => task.catalog_item_id === bookId);
+      if (tasks.length) {
+        append(main, node("h2", {}, book.usable_market_estimate ? "Action items" : "Next steps"));
+        for (const task of tasks) append(main, routeLink(`${task.action} — ${human(actionStatus(task))}`, `actions/${encodeURIComponent(task.id)}`));
+      }
+      append(main, routeLink("About this record", `about/${encodeURIComponent(bookId)}`));
     }
 
     function renderHolding(holdingId) {
@@ -1298,7 +1570,7 @@ _DOCUMENT = r"""<!doctype html>
         ["Inventory status", statusLabel(holding.inventory_status)],
         ["Copies represented", holding.copies],
         ["Record type", human(holding.holding_state_type)],
-        ["Current believed location", holding.current_location_id],
+        ["Location", displayLocation(holding.source_collection_label || holding.current_location_id)],
         ["Collection label from source", holding.source_collection_label],
         ["Last verified", holding.last_verified_at],
         ["Area checked", holding.verification_scope],
@@ -1344,7 +1616,7 @@ _DOCUMENT = r"""<!doctype html>
         ["Priority band", row.priority_band],
         ["Priority score", row.priority_score],
         ["Signal count", row.signal_count],
-        ["Signal summary", row.signal_summary],
+        ["Why", row.signal_explanation],
         ["Assessment status", row.assessment_status],
         ["Assessed at", row.assessed_at]
       ]));
@@ -1378,14 +1650,14 @@ _DOCUMENT = r"""<!doctype html>
       heading("Market evidence summary", id);
       append(main, definitionList([
         ["Freshness", human(row.status)],
-        ["Evidence status", human(row.evidence_status)],
+        ["Evidence status", row.evidence_status_display || human(row.evidence_status)],
         ["Observed sources", row.observed_sources],
         ["Listings", row.listing_count],
-        ["Confidence", human(row.market_confidence)],
+        ["Confidence", row.confidence_display || human(row.market_confidence)],
         ["Likely range", [row.likely_low, row.likely_mid, row.likely_high].filter(Boolean).join(" / ")],
         ["Currency", row.currency],
         ["Existing review guidance", row.review_recommendation],
-        ["Reason", row.review_reason]
+        ["Notes", row.review_reason_display || human(row.review_reason)]
       ]));
       append(main, detailSection("Technical provenance", definitionList([
         ["Generated at", row.generated_at],
@@ -1475,7 +1747,7 @@ _DOCUMENT = r"""<!doctype html>
       append(card, actions);
       return card;
     }
-    function renderRecommendations() {
+    function renderLegacyRecommendations() {
       clear();
       heading(
         "Recommendations",
@@ -1563,6 +1835,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     function renderReports() {
       clear();
+      append(main, node("h2", {}, "Catalog reports"), routeLink("Physically inventoried books", "catalog-report/present", "button-link"), routeLink("Historical records", "catalog-report/history", "button-link secondary"), routeLink("All records including history", "catalog-report/all", "button-link secondary"));
       heading("Reports", "Choose a prepared report by what you want to review or share.");
       append(main, node("p", {class: "notice"}, "Every report shown here was registered and checked for this workspace. Other project files are not shown automatically."));
       append(main, sourceMessages());
@@ -1629,10 +1902,11 @@ _DOCUMENT = r"""<!doctype html>
       ])));
       append(main, node("p", {class: "notice"}, "Opening or downloading a report does not modify project state."));
     }
-    function renderAbout() {
+    function renderAbout(bookId = "") {
       clear();
       heading("About this data", "Technical context is available here without leading the Steward experience.");
-      append(main, node("p", {class: "notice"}, "This workspace is read-only. It does not save filters, notes, recommendations, or decisions."));
+      append(main, node("p", {}, "The local workspace saves dispositions and action statuses in project records. Offline HTML is read-only. Acquisition history and raw inventory evidence are preserved."));
+      if (bookId) append(main, definitionList([["Catalog item ID", bookId]]));
       append(main, definitionList([
         ["Snapshot ID", DATA.snapshot.snapshot_id],
         ["Presentation model", DATA.snapshot.model_version],
@@ -1668,15 +1942,18 @@ _DOCUMENT = r"""<!doctype html>
       const [route, id] = currentRoute();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
+          || (["recommendations", "recommendation"].includes(route) && link.dataset.nav === "actions")
           || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision", "recommendation", "report"].includes(route) && link.dataset.nav === "library")
           || (["home", "explore"].includes(route) && link.dataset.nav === "library");
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");
       });
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
-      else if (route === "recommendations") renderRecommendations();
+      else if (route === "recommendations" || route === "actions") renderActions(id);
+      else if (route === "settings") renderSettings();
+      else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();
-      else if (route === "about") renderAbout();
+      else if (route === "about") renderAbout(id);
       else if (route === "book") renderBook(id);
       else if (route === "holding") renderHolding(id);
       else if (route === "acquisition") renderAcquisition(id);
@@ -1685,7 +1962,7 @@ _DOCUMENT = r"""<!doctype html>
       else if (route === "market") renderMarket(id);
       else if (route === "observation") renderObservation(id);
       else if (route === "decision") renderDecision(id);
-      else if (route === "recommendation") renderRecommendation(id);
+      else if (route === "recommendation") renderActions(id);
       else if (route === "report") renderReport(id);
       else renderNotFound("workspace route", route);
       document.title = `${main.querySelector("h1")?.textContent || "Steward Workspace"} — Library Valuation`;
@@ -1694,6 +1971,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     window.addEventListener("hashchange", renderRoute);
     renderRoute();
+    connectWorkspace();
   })();
   </script>
 </body>

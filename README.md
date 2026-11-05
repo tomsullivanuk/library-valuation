@@ -749,3 +749,128 @@ This keeps already matched rows intact, retries missing rows by the original
 ISBN-10, then searches Open Library by title. The output includes
 `resolution_source`, `resolution_confidence`, `resolution_notes`, and
 `resolved_query`.
+
+### Focus on a Completed Physical Inventory
+
+Once all physical books have been inventoried, explicitly select the completed
+snapshot using a CSV manifest with `collection,file,rows,copies,sha256` columns.
+Each file is an untouched, already-imported Libib export inside an audit-area
+folder immediately below `input/libib/`. Preview first:
+
+```bash
+.venv/bin/python -m valuation.completed_inventory \
+  --manifest output/libib_inventory_20261020/detailed_export_manifest.csv \
+  --market-evidence-summary output/libib_inventory_20261020/combined_market_evidence_summary.csv
+```
+
+Add `--publish` to save the completed-inventory declaration and regenerate the
+workspace. This records the steward's assertion that these exports collectively
+cover the physical library; it preserves the original partial-audit history.
+The command validates source hashes and durable entry/copy counts and restores
+prior files if publication fails. It performs no network collection or new
+catalog matching. `--output-dir` can direct a preview to a separate folder.
+Existing workbook registration is explicit; use `--inventory-report` with a
+relative path below the output directory to include another inventory workbook.
+Existing reports without a verified catalog snapshot remain labelled stale.
+
+Open `output/steward_workspace.html`. The Collection filter defaults to **Books
+still present**; **Outside completed inventory / history** and **All records
+including history** retain access to past purchases. Entries awaiting catalog
+or physical identification remain visible in the inventory identification
+section. Clearing filters returns to the present-books view. CSV export follows
+the selected catalog view. Identifying an unresolved entry later can bring its
+accepted catalog link into the active view on regeneration.
+
+No acquisition or catalog history is deleted. Absence from the completed
+inventory excludes a record from active stewardship by default; it does not
+record a confirmed donation or sale. Market evidence retains its original dates
+and asking-price limitations.
+
+Refresh a complete Libib inventory from newly downloaded detailed exports:
+
+```bash
+.venv/bin/python -m valuation.libib_snapshot \
+  --manifest output/libib_inventory_20261103/detailed_export_manifest.csv \
+  --previous-manifest output/libib_inventory_20261020/detailed_export_manifest.csv \
+  --market-evidence-summary output/libib_inventory_20261020/combined_market_evidence_summary.csv
+```
+
+The default stages and previews the whole import without changing durable state.
+Use a separate `--output-dir` to retain the current workspace during preview;
+add `--publish` to publish the validated repositories and workspace together.
+Both manifests are explicit source lists: all hashes, collection labels, entry
+counts and quantities are checked before import. The previous manifest supplies
+original source IDs omitted by the historical observation privacy allowlist.
+Only a unique source ID plus unchanged bibliographic fingerprint and quantity
+can corroborate continuity across renamed collection/folder contexts. Changed
+identity or quantity remains reviewable. New source entries remain distinct even
+when they share ISBNs; explicit multi-copy quantities stay quantity groups.
+
+Identical header-only exports for empty collections are preserved separately in
+the completed declaration, avoiding duplicate imports for identical source
+bytes. The workflow retains all purchase, catalog and inventory history and
+uses the existing conservative catalog matcher. Generated outputs include a
+current identification-review CSV and a historical-catalog CSV alongside the
+workspace and inventory review workbook. The workbook may include historical
+review evidence; the Library identification section shows the current snapshot.
+Existing market evidence is reused only after catalog-identity validation, with
+its original dates and limitations. No pricing requests are made.
+
+Apply a per-entry assisted review with `python -m valuation.inventory_review
+--plan PATH --output-dir PREVIEW_DIRECTORY`. Add `--publish` to apply it. The plan
+must cover the current unresolved inventory exactly and match repository and
+source fingerprints. Decisions append to the existing review history. Source-only
+identities keep ISBN and edition unknown; format and location questions are
+reported separately from unresolved identities. No purchase records or raw Libib
+observations are changed. The workspace shows specific remaining questions and
+links to the review ledger and follow-up checklist.
+
+The November follow-up review is recorded in
+`data/inventory_followup_reviews.json`. Purchase-supported links use medium
+confidence: they infer the surviving edition from a unique matching acquisition
+and the transcribed alternatives, without asserting physical verification.
+The completed Libib collection takes precedence over earlier box annotations.
+`output/physical_book_checks.csv` combines the remaining identity and format
+questions, grouped by box with source evidence and a blank answer column.
+`output/inventory_followup_resolutions.csv` retains every reviewed follow-up,
+including its outcome and evidence; `output/inventory_review_followups.csv`
+contains only the remaining format checks.
+
+### Everyday workspace
+
+Run `.venv/bin/python -m valuation.workspace_service` and open
+[the local Library](http://127.0.0.1:8765). Add `--background` to keep the service running independently of the launcher.
+Restart it after restarting the computer. Library
+defaults to physically inventoried books. Reports provides historical/all-record
+views. Action Items combines physical book checks with optional research and saves
+Complete, Defer, Dismiss, Reopen and answers/notes. Select a disposition in book
+details and press **Save**. Generated HTML remains a read-only fallback.
+
+Saved decisions remain in the local data repositories across reloads and workspace
+regeneration. They are separate from source observations and purchase history. A
+completed task does not automatically change an ISBN or assert a disposal. See
+[the agreed workspace review](docs/WORKSPACE_REVIEW_20261104.md) for the full scope.
+
+Double-click `Open Library.command` to start the local service and open the Library.
+The service runs in the background, so the launcher window can be closed. If the
+service is already running, the launcher reuses it. Reopen it after restarting the
+computer; saved decisions remain in place.
+
+Action Items now includes **Estimate research**: concrete next steps and search
+links for physical books without supported estimates. Existing book checks remain
+the next step where an edition/binding question blocks research. Generic research
+scores are retained in the underlying assessment records but removed from book
+details. Save findings in the task's answer/note; completing it records progress
+without silently changing the catalog or estimate.
+
+From an **Estimate research** task, enter findings in **Answer or note**, expand
+**Review and save a revised estimate**, and enter the per-copy low/high range,
+currency, research date and source links. **Review estimate** previews the previous
+and revised ranges. **Save estimate and complete task** updates the Library and
+book detail immediately and records completion. Completed research tasks remain
+available for later revisions; book details include **Estimate history**.
+
+Reviewed ranges are stored separately from observed listings in
+`data/reviewed_estimates.json`. Exact prices, purchase history and prior estimates
+are retained. Catalog-identity changes prevent an old reviewed range from being
+automatically applied to a different edition.
