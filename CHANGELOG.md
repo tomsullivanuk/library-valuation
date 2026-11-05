@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.11.1 - 2026-11-05
+
+Release focus: the everyday physical-library workspace and saved research decisions.
+
+- Reconcile the completed Libib inventory while preserving purchase history.
+- Simplify Library and book details, search, locations, acquisition costs, and market explanations.
+- Add a local background service, saved Action Items, and individual dispositions.
+- Replace generic research scores with concrete estimate-research tasks.
+- Review and save revised value ranges from tasks with estimate history and guarded persistence.
+- Validate with 603 tests and browser save/restart checks.
+
+See [release notes](docs/RELEASE_NOTES_v0.11.1.md) for migration requirements and limitations.
+
 ## v0.11.0 - 2026-07-26
 
 Release focus: Steward Workspace.

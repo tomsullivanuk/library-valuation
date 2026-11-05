@@ -844,7 +844,7 @@ Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
 views. Action Items combines physical book checks with optional research and saves
 Complete, Defer, Dismiss, Reopen and answers/notes. Select a disposition in book
-details and press **Save disposition**. Generated HTML remains a read-only fallback.
+details and press **Save**. Generated HTML remains a read-only fallback.
 
 Saved decisions remain in the local data repositories across reloads and workspace
 regeneration. They are separate from source observations and purchase history. A
