@@ -13,7 +13,7 @@ import hashlib
 import json
 import re
 from collections import defaultdict
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path, PurePosixPath
@@ -304,6 +304,10 @@ class BookView:
     estimated_value_currency: str
     disposition: str
     usable_market_estimate: bool = False
+    reviewed_estimate_id: str = ""
+    reviewed_estimate_date: str = ""
+    reviewed_estimate_note: str = ""
+    reviewed_estimate_sources: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -363,6 +367,24 @@ class _LoadedDerived:
     source: SourceView
     rows: tuple[dict[str, str], ...]
 
+
+
+def project_reviewed_estimate(book: BookView, review) -> BookView:
+    """Overlay a steward judgment without rewriting the observed market evidence."""
+    low, high, currency = review["low"], review["high"], review["currency"]
+    sort_low, sort_high = _presentation_currency_range_values(low, high)
+    display = _rounded_currency_range(low, high, currency)
+    precise_low = format(Decimal(low), ",.2f").removesuffix(".00")
+    precise_high = format(Decimal(high), ",.2f").removesuffix(".00")
+    return replace(book, resale_market_status="estimate_available",
+        resale_market_summary=f"{_currency_prefix(currency)}{precise_low}–{_currency_prefix(currency)}{precise_high}",
+        resale_market_card_summary=display, estimated_value_display=display,
+        estimated_value=low if low==high else "", estimated_value_precise_low=low,
+        estimated_value_precise_high=high, estimated_value_sort_low=sort_low,
+        estimated_value_sort_high=sort_high, estimated_value_currency=currency,
+        usable_market_estimate=True, reviewed_estimate_id=review["review_id"],
+        reviewed_estimate_date=review["researched_on"], reviewed_estimate_note=review["note"],
+        reviewed_estimate_sources=tuple(review["source_urls"]))
 
 
 def _plain_research_reasons(summary: str, fallback: str = "") -> str:
@@ -860,6 +882,16 @@ def build_steward_presentation(
         for row in sorted(catalog_rows, key=lambda item: item["catalog_item_id"])
     )
 
+    from valuation.estimate_reviews import current_reviews, FILE_NAME as ESTIMATE_FILE
+    reviewed = current_reviews(data_dir, books)
+    books = tuple(project_reviewed_estimate(book, reviewed[book.catalog_item_id])
+                  if book.catalog_item_id in reviewed else book for book in books)
+    estimate_path = data_dir / ESTIMATE_FILE
+    if estimate_path.exists():
+        sources.append(SourceView(source_key="reviewed_estimates", authority="steward_review",
+            status="current", row_count=len(reviewed), content_sha256=hashlib.sha256(estimate_path.read_bytes()).hexdigest(),
+            schema_version="reviewed_estimates_v1", generated_at="",
+            explanation="Steward-reviewed ranges; earlier observations and estimate history are preserved."))
     completed_inventory = resolve_completed_inventory(data_dir, completed_inventory_declaration)
     if completed_inventory.completed:
         sources.append(SourceView(

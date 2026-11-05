@@ -997,3 +997,20 @@ book check already supplies the required next step. Tasks explain why/how and
 provide encoded manual-search links; no price lookup is run during generation.
 Extra guidance is excluded from physical-check fingerprints so answered questions
 keep their status. Earlier recommendation events and raw assessments are retained.
+
+### Reviewed estimates from research tasks
+
+`valuation.estimate_reviews` owns validation and the append-only reviewed-estimate
+repository. It stores steward judgments separately from observed asking prices.
+The presentation overlays the latest identity-matching review on BookView's range,
+sort/filter/export values and usability, while retaining the original MarketEvidenceView.
+A book-identity fingerprint covers catalog ID, ISBNs, title, author, publisher and
+year; mismatched reviews remain in history but do not price a changed edition.
+
+An explicit two-step task editor previews the prior/new per-copy ranges, currency,
+date, basis and sources before saving. The local service validates the task, book
+identity, expected revision and preceding estimate, then atomically publishes the
+new estimate and task-completion event. Failure rolls back both. The client applies
+returned range projections immediately; a fresh presentation rebuild applies the
+same durable review after reload/regeneration. Completed estimate tasks are retained
+from saved context for further review; earlier observations and decisions are unchanged.

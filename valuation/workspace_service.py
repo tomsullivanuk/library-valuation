@@ -18,6 +18,7 @@ import time
 import threading
 import unicodedata
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,6 +28,8 @@ from urllib.request import urlopen
 from urllib.error import URLError
 
 from valuation.completed_inventory import publish_files
+from valuation import estimate_reviews
+from valuation.steward_presentation import project_reviewed_estimate
 from valuation.repositories import CollectorReviewRepository, COLLECTOR_REVIEW_FIELDNAMES
 from valuation.steward_presentation import build_steward_presentation, DerivedEvidenceInput, RegisteredReport
 from valuation.steward_workspace import build_recommendation_queues, render_steward_workspace
@@ -118,6 +121,7 @@ def estimate_research_action(book, market):
         links = [dict(label="Search AbeBooks", url=lookup_attempt(strategy, query, title=book.title, author=book.author)["url"]),
                  dict(label="Search eBay", url="https://www.ebay.com/sch/i.html?" + urlencode({"_nkw":query}))]
     return dict(id="estimate-research:"+book.catalog_item_id, title=book.title,
+        book_identity=estimate_reviews.book_identity(book),
         action=action, category="Estimate research", location=book.location_summary,
         evidence=market.review_reason_display if market and market.status == "current" else "",
         reason=reason, next_step=step, search_links=links,
@@ -163,6 +167,8 @@ def build_actions(model, checks):
                 continue  # Old generic research scores do not define executable tasks.
             if rec.source_kind == "market_evidence":
                 book = books.get(rec.entity_id)
+                if book and book.reviewed_estimate_id:
+                    continue  # The steward has reviewed and superseded this old pricing concern.
                 if book and not book.usable_market_estimate:
                     continue  # Replaced by one specific next step, or the existing book check.
             # A newly inventoried book is a fact, not by itself work to be done.
@@ -244,23 +250,50 @@ class WorkspaceStore:
             raise ValueError("Unsupported saved workspace state")
         return state
 
+    def all_tasks(self, state):
+        tasks = {task["id"]:task for task in self.actions}
+        allowed = set(self.model.completed_inventory.catalog_item_ids) if self.model.completed_inventory.completed else {b.catalog_item_id for b in self.model.books}
+        for tid, saved in state["actions"].items():
+            task = saved.get("task")
+            if tid not in tasks and saved.get("estimate_review_id") and task and task.get("catalog_item_id") in allowed:
+                tasks[tid] = task
+        return tasks
+
     def snapshot(self):
         with self.lock:
             state = self.read()
             reviews = CollectorReviewRepository(self.data_dir / "collector_reviews.csv").load()
+            estimate_history = estimate_reviews.load_reviews(self.data_dir)
             actions = []
-            for task in self.actions:
+            books = {b.catalog_item_id:b for b in self.model.books}
+            for task in self.all_tasks(state).values():
                 saved = state["actions"].get(task["id"], {})
                 if saved.get("fingerprint") != task["fingerprint"]:
                     saved = {}
                 actions.append(dict(task, status=saved.get("status", "open"),
                     deferred_until=saved.get("deferred_until", ""), note=saved.get("note", "")))
+                book = books.get(task["catalog_item_id"])
+                if book and book.reviewed_estimate_id and saved.get("estimate_review_id"):
+                    actions[-1]["reason"] = "This research task has a saved, reviewed estimate. You can review and revise it again below."
             observed = {h.latest_inventory_observation_id for h in self.model.holdings if h.holding_id in self.model.completed_inventory.holding_ids}
             observed.update(self.model.completed_inventory.unresolved_observation_ids)
             titles = {" ".join(unicodedata.normalize("NFKC", o.title).casefold().split()) for o in self.model.observations if o.inventory_observation_id in observed and o.title.strip()}
             return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
                 dispositions={r["catalog_item_id"]: ("gift_donate" if r["disposition"] in {"gift", "donate"} else r["disposition"]) for r in reviews},
-                disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles))
+                disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles),
+                estimate_currencies=list(estimate_reviews.CURRENCIES),
+                estimate_history={cid:[{key:row.get(key, "") for key in (
+                    "review_id","low","high","currency","researched_on","note","source_urls","saved_at","supersedes","title")}
+                    for row in estimate_history if row["catalog_item_id"]==cid]
+                    for cid,book in books.items() if book.reviewed_estimate_id},
+                book_identities={cid:estimate_reviews.book_identity(book) for cid,book in books.items()},
+                estimate_updates={cid:{key:getattr(book,key) for key in (
+                    "resale_market_status","resale_market_summary","resale_market_card_summary",
+                    "estimated_value_display","estimated_value","estimated_value_precise_low",
+                    "estimated_value_precise_high","estimated_value_sort_low","estimated_value_sort_high",
+                    "estimated_value_currency","usable_market_estimate","reviewed_estimate_id",
+                    "reviewed_estimate_date","reviewed_estimate_note","reviewed_estimate_sources")}
+                    for cid,book in books.items() if book.reviewed_estimate_id})
 
     @contextmanager
     def write_lock(self):
@@ -281,7 +314,7 @@ class WorkspaceStore:
             kind = request.get("kind")
             payloads = []
             if kind == "action":
-                task = next((t for t in self.actions if t["id"] == request.get("id")), None)
+                task = self.all_tasks(state).get(request.get("id"))
                 if not task or task["fingerprint"] != request.get("fingerprint"):
                     raise ValueError("This task changed or is no longer available. Reload the workspace.")
                 status = request.get("status")
@@ -294,10 +327,37 @@ class WorkspaceStore:
                         raise ValueError("Choose a future date for a deferred item")
                 else:
                     until = ""
-                value = dict(status=status, deferred_until=until, note=note,
+                previous_task = state["actions"].get(task["id"], {})
+                value = {key:previous_task[key] for key in ("task", "estimate_review_id") if key in previous_task}
+                value.update(status=status, deferred_until=until, note=note,
                     fingerprint=task["fingerprint"], updated_at=stamp)
                 state["actions"][task["id"]] = value
                 event = dict(kind=kind, id=task["id"], **value)
+            elif kind == "estimate":
+                task = self.all_tasks(state).get(request.get("id"))
+                if not task or task["category"] != "Estimate research" or task["fingerprint"] != request.get("fingerprint"):
+                    raise ValueError("This research task changed. Reload before saving an estimate.")
+                if request.get("reviewed") is not True:
+                    raise ValueError("Review the revised estimate before saving")
+                book = next(b for b in self.model.books if b.catalog_item_id == task["catalog_item_id"])
+                from valuation.libib_catalog import StrictCatalogRepository
+                from types import SimpleNamespace
+                current = next((b for b in StrictCatalogRepository(self.data_dir/"catalog_items.csv").load() if b["catalog_item_id"] == book.catalog_item_id), None)
+                if (not current or estimate_reviews.book_identity(SimpleNamespace(**current)) != request.get("book_identity")
+                        or estimate_reviews.book_identity(book) != request.get("book_identity")):
+                    raise RuntimeError("The book's identity changed. Reload before reviewing its estimate.")
+                values = estimate_reviews.validate_values(request, datetime.now(ZoneInfo("America/Chicago")).date())
+                records = estimate_reviews.load_reviews(self.data_dir)
+                previous = next((r for r in reversed(records) if r["catalog_item_id"]==book.catalog_item_id), None)
+                if (previous["review_id"] if previous else "") != request.get("previous_estimate_review_id", ""):
+                    raise RuntimeError("The estimate changed elsewhere. Reload and review the latest range.")
+                row = estimate_reviews.new_review(book, values, previous, stamp)
+                records.append(row)
+                payloads.append((self.data_dir/estimate_reviews.FILE_NAME, estimate_reviews.rendered_reviews(records)))
+                state["actions"][task["id"]] = dict(status="complete", deferred_until="", note=values["note"],
+                    fingerprint=task["fingerprint"], updated_at=stamp, task=task, estimate_review_id=row["review_id"])
+                event = dict(kind=kind, id=book.catalog_item_id, task_id=task["id"],
+                    estimate_review_id=row["review_id"], previous_review_id=row["supersedes"], updated_at=stamp)
             elif kind == "disposition":
                 cid, value = request.get("id"), request.get("value")
                 if cid not in {b.catalog_item_id for b in self.model.books} or value not in DISPOSITIONS:
@@ -324,6 +384,9 @@ class WorkspaceStore:
             state["events"].append(event)
             payloads.append((self.path, (json.dumps(state, indent=2, ensure_ascii=False) + "\n").encode()))
             publish_files(payloads)
+            if kind == "estimate":
+                self.model = replace(self.model, books=tuple(project_reviewed_estimate(b,row) if b.catalog_item_id==book.catalog_item_id else b for b in self.model.books))
+                self.actions = build_actions(self.model, load_book_checks(self.data_dir,self.model))
             return self.snapshot()
 
 

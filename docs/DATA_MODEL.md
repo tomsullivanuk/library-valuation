@@ -1280,3 +1280,20 @@ merely having numerical asking prices. Estimate-research actions have stable IDs
 search_links. Physical checks may gain explanatory next_step text without changing
 their existing decision fingerprint. These are projections; no catalog, acquisition,
 physical-inventory, assessment or market-evidence records are rewritten.
+
+### Steward-reviewed value ranges
+
+`reviewed_estimates.json` schema 1 stores an append-only `reviews` list. Each row
+contains review_id, catalog_item_id, book_identity, identifying title/ISBNs,
+low/high per-copy amounts, currency, researched_on, note, source_urls, saved_at and
+supersedes. Low/high are finite non-negative decimal strings with at most two
+places and low <= high. Dates cannot be in the future at entry; source links use
+HTTP(S) without credentials. A written basis is required. Supported currencies
+are explicit; no conversion or market-confidence reclassification is inferred.
+
+BookView's reviewed_estimate_id/date/note/sources identify the overlay. Original
+market evidence and assessment repositories remain separate. Workspace action state
+retains completed task context and its estimate_review_id, allowing the review to
+be revisited after its original missing-estimate task no longer appears in the open
+queue. Estimate and completion events share the global optimistic revision and are
+published together; stale book identities or preceding estimates are rejected.

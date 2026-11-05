@@ -416,3 +416,7 @@ Known follow-up:
 
 - Fix local workspace availability after a chat/launcher closes: background mode
   starts a macOS user service, verifies readiness and reuses the running workspace.
+
+- Add review-and-save of revised per-copy ranges directly from Estimate research
+  tasks. Update book displays immediately, complete the task atomically, and retain
+  estimate history and the original asking-price evidence.

@@ -862,3 +862,15 @@ the next step where an edition/binding question blocks research. Generic researc
 scores are retained in the underlying assessment records but removed from book
 details. Save findings in the task's answer/note; completing it records progress
 without silently changing the catalog or estimate.
+
+From an **Estimate research** task, enter findings in **Answer or note**, expand
+**Review and save a revised estimate**, and enter the per-copy low/high range,
+currency, research date and source links. **Review estimate** previews the previous
+and revised ranges. **Save estimate and complete task** updates the Library and
+book detail immediately and records completion. Completed research tasks remain
+available for later revisions; book details include **Estimate history**.
+
+Reviewed ranges are stored separately from observed listings in
+`data/reviewed_estimates.json`. Exact prices, purchase history and prior estimates
+are retained. Catalog-identity changes prevent an old reviewed range from being
+automatically applied to a different edition.

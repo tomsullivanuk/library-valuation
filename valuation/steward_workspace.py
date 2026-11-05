@@ -772,6 +772,8 @@ _DOCUMENT = r"""<!doctype html>
     .disposition-editor select { width: auto; min-width: 10rem; max-width: 100%; }
     .disposition-editor button { flex: 0 0 auto; min-height: 0; padding: 0 .7rem; line-height: 1; }
     .disposition-editor [role="status"] { flex-basis: 100%; margin: 0; }
+    .estimate-editor { display: grid; gap: .6rem; max-width: 48rem; }
+    .estimate-preview button { margin: .4rem .5rem .4rem 0; }
     .detail-heading { display: flex; justify-content: space-between; gap: 1rem; }
     .detail-heading h1 { font-size: 1.16rem; font-weight: 750; color: var(--brand-dark); margin-bottom: .35rem; }
     dl {
@@ -858,6 +860,7 @@ _DOCUMENT = r"""<!doctype html>
     let actionLimit = 50;
     let libraryFilterObserver = null;
     let dispositionObserver = null;
+    let estimateSaveMessage = "";
     const main = document.getElementById("main-content");
     const index = {
       books: new Map(DATA.books.map(row => [row.catalog_item_id, row])),
@@ -1154,6 +1157,12 @@ _DOCUMENT = r"""<!doctype html>
       const value = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
       return value && value !== "information_not_included" ? dispositionText(value) : "";
     }
+    function applyEstimateUpdates() {
+      for (const [id, values] of Object.entries(workspaceState.estimate_updates || {})) {
+        const book = index.books.get(id);
+        if (book) Object.assign(book, values);
+      }
+    }
     async function connectWorkspace() {
       const footer = document.getElementById("save-status");
       if (!/^https?:$/.test(location.protocol)) {
@@ -1164,6 +1173,7 @@ _DOCUMENT = r"""<!doctype html>
         const response = await fetch("/api/state", {cache:"no-store"});
         if (!response.ok) throw new Error("The local saving service is unavailable.");
         workspaceState = {...await response.json(), connected:true};
+        applyEstimateUpdates();
         footer.replaceChildren(document.createTextNode("Decisions are saved in your project records. "), routeLink("About this data", "about"));
         renderRoute();
       } catch (error) {
@@ -1178,8 +1188,10 @@ _DOCUMENT = r"""<!doctype html>
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "The change could not be saved.");
         workspaceState = {...result, connected:true};
+        applyEstimateUpdates();
         status.textContent = "Saved.";
-      } catch (error) { status.textContent = error.message; }
+        return true;
+      } catch (error) { status.textContent = error.message; return false; }
       finally { button.disabled = !workspaceState.connected; }
     }
     function acquisitionCost(value, currency) {
@@ -1217,6 +1229,51 @@ _DOCUMENT = r"""<!doctype html>
       form.addEventListener("submit", async event => { event.preventDefault(); await saveWorkspace({kind:"disposition", id:book.catalog_item_id, value:select.value}, status, button); });
       return form;
     }
+    function estimateEditor(task, note) {
+      const book = index.books.get(task.catalog_item_id);
+      const form = node("form", {class:"panel estimate-editor"});
+      append(form, node("p", {}, "Enter a per-copy value range. Add your research findings above and source links below, then review before saving."));
+      function field(label, element) { const row=node("label", {}, label); append(row,element); append(form,row); return element; }
+      const low=field("Low estimate",node("input", {type:"number",min:"0",step:"0.01",required:"", "aria-label":"Low estimate"}));
+      const high=field("High estimate",node("input", {type:"number",min:"0",step:"0.01",required:"", "aria-label":"High estimate"}));
+      low.value=book.estimated_value_precise_low || ""; high.value=book.estimated_value_precise_high || "";
+      const currency=field("Currency",node("select", {"aria-label":"Estimate currency"}));
+      for (const value of workspaceState.estimate_currencies || ["USD"]) append(currency,node("option",{value},value));
+      currency.value=book.estimated_value_currency || "USD";
+      const researched=field("Research date",node("input", {type:"date",required:"", "aria-label":"Estimate research date"}));
+      researched.value=book.reviewed_estimate_date || new Date().toLocaleDateString("en-CA",{timeZone:"America/Chicago"});
+      const sources=field("Source links (one per line, where available)",node("textarea",{rows:"3", "aria-label":"Estimate source links"}));
+      sources.value=(book.reviewed_estimate_sources || []).join("\n");
+      const review=node("button",{type:"submit"},"Review estimate"); review.disabled=!workspaceState.connected;
+      const preview=node("div", {class:"estimate-preview"}); const status=node("p",{role:"status","aria-live":"polite"});
+      append(form,review,preview,status);
+      form.addEventListener("input",()=>preview.replaceChildren());
+      note.addEventListener("input",()=>preview.replaceChildren());
+      form.addEventListener("submit",event=>{
+        event.preventDefault(); status.textContent="";
+        if (!workspaceState.connected) { status.textContent="Open the local workspace before saving an estimate."; return; }
+        if (!note.value.trim()) { status.textContent="Explain the basis for the estimate in Answer or note above."; note.focus(); return; }
+        if (Number(low.value)>Number(high.value)) { status.textContent="The low estimate must not exceed the high estimate."; return; }
+        const payload={kind:"estimate", id:task.id, fingerprint:task.fingerprint,
+          book_identity:workspaceState.book_identities[book.catalog_item_id],
+          previous_estimate_review_id:book.reviewed_estimate_id || "", reviewed:true,
+          low:low.value, high:high.value, currency:currency.value, researched_on:researched.value,
+          source_urls:sources.value.split(/\n/).map(value=>value.trim()).filter(Boolean), note:note.value};
+        preview.replaceChildren();
+        append(preview,node("h3",{},"Confirm the revised range"),definitionList([
+          ["Book",book.title],["Previous range",book.resale_market_summary],
+          ["Revised range",`${acquisitionCost(low.value,currency.value)}–${acquisitionCost(high.value,currency.value)} per copy`],
+          ["Research date",researched.value],["Source links",payload.source_urls.join("; ") || "None provided"],["Basis",payload.note]]),
+          node("p",{},"Saving updates the book's range and completes this research task. Earlier estimates and source evidence remain in history."));
+        const save=node("button",{type:"button",class:"primary"},"Save estimate and complete task");
+        save.addEventListener("click",async()=>{
+          if (await saveWorkspace(payload,status,save)) { estimateSaveMessage="Revised estimate saved. The book's value range is updated and this research task is complete."; renderActions(task.id); }
+        });
+        const edit=node("button",{type:"button"},"Back to editing"); edit.addEventListener("click",()=>{preview.replaceChildren();low.focus();});
+        append(preview,save,edit);
+      });
+      return form;
+    }
     function actionStatus(task) {
       if (task.status === "deferred" && task.deferred_until <= new Date().toLocaleDateString("en-CA", {timeZone:"America/Chicago"})) return "open";
       return task.status || "open";
@@ -1225,6 +1282,7 @@ _DOCUMENT = r"""<!doctype html>
       const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
       if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
       clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
+      if (estimateSaveMessage) { append(main,node("p",{role:"status","aria-live":"polite"},estimateSaveMessage)); estimateSaveMessage=""; }
       if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
       const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
       filter.querySelector("select").value = actionFilter;
@@ -1251,6 +1309,7 @@ _DOCUMENT = r"""<!doctype html>
         const noteLabel = node("label", {}, "Answer or note "); const note = node("textarea", {rows:"2", "aria-label":`Answer or note for ${task.title}`}); note.value = task.note || ""; append(noteLabel, note);
         const dateLabel = node("label", {}, "Defer until "); const until = node("input", {type:"date", "aria-label":`Defer until for ${task.title}`}); until.value = task.deferred_until || ""; append(dateLabel, until);
         append(card, noteLabel, dateLabel);
+        if (task.category === "Estimate research" && index.books.has(task.catalog_item_id)) append(card,detailSection("Review and save a revised estimate",estimateEditor(task,note)));
         const status = node("p", {role:"status", "aria-live":"polite"});
         const buttons = node("div", {class:"card-actions"});
         for (const [value, text] of [["complete","Complete"],["deferred","Defer"],["dismissed","Dismiss"],["open","Reopen"]]) {
@@ -1471,9 +1530,26 @@ _DOCUMENT = r"""<!doctype html>
         const a = index.acquisitions.get(ref);
         if (a) append(main, definitionList(acquisitionFacts(a)));
       }
+      if (book.reviewed_estimate_id) {
+        append(main,node("h2",{},"Your reviewed estimate"),definitionList([["Range",book.resale_market_summary],["Research date",book.reviewed_estimate_date],["Your notes",book.reviewed_estimate_note]]));
+        if (book.reviewed_estimate_sources?.length) {
+          const sources=node("ul",{class:"link-list"});
+          book.reviewed_estimate_sources.forEach((url,index)=>append(sources,append(node("li"),node("a",{href:url,target:"_blank",rel:"noopener noreferrer"},`Research source ${index+1}`))));
+          append(main,sources);
+        }
+        const history=workspaceState.estimate_history?.[bookId] || [];
+        if (history.length) {
+          const entries=node("div");
+          for (const row of [...history].reverse()) append(entries,definitionList([
+            ["Range",`${acquisitionCost(row.low,row.currency)}–${acquisitionCost(row.high,row.currency)}`],
+            ["Research date",row.researched_on],["Saved",row.saved_at.slice(0,10)],["Notes",row.note],
+            ["Sources",(row.source_urls || []).join("; ") || "None provided"]]));
+          append(main,detailSection("Estimate history",entries));
+        }
+      }
       append(main, node("h2", {}, "Market research"));
       const market = index.market.get(book.market_evidence_id);
-      if (market) append(main, definitionList([["Estimate", book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
+      if (market) append(main, definitionList([[book.reviewed_estimate_id ? "Original asking-price range" : "Estimate", book.reviewed_estimate_id ? (market.likely_low && market.likely_high ? `${acquisitionCost(market.likely_low,market.currency)}–${acquisitionCost(market.likely_high,market.currency)}` : acquisitionCost(market.likely_mid || market.likely_low || market.likely_high,market.currency)) : book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
       else append(main, node("p", {}, "Not researched."));
       const tasks = workspaceState.actions.filter(task => task.catalog_item_id === bookId);
       if (tasks.length) {

@@ -117,3 +117,19 @@ does not reopen an unchanged answered book check. Retain all saved action histor
 market evidence and original assessments. Research links open manual searches;
 record findings in the task note. Completing a task does not automatically change
 an estimate or catalog identity.
+
+## Review and save an estimate from a research task
+
+Research tasks now support a per-copy low/high range, currency, research date,
+source links and a written basis drawn from Answer or note. Review estimate first
+shows previous and revised ranges. Save estimate and complete task commits the
+review, updates Library/detail/sorting/filtering/export values, and saves completion.
+Completed tasks can be revisited for further revisions. Show Your reviewed estimate
+and expandable Estimate history separately from original market observations.
+
+Preserve all earlier estimates, research notes, listing evidence and purchase data.
+Save estimate and task completion atomically; reject invalid amounts, future dates,
+unsafe links, stale revisions and changed book identities. Adding a range is an
+explicit steward judgment, not an automatic claim that the original listings were
+high-confidence or confirmed sales. The previous note that the app cannot approve
+and save a revised estimate is superseded by this workflow.
