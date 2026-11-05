@@ -15,7 +15,7 @@ belongs in release notes, the changelog, and architecture documentation.
 
 ## Current Product Baseline
 
-Through v0.11.0, Library Valuation has established:
+Through v0.11.1, Library Valuation has established:
 
 - a durable catalog and acquisition history derived from Amazon imports;
 - research prioritization and collector-owned review state;
@@ -32,6 +32,10 @@ Through v0.11.0, Library Valuation has established:
   on a book-first Library with details and supporting evidence; and
 - atomic generation of inventory summaries, review workbooks, and the
   registered-report workspace.
+
+v0.11.1 adds the completed physical-inventory default, a local background service,
+saved Action Items and dispositions, and reviewed estimate history. The generated
+HTML remains a read-only fallback.
 
 The detailed record is maintained in [the changelog](../CHANGELOG.md),
 [v0.11.0 release notes](RELEASE_NOTES_v0.11.0.md), prior release notes, and the
@@ -118,23 +122,66 @@ Future release plans that change the workspace should reference the
 [Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md) rather than
 restate or redefine them.
 
-### v0.12.0 — Collection Intelligence
+### v0.12.0 — Migration, Library Valuation Review, and Family Access
 
-Help the steward understand the library as a collection rather than only as
-individual catalog rows.
+Approved direction: November 5, 2026. Deliver the following milestones in order,
+using v0.11.1 as the stable migration baseline. Each milestone has its own
+acceptance gate; partial implementation does not imply the whole release is done.
 
-Likely outcomes include:
+#### 1. Mac Mini migration
 
-- subject, classification, author, publisher, period, and language analysis;
-- identification of coherent scholarly, thematic, or family-significant
-  collections;
-- duplicate, edition, incomplete-set, and multi-volume detection;
-- collection-level market, donation, retention, and institutional
-  opportunities; and
-- explicit confidence and evidence behind proposed groupings.
+Move authoritative operation from the laptop to the Mac Mini. Inventory and
+privately back up source data, saved decisions, reviewed estimates, imports,
+required market evidence, configuration and reports. Recreate the runtime and
+rehearse a restore before final cutover. Verify identities, hashes, application
+counts, browsing and disposable write tests. Establish startup, authenticated
+administration, independent backup/restore, and reboot recovery. The Mac Mini
+must be the only production writer after cutover; the laptop may remain a
+development or administration client.
 
-Proposed collections should remain reviewable. Automated grouping must not
-silently replace catalog or holding identity.
+Acceptance: matching durable state and evidence, verified recovery, agreed startup
+behavior, documented rollback, and a recorded single-writer cutover. See the
+[Mac Mini migration runbook](MAC_MINI_MIGRATION.md).
+
+#### 2. Whole-library valuation review
+
+Programmatically reassess the physically inventoried library using current
+bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
+edition and condition matching, duplicate/set ambiguity, outliers, currencies,
+source dates and evidence quality. Start with a bounded pilot and inspect its
+results before a resumable full-library run. Preserve prior evidence and manually
+reviewed estimates; conflicting updates require an explicit policy rather than
+silent replacement. Preview proposed ranges and exceptions before publishing.
+
+Acceptance: reproducible coverage and before/after results, source-backed ranges,
+no unsupported values, preserved history, and actionable exceptions for checks
+that automation cannot resolve. API access, source terms, cost and rate limits
+must be verified when the implementation is designed.
+
+#### 3. Friends-and-family access
+
+Expose a separate, private subset of capabilities: browse eligible books, keep a
+personal selection list and submit requests for Tom to review. Publish an explicit
+allowlist of recipient-facing fields; exclude purchase history, valuation,
+private notes, storage locations and operational details. Separate recipient
+access from steward administration. Requests do not automatically allocate or
+remove physical copies. Choose hosting (potentially Sites) only after verifying
+access, durable storage, recovery and operating cost with a synthetic pilot.
+
+Acceptance: private access and isolated lists, durable submissions and revisions,
+owner review, backup/restore, and a successful recipient pilot independent of the
+laptop. This brings the family-facing subset of the former v0.14 Publishing
+scope forward; broader dealer and marketplace publishing remains later work.
+
+#### Deferred collection intelligence
+
+The former v0.12 scope remains a backlog direction rather than a prerequisite:
+subject/classification/author/publisher/period/language analysis; scholarly,
+thematic and family-significant groupings; duplicate, edition, incomplete-set and
+multi-volume detection; and collection-level market, donation, retention and
+institutional opportunities. Retain explicit confidence and evidence. Proposed
+groupings must not silently replace catalog or holding identity. Use duplicate
+and edition checks in milestone 2 where necessary for dependable valuation.
 
 ### v0.13.0 — Decision Support
 
@@ -154,7 +201,7 @@ Each recommendation should communicate:
 Recommendations may address individual books, groups, or collections. They
 remain advisory: the application recommends and the steward decides.
 
-### v0.14.0 — Publishing
+### v0.14.0 — Broader Publishing
 
 Generate stewardship artifacts that prepare work for review or for external
 systems.
