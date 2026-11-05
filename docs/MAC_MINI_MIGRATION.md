@@ -158,3 +158,20 @@ A normal owner-initiated restart was tested without subsequent graphical login.
 This verifies service startup across reboot; an actual mains-power interruption
 was not performed. Restart-after-power-failure is configured. The remaining issue
 is cloud upload of newly created snapshots before login, not library availability.
+
+## Automatic login and locking: preparation
+
+The owner selected automatic graphical login followed by locking to allow iCloud
+sync after reboot. Automatic login is not enabled yet. A user LaunchAgent is
+installed to run `operations/lock_after_login.py` at each Aqua login. It requires
+`sysadminctl -screenLock status` to report immediate password-on-wake, turns off
+the display using `pmset`, and verifies `IOConsoleLocked` for the logged-in owner
+session. Failed policy/readiness/lock checks return nonzero for launchd retry;
+success stops the job until the next login. It does not store credentials.
+
+Initial inspection found a 300-second password delay. The owner must select
+Immediately in Lock Screen settings, then the lock task must pass a real-session
+test before automatic login is enabled. This display-sleep mechanism depends on
+that password policy; it is not a guarantee if the setting changes later. Automatic
+login still has a potential unlocked interval and must be rechecked after OS
+updates. Post-reboot locking and independent iCloud upload remain acceptance gates.
