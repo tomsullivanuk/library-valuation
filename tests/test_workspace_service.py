@@ -283,3 +283,14 @@ def test_estimate_research_uses_title_when_no_isbn_and_excludes_history(tmp_path
     assert parse_qs(urlsplit(task['search_links'][0]['url']).query)['tn']==[no_isbn.title]
     scoped=replace(model,completed_inventory=CompletedInventoryScope(completed=True,catalog_item_ids=('BK000001',)))
     assert [t['catalog_item_id'] for t in build_actions(scoped,[])]==['BK000001']
+
+
+def test_migrated_source_cannot_start_or_accept_stale_service_writes(tmp_path):
+    from valuation.workspace_service import load_model
+    store = store_for(tmp_path)
+    (store.data_dir / 'production_moved.json').write_text('{}')
+    with pytest.raises(ValueError, match='Production has moved'):
+        load_model(store.data_dir, tmp_path / 'output')
+    with pytest.raises(ValueError, match='Production has moved'):
+        store.update(dict(kind='disposition', id='BK000001', value='keep', revision=0))
+    assert not store.path.exists()
