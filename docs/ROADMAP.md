@@ -176,9 +176,13 @@ quota resets, protected source state, deferred grading and separate review outpu
 See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). A separate
 [records-only adjudication](EDITION_CHECK_ADJUDICATION_20261106.md) of the initial
 40 edition/inferred-copy flags leaves 14 distinct hands-on questions, without
-changing the frozen worker or source records. Final coverage is pending; no revised
+changing the frozen worker or source records. The
+[all-batch records review](ALL_BATCH_RECORDS_REVIEW_20261106.md) extends this to all
+98 frozen batches: 162 identification flags across 133 books are pre-reviewed,
+leaving 54 distinct physical tasks (the earlier 14 plus 40). This does not claim
+market collection is complete; final market coverage is pending and no revised
 estimates are published. Full validation now passes
-718 tests on both machines. Publication remains separate and requires owner review
+726 tests on both machines. Publication remains separate and requires owner review
 plus preview/conflict/rollback checks.
 
 Programmatically reassess the physically inventoried library using current

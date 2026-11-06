@@ -66,3 +66,47 @@ def test_html_and_csv_escape_recorded_content_and_keep_frozen_scope_separate(tmp
     adjudicate(p,f,tmp_path/'report')
     page=(tmp_path/'report/review.html').read_text();assert '<script>' not in page and 'frozen reports retain their raw flags' in page
     rows=list(csv.DictReader((tmp_path/'report/physical_checks_only.csv').open()));assert any(r['title'].startswith("'=Synthetic") for r in rows)
+
+
+def test_inferred_only_question_is_not_mislabeled_as_merged(tmp_path):
+    p,f=inputs(tmp_path);packet=json.loads(p.read_text());packet['checks']=[c for c in packet['checks'] if not(c['catalog_item_id']=='B2' and c['kind']=='edition')];p.write_text(json.dumps(packet))
+    summary=adjudicate(p,f,tmp_path/'report')
+    assert summary['inferred_checks_remaining']==1 and summary['inferred_checks_merged']==0
+
+
+def test_consistent_target_inventory_identifier_can_resolve_without_page_note(tmp_path):
+    p,f=inputs(tmp_path);packet=json.loads(p.read_text());book=packet['packets']['B1'];book['source_notes']=[];book['observations'][0].update(raw_isbn13='9780198829171',raw_isbn10='0198829175',normalized_isbn13='9780198829171',normalized_isbn10='0198829175');p.write_text(json.dumps(packet))
+    findings=json.loads(f.read_text());findings['B1'].update(resolution_basis='consistent_inventory_identifier',inventory_observation_ids=['OB1']);f.write_text(json.dumps(findings))
+    adjudicate(p,f,tmp_path/'report')
+    b=next(b for b in json.loads((tmp_path/'report/adjudications.json').read_text())['books'] if b['catalog_item_id']=='B1')
+    assert b['inventory_basis'][0]['recorded_isbn13']=='9780198829171' and not b['physical_copy_isbn_verified']
+    book['observations'][0]['raw_isbn13']='9780486600819';p.write_text(json.dumps(packet))
+    with pytest.raises(ValueError,match='Conflicting'):adjudicate(p,f,tmp_path/'conflicting')
+
+
+def test_evidence_for_one_copy_cannot_close_another_copy_question(tmp_path):
+    p,f=inputs(tmp_path);packet=json.loads(p.read_text());packet['checks']=[c for c in packet['checks'] if not(c['catalog_item_id']=='B1' and c['kind']=='edition')]
+    for c in packet['checks']:
+        if c['catalog_item_id']=='B1':c.update(observation_ids=['unknown'],location='8')
+    packet['packets']['B1']['observations']=[dict(inventory_observation_id='known',raw_title='Known copy'),dict(inventory_observation_id='unknown',raw_title='Other copy')]
+    packet['packets']['B1']['source_notes']=[dict(observation_id='known',notes='Known copy has a documented edition.')];p.write_text(json.dumps(packet))
+    with pytest.raises(ValueError,match='source-page'):adjudicate(p,f,tmp_path/'report')
+    findings=json.loads(f.read_text());findings['B1']=dict(outcome='requires_edition_check',finding='The other copy has no recorded identifier.',physical_question='Check only the copy at 8.');f.write_text(json.dumps(findings))
+    adjudicate(p,f,tmp_path/'report')
+    b=next(b for b in json.loads((tmp_path/'report/adjudications.json').read_text())['books'] if b['catalog_item_id']=='B1')
+    assert b['location']=='8' and b['observation_ids']==['unknown'] and not b['source_notes']
+
+
+def test_source_rejected_identifier_stays_excluded_despite_valid_checksum(tmp_path):
+    p,f=inputs(tmp_path);findings=json.loads(f.read_text());findings['B2']['excluded_identifiers']=[dict(printed='0415314534',reason='Source explicitly rejects it')];f.write_text(json.dumps(findings))
+    with pytest.raises(ValueError,match='Source-rejected'):adjudicate(p,f,tmp_path/'report')
+
+
+def test_additional_existing_image_is_copy_scoped_and_fingerprinted(tmp_path):
+    import hashlib
+    p,f=inputs(tmp_path);image=tmp_path/'stored-photo.jpg';image.write_bytes(b'synthetic existing image')
+    findings=json.loads(f.read_text());findings['B1']['additional_record_evidence']=[dict(file=image.name,observation_id='OB1',notes='Re-read existing image: first paper-bound edition.',sha256=hashlib.sha256(image.read_bytes()).hexdigest())];f.write_text(json.dumps(findings))
+    adjudicate(p,f,tmp_path/'report')
+    result=json.loads((tmp_path/'report/adjudications.json').read_text());assert str(image.resolve()) in result['input_hashes']
+    image.write_bytes(b'changed')
+    with pytest.raises(ValueError,match='image changed'):adjudicate(p,f,tmp_path/'changed')
