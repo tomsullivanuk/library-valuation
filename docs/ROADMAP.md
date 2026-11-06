@@ -173,9 +173,12 @@ See the [audit](VALUATION_REVIEW_AUDIT_20261106.md),
 The owner authorized the remaining-library run. A frozen 2,435-record job is now
 running on the Mini in 98 bounded batches, with automatic continuation across
 quota resets, protected source state, deferred grading and separate review outputs.
-See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). Final
-coverage is pending; no revised estimates are published. Full validation now passes
-711 tests on both machines. Publication remains separate and requires owner review
+See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). A separate
+[records-only adjudication](EDITION_CHECK_ADJUDICATION_20261106.md) of the initial
+40 edition/inferred-copy flags leaves 14 distinct hands-on questions, without
+changing the frozen worker or source records. Final coverage is pending; no revised
+estimates are published. Full validation now passes
+718 tests on both machines. Publication remains separate and requires owner review
 plus preview/conflict/rollback checks.
 
 Programmatically reassess the physically inventoried library using current
