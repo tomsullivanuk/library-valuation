@@ -157,6 +157,10 @@ rules remain prerequisites. The isolated offline replay is complete: 30 books,
 changes, and 635 passing tests on both machines. See the
 [audit and pilot readiness](VALUATION_REVIEW_AUDIT_20261106.md) and
 [offline replay results](VALUATION_OFFLINE_REPLAY_20261106.md).
+The eBay-only live pilot is also complete: 30 books, 156 listing details,
+26 candidate comparisons, and no estimate changes. See the
+[live pilot review](VALUATION_LIVE_PILOT_20261106.md); wider collection and
+publication remain subject to review.
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,

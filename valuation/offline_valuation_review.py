@@ -26,6 +26,7 @@ POLICY = dict(max_age_days=30, minimum_comparables=3, maximum_spread_ratio='3',
               scope='per-copy asking prices; not realized proceeds',
               publication='disabled; candidate ranges are never publishable')
 REASONS = {
+ 'metadata_conflict':'The listing returned conflicting edition or format facts; review the original listing.',
  'source':'The observation source is unsupported.',
  'status_row':'The source reported a lookup status, not a listing.',
  'invalid_date':'The observation date is missing or invalid.',
@@ -155,11 +156,13 @@ def review_book(book, observations, *, as_of, max_age_days=30):
         if n is None or n != n.quantize(Decimal('.01')):reasons.append('invalid_price');continue
         if d['currency'] not in POLICY['currencies']:reasons.append('currency');continue
         d['price']=money(n)
+        if row.get('detail_status') in {'conflicting_isbns','conflicting_bindings'}:
+            reasons.append('metadata_conflict');continue
         # Sample ISBN fields belong to the search target, never the returned listing.
         actual_isbn=isbn(row.get('listing_isbn13') or row.get('listing_isbn10',''))
         if target_isbn and actual_isbn and target_isbn!=actual_isbn:
             reasons.append('isbn_mismatch');continue
-        content=row.get('listing_title','')+' '+row.get('condition','')
+        content=' '.join(row.get(k,'') for k in ('listing_title','condition','listing_condition_description','listing_edition'))
         if re.search(r'\b(ebook|e-book|audiobook|kindle|pdf|signed|inscribed|bundle)\b|\b(?:lot|set) of \d|\b\d+[ -]volume set',content,re.I):
             reasons.append('special_copy');continue
         title_match=overlap(book.get('title',''),row.get('listing_title',''))>=.8

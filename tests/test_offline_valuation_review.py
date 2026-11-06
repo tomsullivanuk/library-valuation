@@ -64,6 +64,8 @@ def test_missing_target_binding_or_condition_stays_candidate_only():
         r=run(three(),b);assert r['proposal'] is None
 
 @pytest.mark.parametrize('changes,reason',[
+ ({'detail_status':'conflicting_isbns'},'metadata_conflict'),
+ ({'listing_condition_description':'Signed by author'},'special_copy'),
  ({'listing_binding':'hardcover'},'binding_mismatch'),
  ({'listing_condition_grade':'poor'},'condition_mismatch'),
  ({'listing_title':'Signed Example Philosophy'},'special_copy'),
