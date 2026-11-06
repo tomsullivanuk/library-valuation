@@ -106,3 +106,65 @@ def test_existing_copyright_transcription_narrows_check_without_inventing_printi
  assert r['listing_decisions'][1]['review_disposition']=='held_for_target_edition'
  assert r['recorded_copyright_years']==[1961] and 'printing date' in r['physical_checks'][0]['question']
  assert r['identity_supported_from_records'] is False
+
+
+def scenario_inputs(tmp_path,grade='good',no_isbn=False):
+ book=dict(BOOK);packet=deepcopy(PACKET)
+ if no_isbn:book['isbn13']='';packet['catalog']['isbn13']=''
+ listing=row(1,grade=grade)
+ paths=[]
+ for name,payload in [('packet.json',{'BK1':packet}),('notes.json',{'BK1':'Reviewed facts'}),('prelim.json',{'books':[dict(book=book,review=dict(sources={'ebay':dict(candidate_ranges={'USD':dict(low='10',high='10')})},decisions=[dict(listing=listing_key(listing),disposition='candidate_only')]))]})]:
+  path=tmp_path/name;path.write_text(json.dumps(payload));paths.append(path)
+ obs=tmp_path/'observations.csv'
+ with obs.open('w',newline='') as f:
+  w=csv.DictWriter(f,fieldnames=list(listing));w.writeheader();w.writerow(listing)
+ paths.append(obs)
+ policy=tmp_path/'policy.json';policy.write_text(json.dumps(dict(mode='labelled_used_scenarios',physical_grading='defer_until_handled',publication='disabled',catalog_item_ids=['BK1'],default_grade=None)))
+ return paths,policy
+
+
+def test_owner_policy_applies_scenarios_without_assigning_grade_or_estimate(tmp_path):
+ paths,policy=scenario_inputs(tmp_path);before=[p.read_bytes() for p in paths+[policy]]
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ result=json.loads((tmp_path/'review/review.json').read_text());r=result['reviews'][0]
+ assert result['owner_policy_status']=='applied' and result['owner_policy_question'] is None
+ assert r['actual_condition']=='ungraded' and r['condition_assumed'] is False
+ assert r['saved_range']==dict(low='8',high='12',currency='USD') and not r['publishable']
+ assert r['condition_scenarios'][0]['hypothetical_grade']=='good'
+ assert r['condition_scenarios'][0]['evidence_label']=='limited evidence'
+ assert r['condition_scenarios'][0]['scenario_only'] and not r['condition_scenarios'][0]['publishable']
+ assert next(c for c in r['physical_checks'] if c['kind']=='condition')['status']=='deferred_until_handled'
+ assert (tmp_path/'review/condition_scenarios.csv').exists()
+ page=(tmp_path/'review/review.html').read_text()
+ assert 'Your condition policy is applied' in page and 'If your copy is good' in page
+ assert 'Your one policy decision' not in page
+ assert [p.read_bytes() for p in paths+[policy]]==before
+
+@pytest.mark.parametrize('changes',[dict(publication='enabled'),dict(catalog_item_ids=['OTHER']),dict(default_grade='good')])
+def test_policy_cannot_publish_expand_cohort_or_assign_default_grade(tmp_path,changes):
+ paths,policy=scenario_inputs(tmp_path)
+ data=json.loads(policy.read_text());data.update(changes);policy.write_text(json.dumps(data))
+ with pytest.raises(ValueError,match='Condition policy'):run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ assert not (tmp_path/'review').exists()
+
+
+def test_condition_policy_does_not_waive_edition_check(tmp_path):
+ paths,policy=scenario_inputs(tmp_path,no_isbn=True)
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ r=json.loads((tmp_path/'review/review.json').read_text())['reviews'][0]
+ assert any(c['kind']=='edition' and c['required'] for c in r['physical_checks'])
+ assert not r['condition_scenarios'] and not r['publishable']
+
+
+def test_new_only_evidence_does_not_create_used_scenarios(tmp_path):
+ paths,policy=scenario_inputs(tmp_path,grade='new')
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ r=json.loads((tmp_path/'review/review.json').read_text())['reviews'][0]
+ assert not r['condition_scenarios'] and r['new_copy_context']
+ with (tmp_path/'review/condition_scenarios.csv').open() as f:assert list(csv.DictReader(f))==[]
+
+@pytest.mark.parametrize('invalid',[{},[],{'mode':'labelled_used_scenarios'}])
+def test_incomplete_policy_cannot_silently_appear_applied(tmp_path,invalid):
+ paths,policy=scenario_inputs(tmp_path);policy.write_text(json.dumps(invalid))
+ with pytest.raises(ValueError,match='Condition policy'):run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ assert not (tmp_path/'review').exists()

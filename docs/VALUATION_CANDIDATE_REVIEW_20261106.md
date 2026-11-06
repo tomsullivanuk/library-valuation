@@ -86,9 +86,10 @@ inspect their own book to resolve a seller's contradictory metadata.
 
 ## What needs the owner
 
-One policy question remains: may ungraded books be shown under explicit used-
-condition scenarios, or should any copy-specific range wait for a condition check?
-No default grade has been assumed and neither answer authorizes publication.
+The owner approved clearly labelled used-condition scenarios for the pilot, with
+physical grading deferred until the copies are handled. No default grade is
+assigned and publication remains disabled. The updated report replaces the policy
+question with its applied status.
 
 The focused edition check is *Relativity: The Special and the General Theory*,
 location 74: confirm hardcover/paperback and the printing statement, plus any ISBN,
@@ -138,3 +139,35 @@ refinement also passed the 10 focused record-review tests. The private HTML repo
 was checked in a browser, including its 26 book sections, policy question, recorded
 1961 copyright context and publisher-resolution note. The temporary server was
 stopped afterward.
+
+## Approved condition scenarios applied
+
+The pilot-only policy is recorded privately with the exact 26-record cohort.
+The latest report is under
+`output/valuation_review_20261106/live_ebay_pilot_v1/used_condition_scenarios_v1/`.
+Earlier reports remain available as review history.
+
+- 25 separate grade/currency scenarios are displayed across the 12 books with
+  retained used offers, phrased “If your copy is [grade]”. These are seller asking-
+  price contexts, not condition assignments or approved Library estimates.
+- Every scenario shows its listing count. Fewer than three offers are explicitly
+  labelled limited evidence; three or more do not establish physical comparability.
+- No used scenario is invented for the other 14 books or derived from new prices.
+  New-copy prices remain separate context. No combined mixed-grade band is promoted
+  as the owner's default condition scenario.
+- All 26 condition checks are marked `deferred_until_handled` in the private
+  checklist. Edition and inferred-copy checks remain intact.
+- `condition_scenarios.csv` adds a structured download; physical-check CSV rows now
+  include status. The HTML report links both files.
+- Actual condition remains ungraded and publication false. The policy refuses a
+  default-grade assignment, an expanded cohort, or publication authorization.
+- Canonical records and active estimates on the Mini matched their pre-application
+  hashes. There were no new source requests or changes to live Action Item states.
+
+Nine additional regression cases cover applying the owner decision, preserving
+source values and real-condition uncertainty, deferred grading, retained edition
+checks, no invented new-only scenarios, and rejecting invalid, incomplete,
+publication-enabled, grade-assigning or wrong-cohort policies. The latest browser
+check confirmed 26 book sections, 25 conditional labels, the applied policy and
+absence of the old pending question. Full validation: **676 tests passed on both
+laptop and Mini**.

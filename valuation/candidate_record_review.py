@@ -103,15 +103,19 @@ def review_one(book,packet,rows,accepted_keys,note):
                 publishable=False,condition_assumed=False)
 
 
-def run_review(packet_path,notes_path,preliminary_path,observations_path,output_dir):
+def run_review(packet_path,notes_path,preliminary_path,observations_path,output_dir,*,condition_policy_path=None):
     paths=list(map(Path,(packet_path,notes_path,preliminary_path,observations_path)))
+    policy=json.loads(Path(condition_policy_path).read_text()) if condition_policy_path else None
     hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+    if condition_policy_path:hashes[str(Path(condition_policy_path))]=hashlib.sha256(Path(condition_policy_path).read_bytes()).hexdigest()
     packet,notes,prelim=[json.loads(p.read_text()) for p in paths[:3]];rows=read_csv(paths[3])
     expected=[v for k,v in prelim.get('summary',{}).get('input_hashes',{}).items() if Path(k).name==paths[3].name]
     if expected and (len(expected)!=1 or expected[0]!=hashes[str(paths[3])]):raise ValueError('Observations differ from the reviewed pilot evidence')
     candidates=[v for v in prelim['books'] if any(s['candidate_ranges'] for s in v['review']['sources'].values())]
     ids={v['book']['catalog_item_id'] for v in candidates}
     if set(packet)!=ids or set(notes)!=ids:raise ValueError('Evidence packet and authored notes must cover exactly the candidate cohort')
+    if condition_policy_path and (not isinstance(policy,dict) or policy.get('mode')!='labelled_used_scenarios' or policy.get('physical_grading')!='defer_until_handled' or policy.get('publication')!='disabled' or policy.get('default_grade') is not None or set(policy.get('catalog_item_ids',[]))!=ids):
+        raise ValueError('Condition policy must explicitly cover this cohort, defer grading, and forbid publication')
     out=Path(output_dir)
     if out.exists() or 'data' in out.resolve().parts:raise ValueError('Use a new private report directory outside canonical data')
     reviews=[]
@@ -121,31 +125,61 @@ def run_review(packet_path,notes_path,preliminary_path,observations_path,output_
         if isbn(packet[cid]['catalog'].get('isbn13') or packet[cid]['catalog'].get('isbn10',''))!=isbn(b.get('isbn13') or b.get('isbn10','')):raise ValueError('Target edition changed since pilot')
         keys={d['listing'] for d in v['review']['decisions'] if d['disposition'] in {'candidate_only','verified_comparable'}}
         reviews.append(review_one(b,packet[cid],[r for r in rows if r['catalog_id']==cid],keys,notes[cid]))
+        if policy:
+            item=reviews[-1];item['actual_condition']='ungraded';item['condition_policy']='labelled_used_scenarios'
+            item['condition_scenarios']=[dict(hypothetical_grade=grade,currency=currency,low=g['low'],high=g['high'],listing_count=g['count'],evidence_label='limited evidence' if g['count']<3 else 'three or more offers; comparability still requires review',scenario_only=True,publishable=False) for grade,groups in item['retained_used_by_grade'].items() for currency,g in groups.items()]
+            for check in item['physical_checks']:
+                if check['kind']=='condition':check.update(status='deferred_until_handled',priority='when you handle the copies')
+            if item['identity_supported_from_records'] and item['condition_scenarios']:
+                item['research_next_steps']=[step for step in item['research_next_steps'] if not step.startswith('Used comparisons are available by grade.')]
+                item['research_next_steps'].append('Use the clearly labelled condition scenarios for review now. Grade each actual copy when it is handled; no scenario assigns its present condition.')
     summary=dict(reviewed_books=len(reviews),identity_supported=sum(r['identity_supported_from_records'] for r in reviews),edition_checks=sum(any(p['kind']=='edition' for p in r['physical_checks']) for r in reviews),inferred_copy_checks=sum(bool(r['inferred_copy_observation_ids']) for r in reviews),books_with_retained_used_context=sum(bool(r['retained_used_context']) for r in reviews),books_without_used_context=sum(not r['retained_used_context'] for r in reviews),books_with_three_used_offers=sum(any(g['count']>=3 for g in r['retained_used_context'].values()) for r in reviews),books_with_three_same_grade_offers=sum(any(g['count']>=3 for grades in r['retained_used_by_grade'].values() for g in grades.values()) for r in reviews),listing_decisions=dict(Counter(d['review_disposition'] for r in reviews for d in r['listing_decisions'])),estimates_changed=0,source_requests=0)
-    assert hashes=={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+    if policy:
+        summary.update(condition_scenarios=sum(len(r['condition_scenarios']) for r in reviews),condition_checks_deferred=sum(c.get('status')=='deferred_until_handled' for r in reviews for c in r['physical_checks']))
+    assert hashes=={name:hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in hashes}
     out.mkdir(parents=True,mode=0o700)
     def save(name,content):p=out/name;p.write_text(content,encoding='utf-8');p.chmod(0o600)
-    save('review.json',json.dumps(dict(version=VERSION,input_hashes=hashes,summary=summary,owner_policy_question='Should ungraded books be shown under explicit used-condition scenarios, or remain without a copy-specific range until condition is checked? No default grade has been assumed.',reviews=reviews),indent=2)+'\n')
+    save('review.json',json.dumps(dict(version=VERSION,input_hashes=hashes,summary=summary,condition_policy=policy,owner_policy_status='applied' if policy else 'pending',owner_policy_question=None if policy else 'Should ungraded books be shown under explicit used-condition scenarios, or remain without a copy-specific range until condition is checked? No default grade has been assumed.',reviews=reviews),indent=2)+'\n')
     checks=[]
     for r in reviews:
-        for c in r['physical_checks']:checks.append(dict(catalog_item_id=r['catalog_item_id'],title=r['title'],location=c.get('location',r['location']),kind=c['kind'],priority=c['priority'],question=c['question'],required_before_any_estimate=c['required']))
+        for c in r['physical_checks']:checks.append(dict(catalog_item_id=r['catalog_item_id'],title=r['title'],location=c.get('location',r['location']),kind=c['kind'],priority=c['priority'],question=c['question'],required_before_any_estimate=c['required'],status=c.get('status','open')))
     with (out/'physical_checks.csv').open('w',newline='') as f:
         w=csv.DictWriter(f,fieldnames=list(checks[0]));w.writeheader()
         for c in sorted(checks,key=lambda c:(not c['required_before_any_estimate'],c['location'],c['title'])):w.writerow({k:("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for k,v in c.items()})
     (out/'physical_checks.csv').chmod(0o600)
+    if policy:
+        fields=['catalog_item_id','title','hypothetical_grade','currency','low','high','listing_count','evidence_label','actual_condition','scenario_only','publishable']
+        with (out/'condition_scenarios.csv').open('w',newline='') as f:
+            w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
+            for item in reviews:
+                for scenario in item['condition_scenarios']:
+                    row=dict(catalog_item_id=item['catalog_item_id'],title=item['title'],actual_condition='ungraded',**scenario)
+                    w.writerow({k:("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for k,v in row.items()})
+        (out/'condition_scenarios.csv').chmod(0o600)
     def esc(v):return html.escape(str(v))
     def display(groups):return '; '.join(f"{c} {g['low']}–{g['high']} ({g['count']} offers)" for c,g in groups.items()) or 'No retained used comparison'
     parts=['<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Candidate record review</title><style>body{font:17px system-ui;color:#243c33;max-width:1150px;margin:32px auto;padding:20px}h1,h2{color:#215a45}p,li{line-height:1.5}details{border:1px solid #ccd6d0;padding:16px;margin:12px 0;border-radius:8px}summary{font-weight:bold;cursor:pointer}table{border-collapse:collapse;width:100%;font-size:14px}td,th{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid #ddd}.notice{padding:16px;background:#fff4d7}.scroll{overflow:auto}</style><h1>Candidate comparisons reviewed against your records</h1><p class="notice">Review only. No Library estimates, source records or existing Action Item statuses have been changed. Source listings and earlier pilot reports are preserved.</p>']
     parts.append('<p>'+esc(f"{summary['reviewed_books']} comparisons reviewed; {summary['identity_supported']} ISBN identities supported by purchase and inventory records. {summary['edition_checks']} edition check requires the book. Used and new offers are separated; held prices remain evidence, not corrections to a seller’s listing.")+'</p>')
-    parts.append('<h2>Your one policy decision</h2><p>May ungraded books be compared under clearly labelled used-condition scenarios, or should a copy-specific range wait until its condition is checked? No condition grade is currently assumed. This decision does not authorize publication.</p><h2>Priority physical edition checks</h2>')
+    if policy:
+        parts.append('<h2>Your condition policy is applied</h2><p>Use clearly labelled used-condition scenarios for review now. Actual copies remain ungraded; physical grading is deferred until you handle them. No default grade is selected and estimates remain unchanged.</p><p><a href="condition_scenarios.csv">Download condition scenarios</a> · <a href="physical_checks.csv">Download deferred physical-check checklist</a></p>')
+    else:
+        parts.append('<h2>Your one policy decision</h2><p>May ungraded books be compared under clearly labelled used-condition scenarios, or should a copy-specific range wait until its condition is checked? No condition grade is currently assumed. This decision does not authorize publication.</p>')
+    parts.append('<h2>Priority physical edition checks</h2>')
     for r in reviews:
         for c in r['physical_checks']:
             if c['kind'] in {'edition','inferred_copy_identity'}:parts.append('<p><b>'+esc(r['title'])+'</b> · Location '+esc(c.get('location',r['location']))+' · '+esc(c['priority'])+'<br>'+esc(c['question'])+'</p>')
     parts.append('<h2>Condition checks, when you handle the copies</h2><p>Current condition is not established for these 26 books. Record it when retrieving a book or before a copy-specific estimate/sale; these are not 26 urgent edition investigations. The downloadable checklist keeps condition checks separate from edition questions and market research.</p><h2>All 26 reviewed comparisons</h2>')
     for r in reviews:
         parts.append('<details><summary>'+esc(r['title'])+'</summary><p>Location: '+esc(r['location'])+'</p><p>'+esc(r['note'])+'</p><p>Identity from existing records: '+('supported by purchased and scanned ISBN' if r['identity_supported_from_records'] else 'edition still unresolved')+'.</p>')
-        parts.append('<p>Recorded inventory publisher: '+esc('; '.join(r['recorded_publishers']))+'</p><p>Retained used asking-price context: '+esc(display(r['retained_used_context']))+'</p>')
-        for grade,values in r['retained_used_by_grade'].items():parts.append('<p>'+esc(grade.replace('_',' ')+': '+display(values))+'</p>')
+        parts.append('<p>Recorded inventory publisher: '+esc('; '.join(r['recorded_publishers']))+'</p>')
+        if policy:
+            parts.append('<h3>Used-condition scenarios · your copy is ungraded</h3>')
+            if not r['condition_scenarios']:parts.append('<p>No retained used evidence supports a scenario. New-copy prices are shown separately as context; no used price is invented.</p>')
+            for scenario in r['condition_scenarios']:
+                parts.append('<p><b>If your copy is '+esc(scenario['hypothetical_grade'].replace('_',' '))+':</b> '+esc(scenario['currency']+' '+scenario['low']+'–'+scenario['high'])+' in asking-price evidence ('+esc(scenario['listing_count'])+' offers; '+esc(scenario['evidence_label'])+'). This is not an assigned condition or an approved estimate.</p>')
+        else:
+            parts.append('<p>Retained used asking-price context: '+esc(display(r['retained_used_context']))+'</p>')
+            for grade,values in r['retained_used_by_grade'].items():parts.append('<p>'+esc(grade.replace('_',' ')+': '+display(values))+'</p>')
         parts.append('<p>New-copy context: '+esc(display(r['new_copy_context']).replace('No retained used comparison','No new-copy context'))+'</p>')
         if r['edition_binding_inference']['value']:parts.append('<p>Listing metadata suggests '+esc(r['edition_binding_inference']['value'])+' for this ISBN; the physical copy has not been inspected.</p>')
         parts.append('<ul>'+''.join('<li>'+esc(x)+'</li>' for x in r['research_next_steps'])+'</ul><div class="scroll"><table><thead><tr><th>Saved listing</th><th>Price / condition</th><th>Review decision</th></tr></thead><tbody>')

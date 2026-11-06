@@ -165,6 +165,9 @@ The 26 candidate comparisons have been checked against existing records: 25
 catalog identities are supported, 12 retain used-copy context, and one focused
 physical edition check remains. Estimates are unchanged. See the
 [record-review results](VALUATION_CANDIDATE_REVIEW_20261106.md).
+The owner-approved condition policy is applied to the pilot: 25 explicitly
+labelled used-grade scenarios across 12 books, with grading deferred until handling.
+Actual copy grades and Library estimates remain unchanged; edition checks remain.
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
