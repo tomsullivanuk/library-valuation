@@ -1,0 +1,140 @@
+# Existing-record review of the 26 live pilot comparisons
+
+Completed November 6, 2026. All 26 books with candidate prices were reviewed against
+the existing acquisition records, current Libib observations, catalog identities,
+prior reconciliation decisions, earlier source-page transcriptions and saved live
+listing details. No new marketplace requests were made. Estimates, canonical
+records and existing Action Item statuses remain unchanged; this is a separate
+review receipt and checklist, not publication or automatic task completion.
+
+## Outcomes
+
+| Outcome | Count |
+| --- | ---: |
+| Candidate book comparisons reviewed | 26 |
+| Catalog-level ISBN identities supported by purchase and scanned inventory records | 25 |
+| Book needing a focused physical edition check | 1 |
+| Previously inferred linked copy needing confirmation when handled | 1 |
+| Books retaining used-copy price context after working holds | 12 |
+| Books with at least three retained used offers, possibly across condition grades | 8 |
+| Books with at least three offers within one condition grade | 4 |
+| Books without retained ordinary-used evidence | 14 |
+| Published changes / new source requests | 0 / 0 |
+
+The 14 books without retained used context include the one unresolved edition;
+the other 13 need more suitable market evidence, not an owner edition investigation.
+Four of the 12 with retained used context have fewer than three used offers and
+also remain thin. All used-price contexts are conditional comparisons, not approved
+replacement estimates or claims about the condition of the owner's copies.
+
+## What existing records resolved
+
+Matching acquisition and scanned Libib ISBNs support 25 catalog identities. Short
+catalog titles, source publisher wording and printing-year differences were not
+allowed to create unnecessary physical edition checks when those identifiers
+agree. Multiple purchases remain purchase history; they do not independently prove
+that the currently inventoried copies are different editions.
+
+The inventory already supplies the correct Cambridge University Press wording
+for a record whose catalog publisher has an unrelated ESOL label. The corrected
+wording is used as review context; the canonical publisher field has not been
+changed. This preserves the boundary between record-review conclusions and
+publishing metadata changes.
+
+Prior notes for the ISBN-less Crown *Relativity* already record Robert W. Lawson's
+authorised translation and copyright 1961 by the Estate of Albert Einstein. This
+resolves part of its identity and excludes a listing claimed to be a 1931 first
+edition. Copyright is explicitly not treated as the printing/publication year.
+The remaining physical question concerns actual binding and printing, then jacket
+and condition; it is not a request to identify the book from scratch.
+
+An ISBN-less physical observation already linked to *The Principle of Relativity*
+by reviewed title/creator/publisher evidence retains its medium-confidence link.
+The two barcode-bearing observations and matching acquisitions support the catalog
+ISBN, but do not physically verify the third copy's edition. Its earlier decision
+is preserved; confirmation is deferred until a copy-specific estimate or sale.
+
+## Listing decisions
+
+| Decision on saved listing evidence | Rows |
+| --- | ---: |
+| Retained working candidates, including separate new-copy context | 124 |
+| Held for title-versus-structured-format/condition contradictions | 2 |
+| Held used prices above multiple new-copy item-price offers | 9 |
+| Held high price outside a tight same-format/grade cluster | 1 |
+| Held pending the target book's remaining edition details | 3 |
+| Excluded different publisher editions for the ISBN-less book | 5 |
+| Excluded publication claim earlier than the recorded copyright | 1 |
+| Already outside the preliminary candidate set; unchanged | 8 |
+
+Held rows remain in the saved evidence. A hold is not a finding that a seller's
+listing is false. New and used asking prices are separated, with used grades kept
+separate. Nine used offers exceed at least two compatible-ISBN new-copy item prices
+and are over 25% above the lowest such offer. They are held as weak working evidence
+pending market/delivered-cost review. Shipping was not collected, so this is not a
+claim that their total delivered prices are necessarily uncompetitive.
+
+The high-outlier hold is supported by three same-format/grade offers whose prices
+are within a 1.5 ratio and a fourth price over three times the lower cluster's
+median. It is omitted from the working context but preserved for inspection. These
+are transparent diagnostic heuristics, not accepted valuation or sale-pricing rules.
+
+One listing calls itself hardcover in its title but paperback in structured data;
+another calls itself Very Good in its title but Good in its structured condition.
+Both are held rather than choosing a preferred field or asking the owner to
+inspect their own book to resolve a seller's contradictory metadata.
+
+## What needs the owner
+
+One policy question remains: may ungraded books be shown under explicit used-
+condition scenarios, or should any copy-specific range wait for a condition check?
+No default grade has been assumed and neither answer authorizes publication.
+
+The focused edition check is *Relativity: The Special and the General Theory*,
+location 74: confirm hardcover/paperback and the printing statement, plus any ISBN,
+jacket and condition. Existing notes already establish the Crown/Lawson/1961
+copyright context. The inferred *Principle of Relativity* copy is a separate,
+conditional check in location 83 and 83a when handled; its accepted link is not reopened or rewritten.
+
+Condition remains unrecorded for all 26 books. A deferred checklist groups these
+checks separately from the priority edition question. Inspect copies when retrieved
+or before copy-specific pricing/sale, rather than treating all 26 as urgent
+bibliographic investigations. The checklist retains locations, questions and
+priorities. Further seller/price research is explicitly agent work, not reassigned
+to the owner as a physical task.
+
+## Implementation, artifacts and validation
+
+`valuation/candidate_record_review.py` creates private, reproducible record-review
+receipts, per-listing decisions, an HTML review and a physical-check CSV. It checks
+cohort coverage, target ISBN compatibility and observation fingerprints; refuses
+to overwrite prior reviews or write into a canonical data directory; and does not
+alter its inputs. Binding inferred from consistent returned listing metadata is
+labelled as an inference, never as physical verification. Current condition remains
+unknown. Original pilot evidence and earlier review outputs are retained.
+
+Private results are on the Mini and copied to the laptop under
+`output/valuation_review_20261106/live_ebay_pilot_v1/reviewed_candidates_v3/`:
+
+- `review.html`: all 26 authored conclusions, used/new/grade contexts, held rows,
+  the owner policy question and focused physical checks;
+- `physical_checks.csv`: one priority edition check, one deferred inferred-copy
+  check and 26 deferred condition checks;
+- `review.json`: authored notes, acquisition/observation references, prior-note
+  facts, per-listing decisions, retained contexts and input hashes;
+- `protected_state_verification.json`: unchanged canonical and active-summary
+  hashes on the authoritative Mini.
+
+Individual book lists, source packets, source-page notes and receipts remain
+private and ignored by Git. The public repository contains only the generic tool,
+synthetic regression tests and aggregate findings. Ten new tests cover supported
+versus mismatched identities, non-invention of physical facts, contradictory listing
+metadata, used/new separation, outliers, condition/currency distinctions, earlier
+copyright evidence, preserved inferred-copy links, complete cohort requirements,
+changed source evidence, private outputs and unchanged inputs.
+
+Full-suite validation: **667 tests passed on laptop and Mini**; the final copy-location
+refinement also passed the 10 focused record-review tests. The private HTML report
+was checked in a browser, including its 26 book sections, policy question, recorded
+1961 copyright context and publisher-resolution note. The temporary server was
+stopped afterward.

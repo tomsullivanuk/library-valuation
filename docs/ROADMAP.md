@@ -161,6 +161,10 @@ The eBay-only live pilot is also complete: 30 books, 156 listing details,
 26 candidate comparisons, and no estimate changes. See the
 [live pilot review](VALUATION_LIVE_PILOT_20261106.md); wider collection and
 publication remain subject to review.
+The 26 candidate comparisons have been checked against existing records: 25
+catalog identities are supported, 12 retain used-copy context, and one focused
+physical edition check remains. Estimates are unchanged. See the
+[record-review results](VALUATION_CANDIDATE_REVIEW_20261106.md).
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
