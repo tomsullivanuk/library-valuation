@@ -1,8 +1,9 @@
 # Mac Mini migration runbook
 
 Status: Mac Mini is the sole production host as of November 5, 2026. System
-startup and daily snapshot services are installed and healthy. Pre-login reboot
-recovery has passed. Pre-login off-device iCloud upload remains unresolved.
+startup and daily snapshot services are installed and healthy. Automatic login,
+screen locking, library recovery and independent iCloud backup verification have
+passed after reboot. Milestone 1 migration acceptance is complete.
 Baseline: v0.11.1. This is milestone 1 of the revised v0.12 roadmap.
 
 ## Preparation completed on the laptop
@@ -159,10 +160,10 @@ This verifies service startup across reboot; an actual mains-power interruption
 was not performed. Restart-after-power-failure is configured. The remaining issue
 is cloud upload of newly created snapshots before login, not library availability.
 
-## Automatic login and locking: preparation
+## Automatic login and locking: preparation history
 
 The owner selected automatic graphical login followed by locking to allow iCloud
-sync after reboot. Automatic login is not enabled yet. A user LaunchAgent is
+sync after reboot. At preparation time automatic login was not yet enabled. A user LaunchAgent is
 installed to run `operations/lock_after_login.py` at each Aqua login. It requires
 `sysadminctl -screenLock status` to report immediate password-on-wake, turns off
 the display using `pmset`, and verifies `IOConsoleLocked` for the logged-in owner
@@ -175,3 +176,30 @@ test before automatic login is enabled. This display-sleep mechanism depends on
 that password policy; it is not a guarantee if the setting changes later. Automatic
 login still has a potential unlocked interval and must be rechecked after OS
 updates. Post-reboot locking and independent iCloud upload remain acceptance gates.
+
+## Final acceptance: November 5, 2026
+
+The owner enabled automatic login for the existing account (shown by its full
+name in Users & Groups) and restarted the Mini without manually logging in.
+Verification after that restart confirmed:
+
+- automatic-login configuration identifies the expected owner account;
+- the owner graphical session is running and `IOConsoleLocked` is true;
+- password-on-wake remains immediate and the login-lock task reports success;
+- the system library service is running and the laptop's private connection
+  recovered with the expected destination workspace identity and 2,521 titles;
+- the backup job exited successfully; and
+- the new post-reboot snapshot synced through iCloud to the laptop, where archive
+  checksums and all 3,982 member hashes were independently verified.
+
+This resolves the earlier pre-login iCloud gap by establishing a logged-in but
+locked session. The earlier test findings above are retained as preparation
+history, not current unresolved blockers. Milestone 1 is complete. An actual
+mains-power interruption was not tested; a normal restart was tested and automatic
+restart after power loss is configured. Monitor backup capacity (dated snapshots
+are retained), check recovery periodically and retest locking after OS updates.
+
+Next: milestone 2, whole-library valuation review. Establish refresh rules and a
+bounded pilot before collecting or replacing estimates; transfer only required
+API credentials securely and verify destination access separately. Family access
+and Sites/provider selection remain milestone 3.

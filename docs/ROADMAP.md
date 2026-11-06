@@ -130,6 +130,11 @@ acceptance gate; partial implementation does not imply the whole release is done
 
 #### 1. Mac Mini migration
 
+Status: completed November 5, 2026. Final transfer, source write protection,
+automatic login and locking, reboot recovery, laptop reconnection, and independent
+iCloud snapshot verification passed. See the migration runbook for evidence and
+ongoing operational limitations.
+
 Move authoritative operation from the laptop to the Mac Mini. Inventory and
 privately back up source data, saved decisions, reviewed estimates, imports,
 required market evidence, configuration and reports. Recreate the runtime and
