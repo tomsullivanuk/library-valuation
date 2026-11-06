@@ -168,3 +168,19 @@ def test_incomplete_policy_cannot_silently_appear_applied(tmp_path,invalid):
  paths,policy=scenario_inputs(tmp_path);policy.write_text(json.dumps(invalid))
  with pytest.raises(ValueError,match='Condition policy'):run_review(*paths,tmp_path/'review',condition_policy_path=policy)
  assert not (tmp_path/'review').exists()
+
+
+def test_three_same_grade_offers_with_wide_spread_stay_flagged(tmp_path):
+ paths,policy=scenario_inputs(tmp_path)
+ rows=[row(1,'5'),row(2,'12'),row(3,'25')]
+ prelim=json.loads(paths[2].read_text())
+ prelim['books'][0]['review']['decisions']=[dict(listing=listing_key(r),disposition='candidate_only') for r in rows]
+ paths[2].write_text(json.dumps(prelim))
+ with paths[3].open('w',newline='') as f:
+  w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ r=json.loads((tmp_path/'review/review.json').read_text())['reviews'][0]
+ scenario=r['condition_scenarios'][0]
+ assert scenario['listing_count']==3 and scenario['high_spread']
+ assert scenario['evidence_label']=='wide price spread; further review needed'
+ assert r['actual_condition']=='ungraded' and not r['publishable']

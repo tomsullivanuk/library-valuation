@@ -127,7 +127,7 @@ def run_review(packet_path,notes_path,preliminary_path,observations_path,output_
         reviews.append(review_one(b,packet[cid],[r for r in rows if r['catalog_id']==cid],keys,notes[cid]))
         if policy:
             item=reviews[-1];item['actual_condition']='ungraded';item['condition_policy']='labelled_used_scenarios'
-            item['condition_scenarios']=[dict(hypothetical_grade=grade,currency=currency,low=g['low'],high=g['high'],listing_count=g['count'],evidence_label='limited evidence' if g['count']<3 else 'three or more offers; comparability still requires review',scenario_only=True,publishable=False) for grade,groups in item['retained_used_by_grade'].items() for currency,g in groups.items()]
+            item['condition_scenarios']=[dict(hypothetical_grade=grade,currency=currency,low=g['low'],high=g['high'],listing_count=g['count'],evidence_label=('limited evidence' if g['count']<3 else 'wide price spread; further review needed' if Decimal(g['high'])>=3*Decimal(g['low']) else 'three or more offers; comparability still requires review'),high_spread=Decimal(g['high'])>=3*Decimal(g['low']),scenario_only=True,publishable=False) for grade,groups in item['retained_used_by_grade'].items() for currency,g in groups.items()]
             for check in item['physical_checks']:
                 if check['kind']=='condition':check.update(status='deferred_until_handled',priority='when you handle the copies')
             if item['identity_supported_from_records'] and item['condition_scenarios']:
@@ -148,7 +148,7 @@ def run_review(packet_path,notes_path,preliminary_path,observations_path,output_
         for c in sorted(checks,key=lambda c:(not c['required_before_any_estimate'],c['location'],c['title'])):w.writerow({k:("'"+v if isinstance(v,str) and v.startswith(('=','+','-','@')) else v) for k,v in c.items()})
     (out/'physical_checks.csv').chmod(0o600)
     if policy:
-        fields=['catalog_item_id','title','hypothetical_grade','currency','low','high','listing_count','evidence_label','actual_condition','scenario_only','publishable']
+        fields=['catalog_item_id','title','hypothetical_grade','currency','low','high','listing_count','evidence_label','actual_condition','high_spread','scenario_only','publishable']
         with (out/'condition_scenarios.csv').open('w',newline='') as f:
             w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
             for item in reviews:

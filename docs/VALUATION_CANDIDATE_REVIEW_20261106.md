@@ -171,3 +171,56 @@ publication-enabled, grade-assigning or wrong-cohort policies. The latest browse
 check confirmed 26 book sections, 25 conditional labels, the applied policy and
 absence of the old pending question. Full validation: **676 tests passed on both
 laptop and Mini**.
+
+## Used-only follow-up and review
+
+A separate bounded follow-up targets the 25 ISBN-identified books in the existing
+26-comparison cohort, including all 12 books with prior retained used evidence.
+The ISBN-less Crown edition remains deferred rather than borrowing a seller's
+ISBN. Searches use the ISBN keyword with fixed-price and used-condition filters,
+up to ten detail responses per book, a 300-request ceiling, and no broad title
+fallback. The mode is pinned in the resumable checkpoint. The original mixed
+new/used collector behavior and checkpoint format remain compatible.
+
+The condition filter uses the broader USED category; returned listing details
+still determine the specific grade and independently returned ISBN. See
+[eBay's field-filter documentation](https://developer.ebay.com/api-docs/buy/static/ref-buy-browse-filters.html).
+New-copy evidence from the first run remains separate context.
+
+`valuation.pilot_followup.merge_observations` combines immutable saved runs,
+retaining the newest snapshot per book/source/listing. Repeat fetches do not add
+comparables; conflicting records at an identical timestamp stop the merge for
+review. Input fingerprints and a private merge receipt preserve reproducibility.
+The combined evidence is passed through a fresh preliminary review before the
+record review, retaining the original observation fingerprint safeguards.
+
+Grade scenarios now explicitly flag a high/low asking-price ratio of at least
+three. Three offers alone do not make a wide or contradictory comparison usable.
+No default grade, physical condition, approved estimate, or sale proceeds are
+inferred. Physical grading remains deferred; edition questions remain intact.
+
+The follow-up completed all 25 books with **175 requests**, below its 300-request
+cap. It returned 149 listing details; merging with the earlier run removed 57
+repeat fetches, leaving 248 distinct observed listings across the original pilot.
+No listing was counted twice to inflate evidence.
+
+The final record review retains used-copy context for **22 of 26 books**, up from
+12. Six of the original twelve gained retained offers; six remained unchanged.
+The other ten newly supported books previously had no retained used comparison.
+There are now 58 grade/currency scenarios; 14 have at least three offers and a
+high/low ratio below three, across 11 books. These remain review contexts, not
+approved copy-specific values. Thin groups and one three-offer wide-spread group
+remain explicitly labelled. Four books still have no retained used comparison:
+two have only above-new used evidence held, one has no returned used evidence,
+and the ISBN-less edition still needs its physical edition check.
+
+Fresh authored notes address each of the original twelve individually. The final
+private report is `used_followup_v1/review_final/review.html`; the comparison CSV,
+merged evidence, source checkpoints, inputs and prior reports are preserved beside
+it. Canonical records and the active estimate summary matched their pre-run
+hashes. All 26 physical grading checks remain deferred, with the edition and
+inferred-copy checks preserved. No Action Item state or estimate was changed.
+
+Validation: **681 tests passed on laptop and Mini**. Five new cases cover
+used-only filtering without search broadening, checkpoint mode consistency,
+newest-snapshot deduplication, conflicting snapshots, and wide-spread scenarios.

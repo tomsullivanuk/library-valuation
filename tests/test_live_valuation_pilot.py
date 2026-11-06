@@ -152,3 +152,26 @@ def test_auth_retry_is_once_and_gtin_empty_falls_back_to_keyword():
     api.detail('v1|1|0')
     assert len(tokens)==2 and len(detail_calls)==2 and len(searches)==2
     assert state['request_count']==6
+
+
+def test_used_followup_filters_used_and_never_broadens_empty_search():
+    seen=[];state={'manifest':{'request_budget':3,'search_mode':'used_isbn'},'request_count':0}
+    def request(req,timeout):
+        seen.append(req)
+        return {'access_token':'token','expires_in':7200} if req.get_method()=='POST' else {'itemSummaries':[]}
+    api=PilotApi(CREDS,state,lambda:None,request_json=request,sleep=lambda _:None)
+    result=api.search(BOOK,10)
+    params=urllib.parse.parse_qs(urllib.parse.urlsplit(seen[1].full_url).query)
+    assert params['q']==[BOOK['isbn13']]
+    assert params['filter']==['buyingOptions:{FIXED_PRICE},conditions:{USED}']
+    assert result['strategy']=='used_isbn_keyword' and len(seen)==2
+    with pytest.raises(ValueError,match='valid ISBN'):api.search(dict(BOOK,isbn13=''),10)
+
+
+def test_search_mode_is_pinned_for_resume(tmp_path):
+    class Empty:
+        def __init__(self,*a,**k):pass
+        def search(self,*a):return dict(item_ids=[],query='example',strategy='used_isbn_keyword')
+    p=pilot(tmp_path);out=tmp_path/'run'
+    collect(p,out,CREDS,search_mode='used_isbn',api_factory=Empty,progress=lambda _:None)
+    with pytest.raises(ValueError,match='Checkpoint differs'):collect(p,out,CREDS,api_factory=Empty)

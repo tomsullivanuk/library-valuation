@@ -139,7 +139,12 @@ class PilotApi:
         raise RuntimeError('Request failed')
     def search(self,book,limit):
         target=isbn(book.get('isbn13') or book.get('isbn10',''))
-        if target:strategy='gtin';query=target;params={'gtin':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE}'}
+        used_only=self.state['manifest'].get('search_mode')=='used_isbn'
+        if used_only and not target:raise ValueError('Used follow-up requires a valid ISBN')
+        if used_only:
+            strategy='used_isbn_keyword';query=target
+            params={'q':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE},conditions:{USED}'}
+        elif target:strategy='gtin';query=target;params={'gtin':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE}'}
         else:
             strategy='title_author';query=' '.join(x for x in [book.get('title',''),book.get('author','')] if x)
             params={'q':query,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE}'}
@@ -147,7 +152,7 @@ class PilotApi:
         items=payload.get('itemSummaries',[])
         if not isinstance(items,list):raise ValueError('Invalid search response')
         # Single controlled keyword fallback when catalog GTIN indexing has no result.
-        if not items and target:
+        if not items and target and not used_only:
             strategy='isbn_keyword';payload=self.get('item_summary/search',{'q':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE}'})
             items=payload.get('itemSummaries',[])
             if not isinstance(items,list):raise ValueError('Invalid fallback response')
@@ -162,15 +167,17 @@ class PilotApi:
         return self.get('item/'+quote(item_id,safe=''),{'fieldgroups':'PRODUCT'})
 
 
-def collect(pilot_path,output_dir,credentials,*,max_results=10,request_budget=400,delay=1.0,api_factory=PilotApi,progress=print):
+def collect(pilot_path,output_dir,credentials,*,max_results=10,request_budget=400,delay=1.0,api_factory=PilotApi,progress=print,search_mode=None):
     pilot_path=Path(pilot_path).resolve();output_dir=Path(output_dir).resolve()
     if credentials.environment!='production':raise ValueError('Pilot requires explicitly configured production access')
     if not 1<=max_results<=10 or not 1<=request_budget<=400 or delay<0:raise ValueError('Pilot limits exceeded')
     if 'data' in output_dir.parts:raise ValueError('Use a private output directory, not canonical data')
+    if search_mode not in {None,'used_isbn'}:raise ValueError('Unknown search mode')
     pilot=read_csv(pilot_path);ids=[b.get('catalog_item_id','') for b in pilot]
     if not 1<=len(ids)<=30 or not all(ids) or len(set(ids))!=len(ids):raise ValueError('Pilot requires 1–30 distinct catalog identities')
     manifest=dict(version=VERSION,pilot_sha256=hashlib.sha256(pilot_path.read_bytes()).hexdigest(),catalog_ids=ids,
                   max_results=max_results,request_budget=request_budget,marketplace=credentials.marketplace_id,environment=credentials.environment)
+    if search_mode:manifest['search_mode']=search_mode
     output_dir.mkdir(parents=True,exist_ok=True,mode=0o700)
     with (output_dir/'.run.lock').open('a') as lock:
         os.chmod(output_dir/'.run.lock',0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -231,10 +238,11 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--pilot',type=Path,required=True);p.add_argument('--output-dir',type=Path,required=True)
     p.add_argument('--credentials',type=Path,required=True);p.add_argument('--confirm-production',action='store_true')
+    p.add_argument('--search-mode',choices=['used_isbn'],default=None)
     p.add_argument('--max-results',type=int,default=10);p.add_argument('--request-budget',type=int,default=400)
     a=p.parse_args()
     if not a.confirm_production:p.error('Explicit --confirm-production is required')
     import certifi
     os.environ['SSL_CERT_FILE']=certifi.where()
     credentials=EbayCredentials.from_environment(json.loads(a.credentials.read_text()))
-    collect(a.pilot,a.output_dir,credentials,max_results=a.max_results,request_budget=a.request_budget)
+    collect(a.pilot,a.output_dir,credentials,max_results=a.max_results,request_budget=a.request_budget,search_mode=a.search_mode)
