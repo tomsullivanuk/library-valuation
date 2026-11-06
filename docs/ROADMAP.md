@@ -150,6 +150,10 @@ behavior, documented rollback, and a recorded single-writer cutover. See the
 
 #### 2. Whole-library valuation review
 
+Status: read-only audit completed November 6, 2026; a private 30-record diagnostic
+pilot cohort is prepared. Live source access and revised comparison/publication
+rules remain prerequisites. See the [audit and pilot readiness](VALUATION_REVIEW_AUDIT_20261106.md).
+
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
 edition and condition matching, duplicate/set ambiguity, outliers, currencies,
