@@ -184,3 +184,45 @@ def test_three_same_grade_offers_with_wide_spread_stay_flagged(tmp_path):
  assert scenario['listing_count']==3 and scenario['high_spread']
  assert scenario['evidence_label']=='wide price spread; further review needed'
  assert r['actual_condition']=='ungraded' and not r['publishable']
+
+
+def test_scanned_isbn_supports_identity_without_purchase_history():
+ packet=deepcopy(PACKET);packet['acquisitions']=[]
+ r=review([row(1)],packet=packet)
+ assert r['identity_supported_from_records'] and not r['identity_evidence']['purchase_corroborated']
+ assert not any(c['kind']=='edition' for c in r['physical_checks'])
+
+
+def test_binding_groups_are_separate_and_unknown_binding_stays_flagged(tmp_path):
+ paths,policy=scenario_inputs(tmp_path)
+ rows=[row(1,'10'),row(2,'20',listing_binding='hardcover',listing_title='Example Hardcover'),row(3,'30',listing_binding='',listing_title='Example')]
+ prelim=json.loads(paths[2].read_text());prelim['books'][0]['review']['decisions']=[dict(listing=listing_key(r),disposition='candidate_only') for r in rows];paths[2].write_text(json.dumps(prelim))
+ with paths[3].open('w',newline='') as f:
+  w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy)
+ r=json.loads((tmp_path/'review/review.json').read_text())['reviews'][0]
+ assert len(r['condition_scenarios'])==3
+ assert {s['listing_binding'] for s in r['condition_scenarios']}=={'paperback','hardcover','unknown'}
+ assert all(s['listing_count']==1 for s in r['condition_scenarios'])
+ assert 'binding not established' in next(s for s in r['condition_scenarios'] if s['listing_binding']=='unknown')['evidence_label']
+
+
+def test_full_cohort_report_keeps_books_without_search_candidates(tmp_path):
+ paths,policy=scenario_inputs(tmp_path)
+ prelim=json.loads(paths[2].read_text());prelim['books'][0]['review']['sources']['ebay']['candidate_ranges']={};prelim['books'][0]['review']['decisions']=[];paths[2].write_text(json.dumps(prelim))
+ summary=run_review(*paths,tmp_path/'review',condition_policy_path=policy,include_all_books=True)
+ assert summary['reviewed_books']==1 and summary['books_without_used_context']==1
+ assert summary['condition_checks_deferred']==1
+ page=(tmp_path/'review/review.html').read_text()
+ assert 'All 1 reviewed books' in page and '26 books' not in page
+
+
+def test_preliminary_exclusion_reasons_and_existing_notes_are_visible(tmp_path):
+ paths,policy=scenario_inputs(tmp_path)
+ packet=json.loads(paths[0].read_text());packet['BK1']['source_notes']=[dict(notes='First paperback edition 1971. No ISBN shown.')];paths[0].write_text(json.dumps(packet))
+ prelim=json.loads(paths[2].read_text());prelim['books'][0]['review']['decisions'][0].update(disposition='excluded',reasons=['volume_mismatch']);paths[2].write_text(json.dumps(prelim))
+ run_review(*paths,tmp_path/'review',condition_policy_path=policy,include_all_books=True)
+ page=(tmp_path/'review/review.html').read_text()
+ assert 'different volume' in page and 'First paperback edition 1971' in page
+ r=json.loads((tmp_path/'review/review.json').read_text())['reviews'][0]
+ assert not r['condition_scenarios']

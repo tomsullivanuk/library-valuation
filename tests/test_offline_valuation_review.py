@@ -128,3 +128,31 @@ def test_replay_is_deterministic_private_and_refuses_overwrite(tmp_path):
         replay(pilot,[obs],tmp_path/'a',as_of='2026-11-06',historical_as_of='2026-11-02')
     with pytest.raises(ValueError,match='data repository'):
         replay(pilot,[obs],tmp_path/'data/run',as_of='2026-11-06',historical_as_of='2026-11-02')
+
+
+@pytest.mark.parametrize('target,offered',[('Example Philosophy, Volume II','Example Philosophy, Volume I'),('Example Philosophy vol. 2','Example Philosophy Volume 1')])
+def test_explicit_different_volume_is_excluded_even_when_listing_isbn_matches(target,offered):
+    result=run([dict(listing(),listing_title=offered)],dict(BOOK,title=target))
+    assert 'volume_mismatch' in reasons(result)
+    assert not result['sources']['abebooks']['candidate_ranges']
+
+
+def test_matching_roman_and_arabic_volumes_are_not_rejected():
+    result=run([dict(listing(),listing_title='Example Philosophy Volume 2')],dict(BOOK,title='Example Philosophy Volume II'))
+    assert 'volume_mismatch' not in reasons(result)
+    assert result['sources']['abebooks']['candidate_ranges']
+
+
+def test_volume_range_does_not_falsely_exclude_one_of_its_volumes():
+    from valuation.offline_valuation_review import volume_numbers
+    assert volume_numbers('Collected Works, Volumes I–III')=={1,2,3}
+    assert volume_numbers('Collected Works, Vol. 1 & 3')=={1,3}
+    assert volume_numbers('Example 1971 chapter 2')==set()
+
+
+def test_placeholder_title_is_held_despite_structured_matching_isbn():
+    result=run([dict(listing(),listing_title='Unknown by Unknown, Unknown, Like New Used, Free shipping in the US')])
+    assert 'uninformative_title' in reasons(result)
+    assert not result['sources']['abebooks']['candidate_ranges']
+    valid=run([dict(listing(),listing_title='The Unknown Soldier')],dict(BOOK,title='The Unknown Soldier'))
+    assert 'uninformative_title' not in reasons(valid)

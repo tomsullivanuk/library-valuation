@@ -150,24 +150,28 @@ behavior, documented rollback, and a recorded single-writer cutover. See the
 
 #### 2. Whole-library valuation review
 
-Status: read-only audit completed November 6, 2026; a private 30-record diagnostic
-pilot cohort is prepared. Live source access and revised comparison/publication
-rules remain prerequisites. The isolated offline replay is complete: 30 books,
-19 with historical candidates, zero verified fresh proposals, no published
-changes, and 635 passing tests on both machines. See the
-[audit and pilot readiness](VALUATION_REVIEW_AUDIT_20261106.md) and
-[offline replay results](VALUATION_OFFLINE_REPLAY_20261106.md).
-The eBay-only live pilot is also complete: 30 books, 156 listing details,
-26 candidate comparisons, and no estimate changes. See the
-[live pilot review](VALUATION_LIVE_PILOT_20261106.md); wider collection and
-publication remain subject to review.
-The 26 candidate comparisons have been checked against existing records: 25
-catalog identities are supported, 12 retain used-copy context, and one focused
-physical edition check remains. Estimates are unchanged. See the
-[record-review results](VALUATION_CANDIDATE_REVIEW_20261106.md).
-The owner-approved condition policy is applied to the pilot: 25 explicitly
-labelled used-grade scenarios across 12 books, with grading deferred until handling.
-Actual copy grades and Library estimates remain unchanged; edition checks remain.
+Status: read-only audit, the original 30-book pilot, and an additional 100-book
+scale/recovery test are complete as of November 6, 2026. The original candidate
+review and used-only follow-up expanded retained used-copy context to 22 of 26
+reviewed books, with condition scenarios approved for review only.
+
+The additional 100 records exclude the original pilot and exercise eight coverage
+groups across four bounded batches. All 100 completed using 745 requests; actual
+interruption/resume, competing-worker exclusion, and zero-request completed rerun
+checks passed. Seventy-nine books retain used-copy evidence, with 253 explicit
+binding/grade/currency scenarios; 56 scenarios across 39 books have three or more
+listings, known seller binding and no extreme spread. Thin and unresolved cases
+remain flagged. All 100 grading checks are deferred. Estimates, canonical records
+and existing decisions are unchanged. Full validation: 697 tests pass on laptop
+and Mini.
+
+See the [audit](VALUATION_REVIEW_AUDIT_20261106.md),
+[offline replay](VALUATION_OFFLINE_REPLAY_20261106.md),
+[initial live pilot](VALUATION_LIVE_PILOT_20261106.md),
+[candidate review](VALUATION_CANDIDATE_REVIEW_20261106.md), and
+[100-book scale/recovery results](VALUATION_SCALE_TEST_20261106.md).
+A staged wider read-only collection is the next gate; publication remains separate
+and requires owner review plus preview/conflict/rollback checks.
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,

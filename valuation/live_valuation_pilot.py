@@ -139,11 +139,13 @@ class PilotApi:
         raise RuntimeError('Request failed')
     def search(self,book,limit):
         target=isbn(book.get('isbn13') or book.get('isbn10',''))
-        used_only=self.state['manifest'].get('search_mode')=='used_isbn'
-        if used_only and not target:raise ValueError('Used follow-up requires a valid ISBN')
+        mode=self.state['manifest'].get('search_mode')
+        used_only=mode in {'used_isbn','used_preferred'}
+        if mode=='used_isbn' and not target:raise ValueError('Used follow-up requires a valid ISBN')
         if used_only:
-            strategy='used_isbn_keyword';query=target
-            params={'q':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE},conditions:{USED}'}
+            strategy='used_isbn_keyword' if target else 'used_title_author'
+            query=target or ' '.join(x for x in [book.get('title',''),book.get('author','')] if x)
+            params={'q':query,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE},conditions:{USED}'}
         elif target:strategy='gtin';query=target;params={'gtin':target,'limit':limit,'filter':'buyingOptions:{FIXED_PRICE}'}
         else:
             strategy='title_author';query=' '.join(x for x in [book.get('title',''),book.get('author','')] if x)
@@ -172,7 +174,7 @@ def collect(pilot_path,output_dir,credentials,*,max_results=10,request_budget=40
     if credentials.environment!='production':raise ValueError('Pilot requires explicitly configured production access')
     if not 1<=max_results<=10 or not 1<=request_budget<=400 or delay<0:raise ValueError('Pilot limits exceeded')
     if 'data' in output_dir.parts:raise ValueError('Use a private output directory, not canonical data')
-    if search_mode not in {None,'used_isbn'}:raise ValueError('Unknown search mode')
+    if search_mode not in {None,'used_isbn','used_preferred'}:raise ValueError('Unknown search mode')
     pilot=read_csv(pilot_path);ids=[b.get('catalog_item_id','') for b in pilot]
     if not 1<=len(ids)<=30 or not all(ids) or len(set(ids))!=len(ids):raise ValueError('Pilot requires 1–30 distinct catalog identities')
     manifest=dict(version=VERSION,pilot_sha256=hashlib.sha256(pilot_path.read_bytes()).hexdigest(),catalog_ids=ids,
@@ -238,7 +240,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--pilot',type=Path,required=True);p.add_argument('--output-dir',type=Path,required=True)
     p.add_argument('--credentials',type=Path,required=True);p.add_argument('--confirm-production',action='store_true')
-    p.add_argument('--search-mode',choices=['used_isbn'],default=None)
+    p.add_argument('--search-mode',choices=['used_isbn','used_preferred'],default=None)
     p.add_argument('--max-results',type=int,default=10);p.add_argument('--request-budget',type=int,default=400)
     a=p.parse_args()
     if not a.confirm_production:p.error('Explicit --confirm-production is required')

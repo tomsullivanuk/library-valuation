@@ -20,7 +20,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from valuation.libib import is_valid_isbn10, is_valid_isbn13, isbn10_to_isbn13
 
-VERSION = 'offline-review-v1'
+VERSION = 'offline-review-v2'
 POLICY = dict(max_age_days=30, minimum_comparables=3, maximum_spread_ratio='3',
               currencies=['USD', 'GBP', 'EUR', 'CAD', 'AUD', 'CHF', 'JPY', 'NZD'],
               scope='per-copy asking prices; not realized proceeds',
@@ -39,6 +39,8 @@ REASONS = {
  'duplicate_conflict':'The same listing has conflicting records at the same observation time.',
  'special_copy':'The listing may be digital, signed, a bundle or a multi-copy lot; review it separately.',
  'weak_match':'Listing title/author or independently returned ISBN do not provide a plausible match.',
+ 'uninformative_title':'The listing title is a placeholder rather than an identifiable book title; request clearer listing evidence.',
+ 'volume_mismatch':'The listing explicitly names a different volume from the catalog record.',
  'isbn_mismatch':'The listing ISBN differs from the target edition.',
  'binding_mismatch':'The listing binding differs from the target binding.',
  'condition_mismatch':'The listing condition differs from the target condition.',
@@ -84,6 +86,20 @@ def binding(value):
     if any(x in v for x in ('paperback','softcover')):return 'paperback'
     if any(x in v for x in ('hardback','hardcover')):return 'hardcover'
     return ''
+
+
+def volume_numbers(title):
+    """Only explicit volume labels; publication years and chapter numbers are not volumes."""
+    roman={'i':1,'ii':2,'iii':3,'iv':4,'v':5,'vi':6,'vii':7,'viii':8,'ix':9,'x':10,'xi':11,'xii':12,'xiii':13,'xiv':14,'xv':15}
+    matches=re.findall(r'\bvol(?:ume)?s?\.?\s*([0-9]+|[ivx]+)\b(?:\s*([-–/&])\s*([0-9]+|[ivx]+)\b)?',str(title),re.I)
+    result=set()
+    for first,separator,last in matches:
+        start=int(first) if first.isdigit() else roman.get(first.casefold())
+        end=(int(last) if last.isdigit() else roman.get(last.casefold())) if last else start
+        if start is None or end is None:continue
+        if separator in {'-','–'} and 0<=end-start<=50:result.update(range(start,end+1))
+        else:result.update((start,end))
+    return result
 
 
 def listing_key(row):
@@ -162,6 +178,13 @@ def review_book(book, observations, *, as_of, max_age_days=30):
         actual_isbn=isbn(row.get('listing_isbn13') or row.get('listing_isbn10',''))
         if target_isbn and actual_isbn and target_isbn!=actual_isbn:
             reasons.append('isbn_mismatch');continue
+        title_tokens=set(re.findall(r'[a-z]+',row.get('listing_title','').casefold()))
+        placeholder_words={'unknown','by','like','new','used','free','shipping','in','the','us','good','very','acceptable','hardcover','paperback'}
+        if 'unknown' in title_tokens and title_tokens<=placeholder_words and overlap(book.get('title',''),row.get('listing_title',''))<.1:
+            reasons.append('uninformative_title');continue
+        target_volumes=volume_numbers(book.get('title',''));listing_volumes=volume_numbers(row.get('listing_title',''))
+        if target_volumes and listing_volumes and target_volumes.isdisjoint(listing_volumes):
+            reasons.append('volume_mismatch');continue
         content=' '.join(row.get(k,'') for k in ('listing_title','condition','listing_condition_description','listing_edition'))
         if re.search(r'\b(ebook|e-book|audiobook|kindle|pdf|signed|inscribed|bundle)\b|\b(?:lot|set) of \d|\b\d+[ -]volume set',content,re.I):
             reasons.append('special_copy');continue
