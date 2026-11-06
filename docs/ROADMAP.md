@@ -152,7 +152,11 @@ behavior, documented rollback, and a recorded single-writer cutover. See the
 
 Status: read-only audit completed November 6, 2026; a private 30-record diagnostic
 pilot cohort is prepared. Live source access and revised comparison/publication
-rules remain prerequisites. See the [audit and pilot readiness](VALUATION_REVIEW_AUDIT_20261106.md).
+rules remain prerequisites. The isolated offline replay is complete: 30 books,
+19 with historical candidates, zero verified fresh proposals, no published
+changes, and 635 passing tests on both machines. See the
+[audit and pilot readiness](VALUATION_REVIEW_AUDIT_20261106.md) and
+[offline replay results](VALUATION_OFFLINE_REPLAY_20261106.md).
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
