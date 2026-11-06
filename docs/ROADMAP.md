@@ -170,8 +170,13 @@ See the [audit](VALUATION_REVIEW_AUDIT_20261106.md),
 [initial live pilot](VALUATION_LIVE_PILOT_20261106.md),
 [candidate review](VALUATION_CANDIDATE_REVIEW_20261106.md), and
 [100-book scale/recovery results](VALUATION_SCALE_TEST_20261106.md).
-A staged wider read-only collection is the next gate; publication remains separate
-and requires owner review plus preview/conflict/rollback checks.
+The owner authorized the remaining-library run. A frozen 2,435-record job is now
+running on the Mini in 98 bounded batches, with automatic continuation across
+quota resets, protected source state, deferred grading and separate review outputs.
+See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). Final
+coverage is pending; no revised estimates are published. Full validation now passes
+711 tests on both machines. Publication remains separate and requires owner review
+plus preview/conflict/rollback checks.
 
 Programmatically reassess the physically inventoried library using current
 bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
