@@ -34,7 +34,8 @@ def required_requests(folder):
     return min(400, pending + 25) if pending else 0
 
 
-def recover_one(root, credentials, *, use_fresh_balance=False):
+def recover_one(root, credentials, *, use_fresh_balance=False,
+                fresh_policy='explicit_single_batch_fresh_balance', allow_partial=False):
     root = whole.private_root(root)
     with (root / '.controller.lock').open('a') as lock:
         try:
@@ -70,7 +71,7 @@ def recover_one(root, credentials, *, use_fresh_balance=False):
                     not isinstance(sample.get('limit'), int) or
                     not 0 <= sample['reported_remaining'] <= sample['limit']):
                 raise ValueError('Invalid fresh balance')
-            receipt.update(policy='explicit_single_batch_fresh_balance',
+            receipt.update(policy=fresh_policy,
                            ledger_before_refresh=previous, provider_before=sample,
                            allowance_before=sample['reported_remaining'],
                            outcome='authorized_reconciliation_pending')
@@ -79,7 +80,7 @@ def recover_one(root, credentials, *, use_fresh_balance=False):
             quota = dict(quota, remaining=sample['reported_remaining'],
                          updated_at=whole.stamp(), reconciliation_receipt=str(path))
             whole.atomic(ledger.path, quota)
-        if not ledger.ready(required):
+        if not ledger.ready(1 if allow_partial else required):
             receipt['outcome'] = 'insufficient_conservative_allowance'
             whole.atomic(path, receipt)
             return receipt['outcome']
@@ -153,6 +154,17 @@ def recover_one(root, credentials, *, use_fresh_balance=False):
                 whole.atomic(path, receipt)
             return 'batch_complete'
         except Exception as error:
+            checkpoint_path = folder / 'collection/checkpoint.json'
+            checkpoint = json.loads(checkpoint_path.read_text()) if checkpoint_path.exists() else {}
+            errors = [entry.get('error', {}) for entry in checkpoint.get('books', {}).values()
+                      if entry.get('error')]
+            if (allow_partial and checkpoint.get('status') != 'complete' and errors and
+                    errors[-1].get('http_status') == 429):
+                whole.verify_frozen(root, manifest)
+                receipt.update(outcome='quota_paused', allowance_after=ledger.state()['remaining'])
+                whole.atomic(path, receipt)
+                update('waiting_for_quota', next_attempt_at=whole.parse_time(quota['reset']) + 120)
+                return 'quota_paused'
             # Fail closed. No arbitrary exception text or authentication material.
             receipt.update(outcome='critical_stop', error_type=type(error).__name__,
                            allowance_after=ledger.state()['remaining'])

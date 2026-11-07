@@ -188,6 +188,10 @@ guarded one-batch recovery command without changing the frozen worker.
 The owner's subsequent one-batch fresh-provider-balance experiment adds an
 explicit audited adjustment and separate endpoint counts, retaining the reserve
 and leaving revised estimates unpublished.
+Following that test, the owner authorized provider-led automatic continuation:
+fresh eBay reports now set each batch's allowance, a 100-request cushion remains,
+and partial batches checkpoint at the cushion and resume after reset. Original
+valuation rules, evidence and current estimates remain preserved.
 Publication remains separate and requires owner review
 plus preview/conflict/rollback checks.
 

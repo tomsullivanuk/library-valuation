@@ -9,8 +9,9 @@ import sys
 LABEL='local.library-valuation.whole-review'
 
 
-def configuration(project,root,credentials,python,logs):
-    return dict(Label=LABEL,ProgramArguments=[str(python),'-m','valuation.whole_library_review','run','--root',str(root),'--credentials',str(credentials)],WorkingDirectory=str(project),RunAtLoad=True,KeepAlive={'SuccessfulExit':False},ThrottleInterval=60,ProcessType='Background',EnvironmentVariables={'PYTHONUNBUFFERED':'1'},StandardOutPath=str(logs/'whole-library-review.log'),StandardErrorPath=str(logs/'whole-library-review.error.log'))
+def configuration(project,root,credentials,python,logs,*,provider_counts=False):
+    module='valuation.provider_quota_controller' if provider_counts else 'valuation.whole_library_review'
+    return dict(Label=LABEL,ProgramArguments=[str(python),'-m',module,'run','--root',str(root),'--credentials',str(credentials)],WorkingDirectory=str(project),RunAtLoad=True,KeepAlive={'SuccessfulExit':False},ThrottleInterval=60,ProcessType='Background',EnvironmentVariables={'PYTHONUNBUFFERED':'1'},StandardOutPath=str(logs/'whole-library-review.log'),StandardErrorPath=str(logs/'whole-library-review.error.log'))
 
 
 def install(project,root,credentials):
@@ -21,7 +22,7 @@ def install(project,root,credentials):
     subprocess.run(['launchctl','print',domain],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     logs=Path.home()/'Library/Logs/LibraryValuation';logs.mkdir(parents=True,exist_ok=True)
     directory=Path.home()/'Library/LaunchAgents';directory.mkdir(parents=True,exist_ok=True)
-    path=directory/(LABEL+'.plist');config=configuration(project,root,credentials,sys.executable,logs)
+    path=directory/(LABEL+'.plist');config=configuration(project,root,credentials,sys.executable,logs,provider_counts=(root/'provider_quota_policy.json').exists())
     if path.exists():
         if plistlib.loads(path.read_bytes())!=config:raise ValueError('A different review job is already installed; preserve its state')
         print('The matching review job is already installed.');return

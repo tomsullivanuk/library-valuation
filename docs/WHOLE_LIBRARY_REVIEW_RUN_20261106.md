@@ -48,6 +48,13 @@ bound, the same conservative ledger, the unchanged hard cap and reserve, and
 the original frozen rules. This does not change the normal controller policy
 or credit the unexplained larger provider balance.
 
+**Current policy update:** The owner's subsequent authorization now makes fresh
+eBay reports authoritative at each batch boundary. The provider-led continuation
+controller preserves this original frozen runner and matching rules, enforces
+the same 100-request cushion between checks, and can checkpoint partial batches
+instead of reserving a full batch. See the active-policy section of the linked
+quota reconciliation for the migration receipt, durable reset waits and tests.
+
 Temporary transport/service failures use bounded backoff and saved progress.
 Access failures, exhausted per-batch budgets, frozen-code/data/input changes,
 checkpoint/report inconsistencies, broken identity/grade/publication invariants,

@@ -132,3 +132,48 @@ unreviewed arrived flags and the same 54 deferred physical tasks. Current
 estimates, acquisition records, source identities, physical grades and owner
 decisions remain unchanged. No critical stop or new owner-input requirement
 arose. Only code, synthetic tests and aggregate findings go into the existing PR.
+
+## Active policy: provider-led automatic continuation
+
+The owner subsequently authorized making eBay's counts authoritative with a
+100-request cushion. This supersedes the one-batch-only restriction above.
+`valuation.provider_quota_controller` now runs the finite job through the same
+user LaunchAgent. Before each batch it takes a fresh validated daily Browse
+report and replaces the local starting allowance with that provider balance.
+The local historical minimum no longer prevents collection. Every dispatch
+still decrements a persisted local guard between checks, stopping before the
+remaining allowance would fall below 100. Auth calls are conservatively included
+in this between-check guard; the next fresh provider report is authoritative.
+
+The controller no longer requires enough quota for a full batch. It can begin
+with any usable allowance above 100, checkpoint a partial batch at the cushion,
+and wait until the provider reset plus two minutes. A real provider HTTP 429
+also checkpoints and waits. The durable wait survives restarts and does not
+repeatedly refill allowance from the same report while waiting. After reset,
+the same batch resumes with the existing 400-attempt hard cap. Each book still
+has at most ten detail results. Critical integrity/access failures stop the job.
+
+The original frozen runner, manifest, inputs and completed evidence are
+preserved. An explicit continuation receipt binds the original manifest and
+the two new controller/helper code fingerprints, records the prior status and
+ledger, and fixes the cushion at 100. Changed continuation code or policy fails
+closed; the receipt cannot silently be replaced. The former LaunchAgent plist
+and prior progress are archived privately. Independent controller and collection
+locks prevent duplicate workers. New installations select the provider-led
+entry point when the explicit continuation policy is present.
+
+Tests cover fresh provider balances replacing the local ceiling, automatic
+batch-to-batch continuation and completion, partial checkpoints at exactly 100,
+durable reset waits, recovery without estimate changes or grading, provider
+429 responses, policy tampering/replacement, and startup configuration. The
+complete suite passes **740 tests on laptop and Mini**. Revised values remain
+review-only; estimates, purchase history and physical grades are unchanged.
+
+Live verification: batch 47 completed with 184 attempts and the worker
+automatically started batch 48. The run now has **47 of 98 batches / 1,175
+records complete**. The fresh provider balance before batch 47 was 1,150;
+the next batch's fresh report was 970, replacing the intervening local 966
+instead of retaining it as a ceiling. Both the continuation policy and frozen
+review fingerprints verify, with no critical stop. The cumulative records-only
+review matches all 47 completed batches with no unreviewed arrived flags and
+the same 54 deferred physical tasks. Automatic bounded collection remains active.
