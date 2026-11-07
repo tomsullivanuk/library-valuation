@@ -72,3 +72,63 @@ identification flags match the pre-reviewed scope exactly, with zero unreviewed
 arrivals. The 54 focused physical tasks remain unchanged (29 apply to collected
 batches). No physical grading, estimate publication or new owner decision is
 required by this recovery. Individual evidence and audit receipts stay private.
+
+## Explicit fresh-balance experiment (subsequent owner authorization)
+
+The owner subsequently authorized using a newly reported eBay balance for
+exactly one batch, retaining the 100-request reserve. This is an explicit,
+audited change from the conservative recovery above; it does not explain or
+silently refund the historical discrepancy.
+
+`--use-fresh-balance` records the prior ledger, fresh provider response,
+manifest/code fingerprints and proposed adjustment **before** increasing the
+ledger. The shared lock and all frozen-state checks still apply. The existing
+400-attempt hard cap, checkpoint recovery and pre-dispatch reserve guard remain
+unchanged. A timestamped, atomically persisted private request journal counts
+authentication, search and detail dispatches separately, recording safe outcome
+categories and timestamps without request URLs, headers, tokens or response
+payloads. The report records a second provider sample immediately after review,
+compares counts only within the same reset window, and does not top up again.
+A failed comparison is reported separately from a completed review batch.
+
+The normal controller is paused for the experiment and remains on its saved
+reset wait afterward, even if the larger balance could cover more batches.
+Further use of that headroom is a separate decision from this single-batch test.
+The additional tests cover explicit adjustment, separate endpoint counts,
+no post-batch top-up, invalid/insufficient provider balances, and stopping after
+one batch. All **734 tests pass on laptop and Mini**.
+
+### Fresh-balance live result
+
+At 15:54:24 UTC, the fresh provider balance was 1,330; the prior local balance
+was 283. The authorized adjustment was recorded before collection. Batch 46
+completed at 15:57:22 UTC with 174 dispatched attempts: **25 searches, 148 item
+details, one OAuth request**, and no other operations. The private dispatch
+journal matches the checkpoint request total; all dispatches returned normally.
+
+| Measure | Before batch | After batch | Decrease |
+| --- | ---: | ---: | ---: |
+| eBay reported allowance | 1,330 | 1,160 | 170 |
+| Adjusted local allowance | 1,330 | 1,156 | 174 |
+
+Both provider samples have the same reset window. The 173 Browse calls differ
+from eBay's reported decrease by only three; the additional OAuth debit explains
+one more request of the four-request local/provider difference. The readings
+are close for this batch, but no exact provider lag/rounding behavior is proven
+and the older 1,015-request discrepancy is still unexplained. The comparison
+does not justify attributing the historical gap to the local request counter.
+The post-batch reading did not increase the local ledger again.
+
+Exactly one batch ran: the job now has **46 of 98 batches / 1,150 of 2,435
+records complete**, with 8,426 recorded collection attempts in total. No second
+batch started despite sufficient new headroom. The normal LaunchAgent is
+restored on the saved November 8, 08:02 UTC reset wait; automatic use of the
+extra current-window balance was not enabled by this single-batch experiment.
+The 100-request reserve and 400-attempt batch cap remain unchanged.
+
+Frozen data/code/input and completed-output verification passes. The cumulative
+identification-review sidecar validates all 46 completed batches, with zero
+unreviewed arrived flags and the same 54 deferred physical tasks. Current
+estimates, acquisition records, source identities, physical grades and owner
+decisions remain unchanged. No critical stop or new owner-input requirement
+arose. Only code, synthetic tests and aggregate findings go into the existing PR.

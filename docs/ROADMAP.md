@@ -185,6 +185,9 @@ estimates are published. A November 7
 [quota reconciliation](QUOTA_RECONCILIATION_20261107.md) preserves the lower local
 allowance despite an unexplained higher eBay balance and adds an explicit,
 guarded one-batch recovery command without changing the frozen worker.
+The owner's subsequent one-batch fresh-provider-balance experiment adds an
+explicit audited adjustment and separate endpoint counts, retaining the reserve
+and leaving revised estimates unpublished.
 Publication remains separate and requires owner review
 plus preview/conflict/rollback checks.
 
