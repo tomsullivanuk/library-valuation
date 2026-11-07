@@ -203,3 +203,34 @@ Next: milestone 2, whole-library valuation review. Establish refresh rules and a
 bounded pilot before collecting or replacing estimates; transfer only required
 API credentials securely and verify destination access separately. Family access
 and Sites/provider selection remain milestone 3.
+
+## External Time Machine drive: November 7 preparation
+
+The owner attached a 2 TB external USB drive and explicitly approved erasing its
+existing contents. Inspection found an old APFS Time Machine volume, about
+1.6 TiB used, but no configured backup destination on the Mini. Both the library
+project and private configuration report Included under `tmutil isexcluded`.
+The existing iCloud snapshot service remains in place.
+
+`operations/configure_external_backup.py` is staged on the Mini with a private
+approved-drive plan and `~/library-migration-setup/setup-external-backup.sh`.
+The plan records the host, physical USB device, exact size/model and existing
+partition UUID. The script rejects mismatched/internal/virtual disks and requires
+explicit erase mode plus administrator execution. It checks Time Machine root
+and Full Disk Access privileges **before erasing**. If allowed, it formats only
+the approved external drive as case-sensitive APFS, names it Mini Time Machine,
+adds it as a destination, enables automatic backups, and requests the first
+backup. The changed partition UUID prevents accidental erase replay.
+
+The Mini requires an administrator password; no password is stored or requested
+in chat. The prepared operator command, run in Terminal on the laptop, is:
+
+```sh
+ssh -t -i ~/.ssh/library_mini_migration wearypops@Thomass-Mac-mini.local 'bash ~/library-migration-setup/setup-external-backup.sh'
+```
+
+Three targeted synthetic tests pass: exact external-disk identity/replay guards,
+explicit authorization/admin requirements, and a denied Time Machine access
+preflight stopping before any erase. No actual erase/setup has run yet.
+Destination selection, first successful backup and a sample restore are pending
+verification after the owner completes the password-protected command.
