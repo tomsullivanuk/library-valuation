@@ -15,7 +15,7 @@ belongs in release notes, the changelog, and architecture documentation.
 
 ## Current Product Baseline
 
-Through v0.11.0, Library Valuation has established:
+Through v0.11.1, Library Valuation has established:
 
 - a durable catalog and acquisition history derived from Amazon imports;
 - research prioritization and collector-owned review state;
@@ -32,6 +32,10 @@ Through v0.11.0, Library Valuation has established:
   on a book-first Library with details and supporting evidence; and
 - atomic generation of inventory summaries, review workbooks, and the
   registered-report workspace.
+
+v0.11.1 adds the completed physical-inventory default, a local background service,
+saved Action Items and dispositions, and reviewed estimate history. The generated
+HTML remains a read-only fallback.
 
 The detailed record is maintained in [the changelog](../CHANGELOG.md),
 [v0.11.0 release notes](RELEASE_NOTES_v0.11.0.md), prior release notes, and the
@@ -118,23 +122,109 @@ Future release plans that change the workspace should reference the
 [Steward Workspace Design Principles](STEWARD_WORKSPACE_DESIGN.md) rather than
 restate or redefine them.
 
-### v0.12.0 — Collection Intelligence
+### v0.12.0 — Migration, Library Valuation Review, and Family Access
 
-Help the steward understand the library as a collection rather than only as
-individual catalog rows.
+Approved direction: November 5, 2026. Deliver the following milestones in order,
+using v0.11.1 as the stable migration baseline. Each milestone has its own
+acceptance gate; partial implementation does not imply the whole release is done.
 
-Likely outcomes include:
+#### 1. Mac Mini migration
 
-- subject, classification, author, publisher, period, and language analysis;
-- identification of coherent scholarly, thematic, or family-significant
-  collections;
-- duplicate, edition, incomplete-set, and multi-volume detection;
-- collection-level market, donation, retention, and institutional
-  opportunities; and
-- explicit confidence and evidence behind proposed groupings.
+Status: completed November 5, 2026. Final transfer, source write protection,
+automatic login and locking, reboot recovery, laptop reconnection, and independent
+iCloud snapshot verification passed. See the migration runbook for evidence and
+ongoing operational limitations.
 
-Proposed collections should remain reviewable. Automated grouping must not
-silently replace catalog or holding identity.
+Move authoritative operation from the laptop to the Mac Mini. Inventory and
+privately back up source data, saved decisions, reviewed estimates, imports,
+required market evidence, configuration and reports. Recreate the runtime and
+rehearse a restore before final cutover. Verify identities, hashes, application
+counts, browsing and disposable write tests. Establish startup, authenticated
+administration, independent backup/restore, and reboot recovery. The Mac Mini
+must be the only production writer after cutover; the laptop may remain a
+development or administration client.
+
+Acceptance: matching durable state and evidence, verified recovery, agreed startup
+behavior, documented rollback, and a recorded single-writer cutover. See the
+[Mac Mini migration runbook](MAC_MINI_MIGRATION.md).
+
+#### 2. Whole-library valuation review
+
+Status: read-only audit, the original 30-book pilot, and an additional 100-book
+scale/recovery test are complete as of November 6, 2026. The original candidate
+review and used-only follow-up expanded retained used-copy context to 22 of 26
+reviewed books, with condition scenarios approved for review only.
+
+The additional 100 records exclude the original pilot and exercise eight coverage
+groups across four bounded batches. All 100 completed using 745 requests; actual
+interruption/resume, competing-worker exclusion, and zero-request completed rerun
+checks passed. Seventy-nine books retain used-copy evidence, with 253 explicit
+binding/grade/currency scenarios; 56 scenarios across 39 books have three or more
+listings, known seller binding and no extreme spread. Thin and unresolved cases
+remain flagged. All 100 grading checks are deferred. Estimates, canonical records
+and existing decisions are unchanged. Full validation: 697 tests pass on laptop
+and Mini.
+
+See the [audit](VALUATION_REVIEW_AUDIT_20261106.md),
+[offline replay](VALUATION_OFFLINE_REPLAY_20261106.md),
+[initial live pilot](VALUATION_LIVE_PILOT_20261106.md),
+[candidate review](VALUATION_CANDIDATE_REVIEW_20261106.md), and
+[100-book scale/recovery results](VALUATION_SCALE_TEST_20261106.md).
+The owner authorized the remaining-library run. A frozen 2,435-record job is now
+running on the Mini in 98 bounded batches, with automatic continuation across
+quota resets, protected source state, deferred grading and separate review outputs.
+See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). A separate
+[records-only adjudication](EDITION_CHECK_ADJUDICATION_20261106.md) of the initial
+40 edition/inferred-copy flags leaves 14 distinct hands-on questions, without
+changing the frozen worker or source records. The
+[all-batch records review](ALL_BATCH_RECORDS_REVIEW_20261106.md) extends this to all
+98 frozen batches: 162 identification flags across 133 books are pre-reviewed,
+leaving 54 distinct physical tasks (the earlier 14 plus 40). This does not claim
+market collection is complete; final market coverage is pending and no revised
+estimates are published. A November 7
+[quota reconciliation](QUOTA_RECONCILIATION_20261107.md) preserves the lower local
+allowance despite an unexplained higher eBay balance and adds an explicit,
+guarded one-batch recovery command without changing the frozen worker.
+Publication remains separate and requires owner review
+plus preview/conflict/rollback checks.
+
+Programmatically reassess the physically inventoried library using current
+bibliographic identities and available AbeBooks/eBay evidence. Review coverage,
+edition and condition matching, duplicate/set ambiguity, outliers, currencies,
+source dates and evidence quality. Start with a bounded pilot and inspect its
+results before a resumable full-library run. Preserve prior evidence and manually
+reviewed estimates; conflicting updates require an explicit policy rather than
+silent replacement. Preview proposed ranges and exceptions before publishing.
+
+Acceptance: reproducible coverage and before/after results, source-backed ranges,
+no unsupported values, preserved history, and actionable exceptions for checks
+that automation cannot resolve. API access, source terms, cost and rate limits
+must be verified when the implementation is designed.
+
+#### 3. Friends-and-family access
+
+Expose a separate, private subset of capabilities: browse eligible books, keep a
+personal selection list and submit requests for Tom to review. Publish an explicit
+allowlist of recipient-facing fields; exclude purchase history, valuation,
+private notes, storage locations and operational details. Separate recipient
+access from steward administration. Requests do not automatically allocate or
+remove physical copies. Choose hosting (potentially Sites) only after verifying
+access, durable storage, recovery and operating cost with a synthetic pilot.
+
+Acceptance: private access and isolated lists, durable submissions and revisions,
+owner review, backup/restore, and a successful recipient pilot independent of the
+laptop. This brings the family-facing subset of the former v0.14 Publishing
+scope forward; broader dealer and marketplace publishing remains later work.
+
+#### Deferred collection intelligence
+
+The former v0.12 scope remains a backlog direction rather than a prerequisite:
+subject/classification/author/publisher/period/language analysis; scholarly,
+thematic and family-significant groupings; duplicate, edition, incomplete-set and
+multi-volume detection; and collection-level market, donation, retention and
+institutional opportunities. Retain explicit confidence and evidence. Proposed
+groupings must not silently replace catalog or holding identity. Use duplicate
+and edition checks in milestone 2 where necessary for dependable valuation.
 
 ### v0.13.0 — Decision Support
 
@@ -154,7 +244,7 @@ Each recommendation should communicate:
 Recommendations may address individual books, groups, or collections. They
 remain advisory: the application recommends and the steward decides.
 
-### v0.14.0 — Publishing
+### v0.14.0 — Broader Publishing
 
 Generate stewardship artifacts that prepare work for review or for external
 systems.

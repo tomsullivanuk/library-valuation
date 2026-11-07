@@ -54,6 +54,8 @@ def _rows(path):
 
 def load_model(data_dir, output_dir):
     data_dir, output_dir = Path(data_dir), Path(output_dir)
+    if (data_dir / "production_moved.json").exists():
+        raise ValueError("Production has moved to the Mac Mini. Use the remote Library; this local copy is archived.")
     reports = []
     for key, label, fmt in [("physical_book_checks", "Physical book checks", "csv"),
                             ("inventory_followup_resolutions", "Follow-up review evidence", "csv"),
@@ -307,6 +309,8 @@ class WorkspaceStore:
 
     def update(self, request):
         with self.write_lock():
+            if (self.data_dir / "production_moved.json").exists():
+                raise ValueError("Production has moved to the Mac Mini. This local copy cannot save changes.")
             state = self.read()
             if type(request.get("revision")) is not int or request["revision"] != state["revision"]:
                 raise RuntimeError("Another change was saved. Reload and try again.")
