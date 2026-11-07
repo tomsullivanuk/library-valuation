@@ -231,7 +231,7 @@ ssh -t -i ~/.ssh/library_mini_migration wearypops@Thomass-Mac-mini.local 'bash ~
 
 Three targeted synthetic tests pass: exact external-disk identity/replay guards,
 explicit authorization/admin requirements, and a denied Time Machine access
-preflight stopping before any erase. No actual erase/setup has run yet.
+preflight stopping before any erase. At that preparation stage, no actual erase/setup had run.
 Destination selection, first successful backup and a sample restore are pending
 verification after the owner completes the password-protected command.
 
@@ -243,6 +243,17 @@ as its access preflight, stops any active backup, and unmounts the approved
 external disk before formatting. If a normal unmount fails, it forces an unmount
 of that same identity-checked, explicitly erase-approved disk. It reenables
 automatic backups after destination setup. A fourth synthetic test verifies
-this busy-drive sequence and exact erase target. The corrected setup still
-requires the owner's administrator-password step; no successful backup is
-claimed until the subsequent verification passes.
+this busy-drive sequence and exact erase target. At that stage, the corrected
+setup awaited the owner's administrator-password step.
+
+### Verified setup and first backup: November 7, approximately 4:03 p.m. Central
+
+The corrected operator run finished erasing and formatting the external drive
+as case-sensitive APFS, mounted it as **Mini Time Machine**, configured it as
+a local Time Machine destination, and requested the first backup. Live queries
+confirm the matching destination, automatic backups enabled (`AutoBackup=1`),
+and `Running=1`, `FirstBackup=1`, `BackupPhase=Copying` on that volume. About
+75.8 GB of an estimated 173.9 GB had copied at verification. The initial backup
+is **in progress**, not yet verified complete; a completed-backup and sample
+restore check remain pending. Keep the existing iCloud snapshots as well.
+The erase/setup command is complete and should not be rerun.
