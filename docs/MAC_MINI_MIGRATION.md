@@ -234,3 +234,15 @@ explicit authorization/admin requirements, and a denied Time Machine access
 preflight stopping before any erase. No actual erase/setup has run yet.
 Destination selection, first successful backup and a sample restore are pending
 verification after the owner completes the password-protected command.
+
+The first operator run passed the access check but formatting failed because
+`backupd` held the original external volume open (unmount/device-open errors).
+Verification found no configured destination, no running backup and the
+original volume still present. The helper now uses disabling automatic backups
+as its access preflight, stops any active backup, and unmounts the approved
+external disk before formatting. If a normal unmount fails, it forces an unmount
+of that same identity-checked, explicitly erase-approved disk. It reenables
+automatic backups after destination setup. A fourth synthetic test verifies
+this busy-drive sequence and exact erase target. The corrected setup still
+requires the owner's administrator-password step; no successful backup is
+claimed until the subsequent verification passes.

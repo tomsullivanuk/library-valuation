@@ -44,7 +44,14 @@ def setup(plan_path, erase_approved=False):
     verify_disk(plan, info, layout)
     print('Verified approved external disk. Checking Time Machine access before erasing.', flush=True)
     # This requires Full Disk Access as well as root. Failure leaves disk intact.
-    subprocess.run(['/usr/bin/tmutil', 'enable'], check=True)
+    subprocess.run(['/usr/bin/tmutil', 'disable'], check=True)
+    subprocess.run(['/usr/bin/tmutil', 'stopbackup'], check=True)
+    # backupd can keep an old Time Machine volume open even without a running
+    # backup. Release that volume before eraseDisk tries to open the device.
+    unmount = subprocess.run(['/usr/sbin/diskutil', 'unmountDisk', plan['device']], check=False)
+    if unmount.returncode:
+        print('Releasing the approved external drive held by the backup service.', flush=True)
+        subprocess.run(['/usr/sbin/diskutil', 'unmountDisk', 'force', plan['device']], check=True)
     # A successful erase changes the partition UUID, preventing accidental replay.
     subprocess.run(['/usr/sbin/diskutil', 'eraseDisk', 'APFSX', 'Mini Time Machine', 'GPT', plan['device']], check=True)
     mount = '/Volumes/Mini Time Machine'
