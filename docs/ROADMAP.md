@@ -181,8 +181,11 @@ changing the frozen worker or source records. The
 98 frozen batches: 162 identification flags across 133 books are pre-reviewed,
 leaving 54 distinct physical tasks (the earlier 14 plus 40). This does not claim
 market collection is complete; final market coverage is pending and no revised
-estimates are published. Full validation now passes
-726 tests on both machines. Publication remains separate and requires owner review
+estimates are published. A November 7
+[quota reconciliation](QUOTA_RECONCILIATION_20261107.md) preserves the lower local
+allowance despite an unexplained higher eBay balance and adds an explicit,
+guarded one-batch recovery command without changing the frozen worker.
+Publication remains separate and requires owner review
 plus preview/conflict/rollback checks.
 
 Programmatically reassess the physically inventoried library using current

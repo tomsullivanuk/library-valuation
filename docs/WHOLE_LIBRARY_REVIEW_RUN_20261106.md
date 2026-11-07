@@ -42,6 +42,12 @@ the reported daily reset plus two minutes, then queries again and continues.
 Quota-control calls are recorded separately. This run is expected to span several
 quota windows; it is not claimed complete when the background job is started.
 
+The [November 7 quota reconciliation](QUOTA_RECONCILIATION_20261107.md)
+documents an explicit one-batch recovery using a tighter worst-case admission
+bound, the same conservative ledger, the unchanged hard cap and reserve, and
+the original frozen rules. This does not change the normal controller policy
+or credit the unexplained larger provider balance.
+
 Temporary transport/service failures use bounded backoff and saved progress.
 Access failures, exhausted per-batch budgets, frozen-code/data/input changes,
 checkpoint/report inconsistencies, broken identity/grade/publication invariants,
