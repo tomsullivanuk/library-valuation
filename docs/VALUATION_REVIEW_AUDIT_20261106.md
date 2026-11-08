@@ -197,3 +197,66 @@ The Mini retains `audit.json`, the pilot CSV, and input hashes under the private
 output directory. A read-only reproduction script and copies of the results are
 also retained in the laptop's ignored output directory. No individual-book pilot
 list, credentials or full library data are included in this GitHub document.
+
+## AbeBooks API investigation — November 8, 2026
+
+**Finding:** AbeBooks documents an official Search Web Services (SWS) API. It is
+a plausible technical source for new comparisons, but access and permission for
+our retained, automated private-library review are not established. The running
+eBay job and current estimates remain unchanged. No account application,
+outbound contact or live AbeBooks search was made for this investigation.
+
+### Access and technical fit
+
+The [current SWS overview](https://www.abebooks.com/developer/search-web-services/overview)
+describes affiliate membership followed by an application for a Client Key.
+The requested details include the requesting IP, website URL, email, technical
+contact and affiliate ID; the documented contact is affiliate@abebooks.com.
+The [affiliate page](https://www.abebooks.com/books/affiliateprogram/) also lists
+webservices@abebooks.com for access inquiries. Eligibility for a private
+application such as ours needs confirmation; a LAN address is not the public
+requesting IP, and the documentation does not establish a static-IP requirement.
+
+The [parameter and return-field documentation](https://www.abebooks.com/developer/search-web-services/parameters)
+supports ISBN/title/author queries, used-condition and binding filters, and
+long-format records with ISBNs, prices/currencies, shipping, listing IDs/links,
+publication year and seller descriptions. This is active asking-price evidence;
+it is not a sold-price history. A result's reported ISBN and metadata would
+still need independent matching to our target edition.
+
+SWS uses Client-Key authentication and XML responses, with a documented default
+rate of 4–5 queries per second. No project-specific daily allowance, pricing,
+approval timeline or bulk-valuation entitlement has been verified. These would
+be agreed before a pilot. A key is passed in the request URL, so a future client
+must redact URLs/errors and keep credentials outside Git and public reports.
+Latin-1 parameter encoding requires explicit handling of unsupported text;
+ISBN queries avoid most text-encoding issues.
+
+### Permission and retention fit
+
+The [published SWS agreement](https://www.abebooks.com/docs/affiliateprogram/webservices/terms-printable.shtml)
+is dated April 15, 2008. Sections 2.1 and 2.3(b) describe individual website-user
+searches; section 2.3(c) limits retained results to 24 hours, places freshness
+conditions on display, and requires listing links. Section 2.1 allows other
+purposes agreed in writing. Our assessment is that durable batch evidence and
+valuation scenarios should not be assumed covered by this standard workflow.
+Confirm the agreement applicable to a new account and obtain written terms
+covering our intended use rather than equating API access with permission.
+
+The inquiry should describe roughly 2,565 inventoried catalog records and ask
+about scheduled searches, duplicate-ISBN handling, retaining observations and
+derived ranges, combining sources, internal access, possible later family
+viewing, audit/backups, deletion/refresh duties, attribution, limits and fees.
+If the usual affiliate model is unsuitable, ask whether a separate license or
+approved data feed supports that workflow. No suitable alternative feed/license
+has yet been established.
+
+### Proposed implementation after access and use terms are confirmed
+
+Add a separate SWS adapter; do not reuse the old HTML parser as an API client or
+change the frozen eBay worker. Start with the same 30-book pilot, comparing
+edition identity, binding, used-condition scenarios, currencies and shipping.
+Preserve source separation, checkpoint/retry limits, explicit permission-based
+retention rules and review-only output. Keep estimates unchanged and physical
+grading deferred. Scale only after the pilot demonstrates useful additional
+comparisons and the retention model supports reproducible review.

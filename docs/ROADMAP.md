@@ -203,6 +203,12 @@ results before a resumable full-library run. Preserve prior evidence and manuall
 reviewed estimates; conflicting updates require an explicit policy rather than
 silent replacement. Preview proposed ranges and exceptions before publishing.
 
+A November 8 [API investigation](VALUATION_REVIEW_AUDIT_20261106.md) confirms that
+AbeBooks Search Web Services is a potential additional source; affiliate/key
+access and written terms for automated valuation and durable evidence retention
+need confirmation before a fresh AbeBooks pilot. The current live review remains
+eBay-only and keeps estimates unchanged.
+
 Acceptance: reproducible coverage and before/after results, source-backed ranges,
 no unsupported values, preserved history, and actionable exceptions for checks
 that automation cannot resolve. API access, source terms, cost and rate limits
