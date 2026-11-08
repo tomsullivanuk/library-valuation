@@ -284,7 +284,51 @@ The private verification receipt and command log are retained under
 `~/library-restore-tests/20261108T182447Z/`; individual records and credentials
 remain outside Git. Verification finished around 12:24 p.m. Central.
 
-The first completed backup and library-file recovery are verified. A full-Mini
-rebuild and a later automatic backup while locked remain acceptance checks;
-the earlier lock-related failures are relevant to unattended operation. Existing
-iCloud snapshots remain in place.
+The first completed backup and library-file recovery are verified. At that
+checkpoint, a full-Mini rebuild and a later automatic backup while locked
+remained acceptance checks. Existing iCloud snapshots remain in place.
+
+### Locked-session automatic backup check: November 8
+
+Read-only inspection found a completed automatic incremental backup with the
+following matched log and destination-manifest evidence (Central time):
+
+- 4:22:28.970 p.m.: Time Machine requested an `automatic backup`.
+- 4:22:29.052 p.m.: the graphical session became locked.
+- 4:22:44.877 p.m.: the first file-copy pass began; the second began at 4:22:50.
+- 4:33:27 p.m.: the completed snapshot was recorded in the destination manifest.
+- 4:33:41.573 p.m.: backupd reported successful completion, about 323 MB backed up.
+
+There were no intervening unlock events or backup failures in the checked
+window. The Mini was still locked at verification, automatic backups were
+enabled, and no caffeinate process was running. The evidence is retained
+privately under `~/library-backup-verification/locked_automatic_20261108T230858Z/`.
+
+This demonstrates automatic copying and completion while locked. The automatic
+request preceded the lock transition by about 0.08 seconds, so it alone does
+not establish that protected files can be backed up after starting in an
+already-locked session. A separate scheduled run began at 5:01 p.m., after the
+Mini had remained locked since 4:22 p.m.; its logs reported 22 files inaccessible
+while locked. This stronger case was observed through completion:
+
+- 4:22:29 p.m.: the session locked, with no later unlock during the run.
+- 5:01:31 p.m.: backupd requested an `automatic backup`.
+- 5:01:47 p.m.: the file pass reported `Device unlocked: false`.
+- 5:13:39 p.m.: the destination manifest recorded the completed snapshot.
+- 5:13:42 p.m.: backupd reported successful completion, about 163 MB backed up.
+
+Seven direct samples confirmed the Mini stayed locked; the final sample found
+the backup finished. The event records contain no unlocks or backup failures
+for this run. The latest completed backup advanced to
+`2026-11-08-171339.backup`. No caffeinate process was running, automatic backups
+remained enabled, and the Mini remained locked afterward. The same private
+evidence directory retains `followup_samples.json`, `followup_events.json` and
+the updated `verification.json`.
+
+**Result:** automatic incremental-backup completion while already locked is
+verified. No new backup, locking, exclusion or power-setting changes were needed
+for this test. The earlier 129-file restore verification remains valid. The
+scope is an incremental backup following a completed unlocked baseline; the
+earlier first-backup failures are retained as evidence that newly inaccessible
+protected content can require an unlocked session. A full-Mini rebuild remains
+untested.
