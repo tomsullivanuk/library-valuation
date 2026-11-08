@@ -257,3 +257,34 @@ and `Running=1`, `FirstBackup=1`, `BackupPhase=Copying` on that volume. About
 is **in progress**, not yet verified complete; a completed-backup and sample
 restore check remain pending. Keep the existing iCloud snapshots as well.
 The erase/setup command is complete and should not be rerun.
+
+### Completed backup and file restore verified: November 8
+
+The initial attempts were interrupted with `BACKUP_FAILED_DEVICE_LOCKED (80)`.
+Logs identified protected calendar attachments as unreadable while the Mini
+was locked. The owner unlocked it and ran a temporary four-hour caffeinate
+session. A subsequent backup completed: `tmutil latestbackup` identifies
+`2026-11-08-121248.backup`, and the verification-time status reports `Running=0`.
+The snapshot was mounted using `tmutil latestbackup -m` before recovery.
+
+An actual `tmutil restore` test recovered these selections into a new private
+directory on the Mini, separate from the live application:
+
+- the complete canonical `data` directory;
+- application code (`valuation`), operations helpers and application config;
+- dependency requirements and the pipeline entry point;
+- the current combined market-evidence summary; and
+- private library configuration, without displaying credentials.
+
+All **129 recovered files (20,584,642 bytes)** matched the backup selections
+using SHA-256 hashes or symbolic-link targets. All 13 CSV/JSON data files parsed
+successfully. The restored canonical files also match the current live files,
+and protected live-file hashes remained unchanged throughout the test.
+The private verification receipt and command log are retained under
+`~/library-restore-tests/20261108T182447Z/`; individual records and credentials
+remain outside Git. Verification finished around 12:24 p.m. Central.
+
+The first completed backup and library-file recovery are verified. A full-Mini
+rebuild and a later automatic backup while locked remain acceptance checks;
+the earlier lock-related failures are relevant to unattended operation. Existing
+iCloud snapshots remain in place.
