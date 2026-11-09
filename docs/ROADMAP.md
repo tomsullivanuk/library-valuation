@@ -214,7 +214,10 @@ A November 8 [API investigation](VALUATION_REVIEW_AUDIT_20261106.md) confirms th
 AbeBooks Search Web Services is a potential additional source; affiliate/key
 access and written terms for automated valuation and durable evidence retention
 need confirmation before a fresh AbeBooks pilot. The current live review remains
-eBay-only and keeps estimates unchanged.
+eBay-only and keeps estimates unchanged. A November 9
+[offline SWS adapter](ABEBOOKS_SWS_OFFLINE_ADAPTER_20261109.md) now passes synthetic
+replay checks on the laptop and Mini. Live transport remains disabled pending
+approval, retention terms and a bounded live pilot.
 
 Acceptance: reproducible coverage and before/after results, source-backed ranges,
 no unsupported values, preserved history, and actionable exceptions for checks

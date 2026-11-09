@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Entirely synthetic data, using documented Book field names. Envelope is a fixture assumption. -->
+<SearchResults>
+  <resultCount>5</resultCount>
+  <Book>
+    <bookId>999999990001</bookId><isbn13>9780198829171</isbn13>
+    <listingCondition>NOT NEW BOOK</listingCondition><itemCondition>Good</itemCondition>
+    <quantity>14</quantity><vendorCurrency>GBP</vendorCurrency><vendorPrice>9.50</vendorPrice>
+    <listingPrice>14.25</listingPrice><firstBookShipCost>3.00</firstBookShipCost><totalListingPrice>17.25</totalListingPrice>
+    <listingUrl>www.abebooks.com/servlet/BookDetailsPL?bi=999999990001&amp;cm_ven=sws</listingUrl>
+    <title>Synthetic Methods</title><author>Synthetic Author</author><publisherName>Synthetic Press</publisherName>
+    <bindingType>S</bindingType><publicationYear>2020</publicationYear>
+    <vendorDescription>A synthetic good-condition fixture, not an actual listing.</vendorDescription>
+  </Book>
+  <Book>
+    <bookId>999999990002</bookId><isbn13>9780198829171</isbn13><itemCondition>Good</itemCondition>
+    <listingPrice>15.00</listingPrice><listingUrl>https://www.abebooks.com/servlet/BookDetailsPL?bi=999999990002</listingUrl>
+    <title>Synthetic Methods</title><author>Synthetic Author</author><bindingType>S</bindingType>
+  </Book>
+  <Book>
+    <bookId>999999990003</bookId><isbn13>9780198829171</isbn13><itemCondition>Good</itemCondition>
+    <listingPrice>16.00</listingPrice><listingUrl>https://www.abebooks.com/servlet/BookDetailsPL?bi=999999990003</listingUrl>
+    <title>Synthetic Methods</title><author>Synthetic Author</author><bindingType>S</bindingType>
+  </Book>
+  <Book>
+    <bookId>999999990004</bookId><isbn13>9781567923254</isbn13><itemCondition>Good</itemCondition>
+    <listingPrice>2.00</listingPrice><listingUrl>https://www.abebooks.com/servlet/BookDetailsPL?bi=999999990004</listingUrl>
+    <title>Synthetic Methods</title><author>Synthetic Author</author><bindingType>S</bindingType>
+  </Book>
+  <Book>
+    <bookId>999999990005</bookId><isbn13>9780198829171</isbn13><itemCondition>New</itemCondition><listingCondition>NEW BOOK</listingCondition>
+    <listingPrice>10.00</listingPrice><listingUrl>https://www.abebooks.com/servlet/BookDetailsPL?bi=999999990005</listingUrl>
+    <title>Synthetic Methods</title><author>Synthetic Author</author><bindingType>S</bindingType>
+  </Book>
+</SearchResults>
