@@ -175,6 +175,11 @@ completed all 98 bounded batches on November 9 at 2:47 a.m. Central, with
 protected source state, deferred grading and separate review outputs. Together
 with the earlier 130-record pilots, the planned lookup passes cover all 2,565
 active catalog records. Revised values remain unpublished pending review.
+The November 9 [results comparison](VALUATION_RESULTS_COMPARISON_20261109.md)
+covers all 2,565 records against current estimates: 1,197 have a stronger
+conditional scenario, 567 meet the large-change review threshold, and 1,368
+need stronger market evidence or lack a retained scenario. Estimates and actual
+grades remain unchanged; review and physical handling are separate next steps.
 See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). A separate
 [records-only adjudication](EDITION_CHECK_ADJUDICATION_20261106.md) of the initial
 40 edition/inferred-copy flags leaves 14 distinct hands-on questions, without
