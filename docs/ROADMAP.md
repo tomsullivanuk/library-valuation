@@ -170,9 +170,11 @@ See the [audit](VALUATION_REVIEW_AUDIT_20261106.md),
 [initial live pilot](VALUATION_LIVE_PILOT_20261106.md),
 [candidate review](VALUATION_CANDIDATE_REVIEW_20261106.md), and
 [100-book scale/recovery results](VALUATION_SCALE_TEST_20261106.md).
-The owner authorized the remaining-library run. A frozen 2,435-record job is now
-running on the Mini in 98 bounded batches, with automatic continuation across
-quota resets, protected source state, deferred grading and separate review outputs.
+The owner authorized the remaining-library run. The frozen 2,435-record Mini job
+completed all 98 bounded batches on November 9 at 2:47 a.m. Central, with
+protected source state, deferred grading and separate review outputs. Together
+with the earlier 130-record pilots, the planned lookup passes cover all 2,565
+active catalog records. Revised values remain unpublished pending review.
 See the [remaining-library run](WHOLE_LIBRARY_REVIEW_RUN_20261106.md). A separate
 [records-only adjudication](EDITION_CHECK_ADJUDICATION_20261106.md) of the initial
 40 edition/inferred-copy flags leaves 14 distinct hands-on questions, without

@@ -146,3 +146,29 @@ A private laptop progress snapshot was captured at that point under
 It is explicitly labelled a snapshot and includes only completed report folders.
 The live Mini job remains authoritative for later progress. The initial 25-record
 outcome is not a completion claim or a forecast of remaining-library coverage.
+
+## Verified completion: November 9, 2026
+
+The finite Mini job completed at **08:47:19 UTC / 2:47:19 a.m. Central**.
+All **98 batches and 2,435 remaining catalog records** have completed collection
+and review receipts. Together with the earlier disjoint 130-record pilots, the
+lookup passes cover the 2,565-record active catalog scope. The run recorded
+18,003 collection attempts across quota windows; it is not waiting to resume.
+
+Both controller states report complete, and the completion receipt confirms
+canonical files unchanged and publication disabled. Original frozen rules,
+inputs, completed-output hashes and the provider continuation policy verify.
+There is no critical-stop receipt. Completion means the planned lookup/review
+pass finished; it does not imply that every record has sufficient comparisons
+for a revised estimate.
+
+The final cumulative records-check validation covers all 98 batches: all 162
+identification flags arrived and match the authored review, with zero pending
+or unreviewed arrived flags. The same **54 distinct physical tasks** remain
+deferred, now all associated with completed batches. No additional owner input
+is required to complete lookups. Reviewing proposed value ranges and handling
+those physical tasks remain separate follow-up work. Current estimates and
+purchase history are unchanged; physical grading remains unassigned.
+
+The final validation receipt is retained privately alongside the all-batch
+records-review artifacts. Individual results and source evidence remain private.
