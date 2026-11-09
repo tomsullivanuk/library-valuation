@@ -24,6 +24,21 @@ Run the demo with a new output directory:
 .venv/bin/python -m operations.abebooks_sws_offline_demo --project . --output output/valuation_review_20261106/abebooks_sws_offline_demo_NEW
 ```
 
+## Affiliate application status — November 9, 2026
+
+The AbeBooks Affiliate Program application was submitted through Impact. The confirmation screen displayed **In Review** and stated that a response notification would follow. Affiliate approval has not yet been received.
+
+The application identifies Pops' Edge at https://tomsullivanuk.substack.com/ as the publication: approaches to gaming, occasional book reviews and other topics. Library Valuation remains a separate private application. Affiliate enrollment does not establish approval for its API or data-retention use. The November 8 inquiry about those uses remains pending; no new email was sent for this status update.
+
+Next steps:
+
+1. Await the affiliate application response; address any requested publication or account information accurately.
+2. If approved, obtain the Affiliate ID and request an SWS Client Key, supplying the required site, technical contact and request-origin information.
+3. Obtain explicit confirmation that private valuation research, retained comparisons and derived value ranges are permitted. Do not treat affiliate acceptance or a key alone as confirmation of these uses.
+4. Once access and use permissions are confirmed, validate real responses with a small approved probe, then run the bounded 30-book pilot before expanding collection.
+
+Keep live requests disabled, estimates unchanged and physical grading deferred while waiting. Do not place credentials, personal account details or private library records in the PR.
+
 ## Before live use
 
 Confirm approved credentials and written permission for automated valuation, comparison retention and derived value ranges. Validate the real response envelope and parameter semantics with a small approved probe: the fixture's `SearchResults` wrapper is provisional, although its Book fields follow the published guide. Implement a separately reviewed live transport with real pacing and secure credential handling. Then run a bounded 30-book pilot and inspect identity, coverage and condition scenarios before expanding. Keep estimates unchanged until the results are explicitly reviewed.

@@ -217,7 +217,10 @@ need confirmation before a fresh AbeBooks pilot. The current live review remains
 eBay-only and keeps estimates unchanged. A November 9
 [offline SWS adapter](ABEBOOKS_SWS_OFFLINE_ADAPTER_20261109.md) now passes synthetic
 replay checks on the laptop and Mini. Live transport remains disabled pending
-approval, retention terms and a bounded live pilot.
+approval, retention terms and a bounded live pilot. The Affiliate Program application
+for Pops' Edge (Substack) was submitted through Impact on November 9 and is **In
+Review**. After acceptance, obtain the Affiliate ID and request an SWS key; confirm
+the separate private valuation and retention permissions before live testing.
 
 Acceptance: reproducible coverage and before/after results, source-backed ranges,
 no unsupported values, preserved history, and actionable exceptions for checks
