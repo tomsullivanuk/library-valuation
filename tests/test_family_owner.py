@@ -66,3 +66,13 @@ def test_backup_preserves_allocations_and_history(setup,tmp_path):
  assert backup.execute('SELECT count(*) FROM request_events').fetchone()[0]==1
  with pytest.raises(r.Conflict):o.update(backup,'owner',action(ids[1],'approved',slot='hold:1'),f)
  backup.close()
+
+def test_inbox_history_is_ordered_and_scoped_to_requested_book(setup):
+ db,c,f,ids=setup
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ o.update(db,'owner',action(ids[0],'pending',1),f)
+ rows={row['id']:row for row in o.inbox(db,f)}
+ events=rows[ids[0]]['items'][0]['history']
+ assert [e['state'] for e in events]==['approved','pending']
+ assert all(e['actor']=='owner' and e['created'] for e in events)
+ assert rows[ids[1]]['items'][0]['history']==[]

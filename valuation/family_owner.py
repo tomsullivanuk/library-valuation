@@ -67,7 +67,9 @@ def inbox(db,facts):
             d=decision(db,row['id'],ref)
             copies=[dict(c,assignment=assigned.get(c['id'])) for c in f['copies']]
             details.append(dict(reference=ref,**{k:v for k,v in f.items() if k!='copies'},copies=copies,decision=d,
-                other_requesters=sorted(people.get(ref,set())-{row['email']})))
+                other_requesters=sorted(people.get(ref,set())-{row['email']}),
+                history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'])
+                    for e in db.execute('SELECT created,actor,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(row['id'],ref))]))
         row['items']=details
     return rows
 
