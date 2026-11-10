@@ -11,7 +11,7 @@ async function render(){
 if(location.hash!=='#requests')return;
 const current=++generation;
 main.replaceChildren();
-const style=text('style',`#main-content .request-heading{font-size:1.8rem;margin-bottom:.5rem} .request-tools{display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;margin:1rem 0}.request-tools label{display:flex;flex-direction:column;gap:.25rem}.request-tools input{width:18rem}.request-tools select,.request-tools input{min-height:2rem}.request-scroll{overflow-x:auto}.request-table{width:100%;border-collapse:collapse;font-size:.95rem}.request-table th,.request-table td{text-align:left;padding:.8rem .6rem;vertical-align:top;border-bottom:1px solid #dce4df}.request-table th{white-space:nowrap}.request-table td:first-child{overflow-wrap:anywhere;max-width:13rem}.request-table .request-book{min-width:13rem}.request-table small{display:block;color:#64716b;margin-top:.25rem}.request-table button{padding:.35rem .55rem;font-size:.88rem;min-height:2rem;margin:0 .25rem .3rem 0}.request-table select{width:12rem;max-width:100%;min-height:2rem}.request-status{text-transform:capitalize;font-weight:600}.request-overlap{color:#895c13!important}.request-detail td{background:#f7f9f7}.request-detail summary{cursor:pointer;color:#245e4c}.request-actions{min-width:10rem}`,main);
+const style=text('style',`#main-content .request-heading{font-size:1.8rem;margin-bottom:.5rem} .request-tools{display:flex;gap:.75rem;align-items:end;flex-wrap:wrap;margin:1rem 0}.request-tools label{display:flex;flex-direction:column;gap:.25rem}.request-tools input{width:18rem}.request-tools select,.request-tools input{box-sizing:border-box;height:2rem;min-height:2rem;padding:0 .4rem;font:inherit;line-height:normal}.request-scroll{overflow-x:auto}.request-table{width:100%;border-collapse:collapse;font-size:.95rem}.request-table th,.request-table td{text-align:left;padding:.8rem .6rem;vertical-align:top;border-bottom:1px solid #dce4df}.request-table th{white-space:nowrap}.request-table td:first-child{overflow-wrap:anywhere;max-width:13rem}.request-table .request-book{min-width:13rem}.request-table small{display:block;color:#64716b;margin-top:.25rem}.request-table button{padding:.35rem .55rem;font-size:.88rem;min-height:2rem;margin:0 .25rem .3rem 0}.request-table select{width:12rem;max-width:100%;min-height:2rem}.request-status{text-transform:capitalize;font-weight:600}.request-overlap{color:#895c13!important}.request-detail td{background:#f7f9f7}.request-detail[hidden]{display:none}.request-table .request-history{display:inline-block;margin-top:.4rem;color:#245e4c;text-decoration:underline;white-space:nowrap}.request-actions{min-width:10rem}.request-actions select{width:10rem}`,main);
 text('h1','Book requests',main).className='request-heading';
 text('p','Approval reserves a copy. Mark collected only after the book has left the library.',main);
 try{
@@ -36,13 +36,18 @@ for(const c of item.copies){const opt=text('option',c.label+(c.assignment?' · '
 const actions=text('td','',tr);actions.className='request-actions';
 const change=async(state)=>{if(state==='collected'&&!confirm('Confirm that this assigned physical book has actually been collected and has left your library?'))return;await request('/api/family-requests',{submission:row.id,reference:item.reference,state,version:item.decision.version,slot:select.value});if(state==='collected'){location.reload();return}await render()};
 if(item.decision.state==='collected'){select.disabled=true;text('small','Collection recorded',actions)}else{
-if(item.decision.state!=='approved'){const approve=button('Approve',()=>change('approved'),actions);approve.disabled=!select.value;select.onchange=()=>{approve.disabled=!select.value}}
-if(item.decision.state!=='pending')button('Return to pending',()=>change('pending'),actions);
-if(item.decision.state!=='declined')button('Decline',()=>change('declined'),actions);
-if(item.decision.state==='approved'){select.disabled=true;button('Mark collected',()=>change('collected'),actions)}
+const menu=text('select','',actions);menu.setAttribute('aria-label','Action for '+item.title);text('option','Choose action',menu).value='';
+let approve;
+if(item.decision.state!=='approved'){approve=text('option','Approve',menu);approve.value='approved';approve.disabled=!select.value;select.onchange=()=>{approve.disabled=!select.value}}
+if(item.decision.state!=='pending')text('option','Return to pending',menu).value='pending';
+if(item.decision.state!=='declined')text('option','Decline',menu).value='declined';
+if(item.decision.state==='approved'){select.disabled=true;text('option','Mark collected',menu).value='collected'}
+menu.onchange=async()=>{const state=menu.value;if(!state)return;menu.disabled=true;try{await change(state)}catch(e){text('p',e.message,actions).setAttribute('role','alert')}finally{menu.value='';menu.disabled=false}};
 }
-const detailRow=text('tr','',body);detailRow.className='request-detail';const cell=text('td','',detailRow);cell.colSpan=7;const detail=text('details','',cell);text('summary','Message and history · '+date(row.created),detail);text('p',row.payload.message||'No message included.',detail);
-if(item.history&&item.history.length){for(const event of item.history)text('p',date(event.created)+' · '+event.state+' · '+event.actor,detail)}else text('p','No decisions recorded yet.',detail);
+const detailRow=text('tr','',body);detailRow.className='request-detail';detailRow.hidden=true;detailRow.id='request-history-'+row.id+'-'+item.reference;
+const history=text('a','Message history',actions);history.className='request-history';history.href='#'+detailRow.id;history.setAttribute('aria-expanded','false');history.setAttribute('aria-controls',detailRow.id);history.onclick=(e)=>{e.preventDefault();detailRow.hidden=!detailRow.hidden;history.setAttribute('aria-expanded',String(!detailRow.hidden))};
+const cell=text('td','',detailRow);cell.colSpan=7;text('p','Submitted '+date(row.created),cell);text('p',row.payload.message||'No message included.',cell);
+if(item.history&&item.history.length){for(const event of item.history)text('p',date(event.created)+' · '+event.state+' · '+event.actor,cell)}else text('p','No decisions recorded yet.',cell);
 }
 }
 states.onchange=()=>{status=states.value;draw()};who.onchange=()=>{person=who.value;draw()};search.oninput=()=>{query=search.value;draw()};draw();
