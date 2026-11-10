@@ -242,6 +242,11 @@ owner review, backup/restore, and a successful recipient pilot independent of th
 laptop. This brings the family-facing subset of the former v0.14 Publishing
 scope forward; broader dealer and marketplace publishing remains later work.
 
+A November 10 [private read-only catalog](PRIVATE_FAMILY_CATALOG_20261110.md)
+now serves 2,565 physically inventoried catalog records through Cloudflare
+Access email PIN, restricted to the two test addresses. Sites did not demonstrate
+account-free access. Recipient lists and durable requests remain outstanding.
+
 #### Deferred collection intelligence
 
 The former v0.12 scope remains a backlog direction rather than a prerequisite:
