@@ -22,3 +22,9 @@ cd ~/library-valuation
 Refresh stages and atomically replaces the HTML after checking canonical hashes. Publication does not automatically refresh when the catalog changes; no recurring job was added. The pre-publication synthetic page is retained outside the web root at `~/library-access-pilot/synthetic-before-real.html` for rollback. Both local canonical records and the user-facing snapshot remain subject to the Mini's existing backup arrangement. Startup uses the already verified automatic-login/lock configuration.
 
 Estimates remain unchanged and physical grading remains deferred. Personal selection lists, notifications and copy allocations are later work.
+
+
+The November 10 [personal-list and request service](FAMILY_REQUESTS_20261110.md)
+now supersedes the static-only server. Its private JSON snapshot is the current
+source for browsing; use the request-service installer for refresh. The older
+HTML export command alone no longer refreshes the active service.

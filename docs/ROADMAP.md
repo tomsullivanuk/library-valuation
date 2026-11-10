@@ -245,7 +245,9 @@ scope forward; broader dealer and marketplace publishing remains later work.
 A November 10 [private read-only catalog](PRIVATE_FAMILY_CATALOG_20261110.md)
 now serves 2,565 physically inventoried catalog records through Cloudflare
 Access email PIN, restricted to the two test addresses. Sites did not demonstrate
-account-free access. Recipient lists and durable requests remain outstanding.
+account-free access. [Personal lists and durable requests](FAMILY_REQUESTS_20261110.md) now run
+on the Mini with separate recipient drafts and an owner-only inbox. Live
+two-address acceptance remains before expanding invitations.
 
 #### Deferred collection intelligence
 
