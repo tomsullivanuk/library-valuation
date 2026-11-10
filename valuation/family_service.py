@@ -5,6 +5,8 @@ import argparse
 import hashlib
 import json
 import os
+import ssl
+import requests
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -15,7 +17,8 @@ from valuation.family_catalog import render
 class Identity:
     def __init__(self,config):
         self.config=config
-        self.keys=jwt.PyJWKClient(config['issuer']+'/cdn-cgi/access/certs',timeout=5,lifespan=300)
+        self.keys=jwt.PyJWKClient(config['issuer']+'/cdn-cgi/access/certs',timeout=5,lifespan=300,
+            ssl_context=ssl.create_default_context(cafile=requests.certs.where()))
     def __call__(self,token):
         key=self.keys.get_signing_key_from_jwt(token)
         c=jwt.decode(token,key.key,algorithms=['RS256'],audience=self.config['audience'],issuer=self.config['issuer'],options={'require':['exp','iat','sub','email','aud','iss']})
@@ -44,7 +47,10 @@ class App:
                 try:
                     if self.headers.get('Host')!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
                     try:email=app.identity(self.headers.get('Cf-Access-Jwt-Assertion',''))
-                    except Exception:return self.reply(403,{'error':'Sign in with an invited email address.'})
+                    except jwt.PyJWKClientConnectionError:
+                        return self.reply(503,'<!doctype html><html lang="en"><title>Sign-in temporarily unavailable</title><h1>Sign-in temporarily unavailable</h1><p>We could not verify your sign-in right now. Please try again shortly.</p><a href="/">Try again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(503,{'error':'Sign-in verification temporarily unavailable. Please retry.'})
+                    except Exception:
+                        return self.reply(403,'<!doctype html><html lang="en"><title>Sign in required</title><h1>Sign in required</h1><p>Please sign in using one of the invited email addresses.</p><a href="/cdn-cgi/access/logout">Sign in again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(403,{'error':'Sign in with an invited email address.'})
                     if email not in app.config['allowed_emails']:return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
                     if write:

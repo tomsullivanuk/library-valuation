@@ -51,3 +51,12 @@ def test_real_signature_claim_validation(monkeypatch):
  for patch in [dict(aud=['wrong']),dict(iss='wrong'),dict(exp=1),dict(email='stranger@example.org')]:
   with pytest.raises(Exception):verifier(jwt.encode(claims|patch,key,algorithm='RS256'))
  with pytest.raises(Exception):verifier(jwt.encode(claims,other,algorithm='RS256'))
+
+def test_signing_keys_use_verified_ca_bundle(monkeypatch):
+ import ssl
+ seen={}
+ def client(url,**kwargs):seen.update(kwargs);return object()
+ monkeypatch.setattr('valuation.family_service.jwt.PyJWKClient',client)
+ Identity(dict(issuer='https://team.cloudflareaccess.com'))
+ assert seen['ssl_context'].verify_mode==ssl.CERT_REQUIRED
+ assert seen['ssl_context'].check_hostname is True
