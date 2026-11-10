@@ -29,3 +29,9 @@ First establish the owner's existing hosting/email services or set up suitable a
 Current status: planning and provider prerequisites only. No magic-link email has been sent, no new hosting/authentication account has been created and no real catalog data or estimates have changed. Physical grading remains deferred.
 
 Sources: https://supabase.com/docs/guides/auth/auth-email-passwordless and https://supabase.com/docs/guides/auth/auth-smtp (checked November 10, 2026).
+
+## Cloudflare setup progress
+
+The owner activated Zero Trust Free in their existing Cloudflare account. The dashboard wizard configured a dedicated `Library sample pilot` application with origin `http://localhost:8877`, hostname `library-pilot.wearyfather.org`, owner plus one authorized test email, and a dedicated `library-sample-pilot` tunnel. The wizard explicitly offers email One Time PIN authentication. Personal recipient details and tunnel credentials are omitted here.
+
+The Mini serves only the three invented books from a separate `~/library-access-pilot` directory on loopback port 8877; a local HTTP check succeeded. The original steward service and catalog are untouched. Cloudflare's official arm64 connector is staged under `~/library-access-pilot/bin/`; connector registration/service activation and end-to-end access remain pending. The sample HTTP server is a temporary pilot process, not yet a reboot-tested production service. DNS creation was confirmed by the dashboard; external availability is not yet verified.
