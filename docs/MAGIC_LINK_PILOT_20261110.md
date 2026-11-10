@@ -49,3 +49,11 @@ Remaining acceptance checks: denial for an unapproved address, used/expired-code
 Replaced the temporary sample process with the `local.library-access-pilot` login LaunchAgent (RunAtLoad/KeepAlive). It serves only the `public/` subdirectory, excluding connector binaries, installer and logs. Verified managed server startup, sample index retrieval, and an operational script path returning 404 locally. The main library remained healthy (HTTP 200). Recovery relies on the Mini's previously configured automatic login; the Cloudflare connector remains a system daemon.
 
 Five credential-free external requests (root, index, two operational paths and a query variant) returned HTTP 403 and no sample-book content. This demonstrates no anonymous content disclosure to that HTTP client; browser/email-specific denial still requires a separate check. Safari was concurrently in use, so dashboard revocation changes were deferred rather than interrupting unrelated work. Existing authenticated-session revocation and actual reboot recovery are not yet verified. Administrator authentication is needed for reboot.
+
+## Revocation verified
+
+Temporarily removed the approved test recipient from the sole email Include rule, leaving only the owner. An already authenticated Safari session still served samples before token invalidation: email removal alone does not immediately terminate issued sessions. Invoked the sample application's “Revoke existing tokens”; refreshing the formerly working session then returned to the email sign-in form. The saved-policy tester explicitly identified the removed test identity as blocked (one tested identity, 100% blocked). Restored the original approved test email afterward. No application was made public and no unrelated access policies were edited.
+
+Operational revocation procedure: remove the address from the allowlist **and** revoke existing application tokens; expect users to authenticate again. This pilot verified the policy engine's denied identity and termination of an existing session, rather than claiming that a generic email-code confirmation proves denial. Unknown-third-party mailbox testing is unnecessary and was not performed.
+
+Reboot recovery: managed sample startup is ready and the owner has been given the administrator-authorized restart command. Actual restart and post-boot verification remain pending.
