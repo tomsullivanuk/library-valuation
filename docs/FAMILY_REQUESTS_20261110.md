@@ -31,3 +31,9 @@ The deployed service rejects forged tokens on catalog, personal-list, inbox and 
 ## Live sign-in repair
 
 The first real browser acceptance exposed a Mini-specific missing system CA trust bundle: urllib could not verify TLS while fetching Cloudflare signing keys. Configured PyJWKClient with the maintained CA bundle supplied by the existing requests dependency, preserving certificate/hostname verification and JWT signature checks. Public signing-key retrieval now succeeds on the Mini. Added a regression test asserting verified TLS and friendly HTML sign-in/unavailable pages rather than raw JSON at the root. All 819 tests pass on both Macs. Verified the actual invited browser session loads “Our library,” 2,565 records and “My list (0)” with its authenticated identity. No access rules or saved request data were changed by the repair.
+
+
+The [unified owner workspace](UNIFIED_OWNER_WORKSPACE_20261110.md) supersedes the
+separate Owner inbox: owner login now opens Library Valuation with a Requests tab.
+Approval, copy assignment, overlap checks and collection tracking are implemented
+there. The family interface remains the recipient view only.

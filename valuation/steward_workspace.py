@@ -834,6 +834,7 @@ _DOCUMENT = r"""<!doctype html>
     <a href="#library" data-nav="library">Library</a>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
     <a href="#actions" data-nav="actions">Action Items</a>
+    <a href="#requests" data-nav="requests">Requests</a>
     <a href="#reports" data-nav="reports">Reports</a>
     <a href="#settings" data-nav="settings">Settings</a>
   </nav>
@@ -844,6 +845,7 @@ _DOCUMENT = r"""<!doctype html>
   <noscript>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
+  <script defer src="/requests.js"></script>
   <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
@@ -1950,6 +1952,7 @@ _DOCUMENT = r"""<!doctype html>
       });
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
       else if (route === "recommendations" || route === "actions") renderActions(id);
+      else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();

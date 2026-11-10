@@ -7,6 +7,10 @@ import json
 import os
 import ssl
 import requests
+import secrets
+import re
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -31,17 +35,25 @@ class App:
         self.config=config;self.identity=identity or Identity(config)
         self.db=Path(config['database']);self.db.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         store.connect(self.db).close();os.chmod(self.db,0o600)
-    def catalog(self):
+    def raw_catalog(self):
         raw=Path(self.config['snapshot']).read_bytes();records=json.loads(raw)
         from valuation.family_catalog import FIELDS
         if not isinstance(records,list) or any(set(r)!=set(FIELDS) for r in records):raise ValueError('Invalid catalog snapshot')
         return {r['reference']:r for r in records},hashlib.sha256(raw).hexdigest()
+    def catalog(self):
+        records,snapshot=self.raw_catalog()
+        if self.config.get('owner_data_dir'):
+            from valuation import family_owner as owner
+            from valuation.workspace_service import load_model
+            facts=owner.live_facts(load_model(self.config['owner_data_dir'],self.config['owner_output_dir'],family_overlay=False),self.config['owner_data_dir'])
+            with closing(store.connect(self.db)) as db:records=owner.available(db,records,facts)
+        return records,snapshot
     def handler(self):
         app=self
         class Handler(BaseHTTPRequestHandler):
             def log_message(self,*args):pass
             def reply(self,status,payload,kind='application/json'):
-                data=payload.encode() if isinstance(payload,str) else json.dumps(payload).encode()
+                data=payload if isinstance(payload,bytes) else payload.encode() if isinstance(payload,str) else json.dumps(payload).encode()
                 self.send_response(status);self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             def handle_request(self,write=False):
                 try:
@@ -54,17 +66,42 @@ class App:
                     if email not in app.config['allowed_emails']:return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
                     if write:
-                        if self.headers.get('Origin')!=app.config['origin'] or self.headers.get('Content-Type')!='application/json' or self.headers.get('X-Family-Request')!='1':return self.reply(403,{'error':'Invalid request origin'})
+                        if self.headers.get('Origin')!=app.config['origin'] or self.headers.get('Content-Type')!='application/json' or (not path.startswith('/owner/') and self.headers.get('X-Family-Request')!='1'):return self.reply(403,{'error':'Invalid request origin'})
                         length=int(self.headers.get('Content-Length','0'))
                         if length<1 or length>300000:return self.reply(413,{'error':'Request too large'})
                         body=json.loads(self.rfile.read(length))
+                    if path=='/owner' or path.startswith('/owner/'):
+                        if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
+                        local=path[len('/owner'):] or '/'
+                        headers={'Origin':'http://127.0.0.1:8765'}
+                        payload=None
+                        if write:
+                            headers.update({'Content-Type':'application/json','X-Workspace-Token':self.headers.get('X-Workspace-Token','')})
+                            payload=json.dumps(body).encode()
+                        req=Request('http://127.0.0.1:8765'+local,data=payload,headers=headers)
+                        try:r=urlopen(req,timeout=30)
+                        except HTTPError as exc:r=exc
+                        output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
+                        if kind=='text/html':
+                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"')
+                            nonce=secrets.token_urlsafe(20)
+                            text=re.sub(r'<script(?=[ >])','<script nonce="'+nonce+'"',text)
+                            self.send_response(r.code);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-ancestors 'none'; base-uri 'none'");self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');output=text.encode();self.send_header('Content-Length',str(len(output)));self.end_headers();self.wfile.write(output);return
+                        return self.reply(r.code,output,kind)
+                    if path=='/' and email==app.config['owner_email']:
+                        self.send_response(302);self.send_header('Location','/owner/');self.send_header('Cache-Control','no-store');self.send_header('Content-Length','0');self.end_headers();return
                     catalog,snapshot=app.catalog()
                     with closing(store.connect(app.db)) as db:
                         if write:
                             if path=='/api/list':return self.reply(200,store.save(db,email,body['version'],body['books'],body.get('message',''),catalog))
                             if path=='/api/submit':return self.reply(200,store.submit(db,email,body['version'],body['key'],catalog,snapshot))
                             return self.reply(404,{'error':'Not found'})
-                        if path=='/api/me':return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=store.submissions(db,email)))
+                        if path=='/api/me':
+                            from valuation import family_owner as owner
+                            owner.schema(db);own=store.submissions(db,email)
+                            for row in own:
+                                for book in row['payload']['books']:book['request_status']=owner.decision(db,row['id'],book['reference'])['state']
+                            return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=own))
                         if path=='/api/inbox':
                             if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
                             return self.reply(200,store.submissions(db))

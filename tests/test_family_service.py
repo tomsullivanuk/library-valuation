@@ -26,6 +26,9 @@ def server(tmp_path):
 def test_http_ownership_and_csrf(server):
  assert server('/api/me',who='forged')[0]==403
  assert server('/api/inbox')[0]==403
+ assert server('/owner/')[0]==403
+ assert server('/owner/api/state')[0]==403
+ assert server('/owner/api/family-requests',data={})[0]==403
  assert server('/api/list',data=dict(version=0,books=['ref']),origin='https://evil.example')[0]==403
  assert server('/api/list',data=dict(version=0,books=['ref']))[0]==200
  assert json.loads(server('/api/me',who='owner@example.org')[1])['draft']['books']==[]
