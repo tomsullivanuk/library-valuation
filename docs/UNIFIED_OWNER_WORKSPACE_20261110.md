@@ -50,3 +50,9 @@ Verified the live owner page on the Mini: one pending row, disabled approval wit
 ### Compact controls follow-up
 
 Matched search and filter controls to a common explicit height. Replaced per-row action buttons with a status-aware Choose action dropdown; approval remains disabled until a copy is selected and Mark collected still requires confirmation. Message history is now a link within the request row, toggling a fully hidden detail row below it with accessible expanded/controls attributes. Verified the deployed owner page visually and opened/closed its history without changing the request decision. JavaScript syntax validation passed; no server or decision-rule changes.
+
+### Action-first assignment
+
+Moved Action before Assigned copy and put Message history in its own unheaded cell on the same row. Matched row dropdown heights, margins and fonts; matched Refresh to filter height. Replaced the always-visible collection instruction with the actual approval sequence. Choosing Approve now enables and focuses copy selection, with an explicit prompt that choosing a copy saves approval. No approval is persisted until a valid copy is selected; the existing atomic reservation API is unchanged. Changing away from Approve disables copy selection. Mark collected remains available only for approved requests, with its existing confirmation.
+
+Verified the deployed owner layout against the current approved request using the All filter. The existing approved assignment was preserved; no live decision was changed for this layout check. JavaScript syntax validation and whitespace checks pass. These changes affect presentation and the ordering of inputs, not inventory, estimates or access permissions.
