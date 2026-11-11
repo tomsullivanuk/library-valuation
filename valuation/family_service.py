@@ -38,8 +38,8 @@ class App:
     def raw_catalog(self):
         raw=Path(self.config['snapshot']).read_bytes();records=json.loads(raw)
         from valuation.family_catalog import FIELDS
-        if not isinstance(records,list) or any(set(r)!=set(FIELDS) for r in records):raise ValueError('Invalid catalog snapshot')
-        return {r['reference']:r for r in records},hashlib.sha256(raw).hexdigest()
+        if not isinstance(records,list) or any(set(r) not in (set(FIELDS),set(FIELDS)-{'description'}) for r in records):raise ValueError('Invalid catalog snapshot')
+        return {r['reference']:dict(r,description=r.get('description','')) for r in records},hashlib.sha256(raw).hexdigest()
     def catalog(self):
         records,snapshot=self.raw_catalog()
         if self.config.get('owner_data_dir'):
@@ -111,7 +111,7 @@ class App:
                             page=render(list(catalog.values()),updated)
                             page=page[:page.index('<script>')]+ '<script src="/app.js" defer></script></html>'
                             page=page.replace('This is a read-only catalog.','You can save a personal list and submit requests to Tom.')
-                            page=page.replace('<main>','<nav><button id="browse">Browse</button> <button id="mine">My list</button> <button id="inbox" hidden>Owner inbox</button></nav><p id="saved" role="status"></p><section id="panel" hidden></section><main>')
+                            page=page.replace('<main>','<nav class="family-nav" aria-label="Library views"><button id="browse">Browse</button> <button id="mine">My List</button> <button id="inbox" hidden>Owner inbox</button></nav><p id="saved" role="status"></p><section id="panel" hidden></section><main>')
                             # Stable references supplied as escaped HTML attributes, never private catalog IDs.
                             import html
                             for r in catalog.values():

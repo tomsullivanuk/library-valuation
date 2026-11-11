@@ -15,7 +15,9 @@ from valuation.libib_catalog import StrictCatalogRepository
 def install(home,owner,allowed):
     home=Path(home);root=home/'library-access-pilot';data=home/'library-valuation/data'
     before={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in data.iterdir() if p.is_file()}
-    records=project(StrictCatalogRepository(data/'catalog_items.csv').load(),resolve_completed_inventory(data))
+    from valuation.workspace_service import load_model
+    descriptions={b.catalog_item_id:b.description for b in load_model(data,home/'library-valuation/output',family_overlay=False).books}
+    records=project(StrictCatalogRepository(data/'catalog_items.csv').load(),resolve_completed_inventory(data),descriptions)
     state=root/'state';state.mkdir(mode=0o700,exist_ok=True);os.chmod(state,0o700)
     for name,payload in [('catalog.json',records),('config.json',dict(database=str(state/'requests.sqlite'),snapshot=str(state/'catalog.json'),origin='https://library-pilot.wearyfather.org',issuer='https://frosty-rain-0886.cloudflareaccess.com',audience='d3cdd8afa98ff0e99e089fc0706e12569383c28e860367a46b0153d1294f247b',owner_data_dir=str(data),owner_output_dir=str(home/'library-valuation/output'),owner_email=owner,allowed_emails=sorted(set(allowed+[owner]))))]:
         path=state/name;tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(payload));tmp.chmod(0o600);tmp.replace(path)

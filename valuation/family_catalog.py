@@ -10,10 +10,10 @@ import os
 from valuation.completed_inventory import resolve_completed_inventory
 from valuation.libib_catalog import StrictCatalogRepository
 
-FIELDS = ('reference', 'title', 'author', 'publisher', 'year', 'isbn', 'availability')
+FIELDS = ('reference', 'title', 'author', 'publisher', 'year', 'isbn', 'availability', 'description')
 
 
-def project(rows, scope):
+def project(rows, scope, descriptions=None):
     if not scope.completed:
         raise ValueError('A completed physical inventory is required')
     ids = set(scope.catalog_item_ids)
@@ -24,7 +24,7 @@ def project(rows, scope):
         raise ValueError('Physical inventory references missing catalog records')
     return sorted([dict(reference=hashlib.sha256(('family-v1:'+r['catalog_item_id']).encode()).hexdigest()[:20],
         title=r['title'], author=r['author'], publisher=r['publisher'], year=r['publication_year'],
-        isbn=r['isbn13'] or r['isbn10'], availability='Physically inventoried') for r in selected],
+        isbn=r['isbn13'] or r['isbn10'], availability='Physically inventoried', description=(descriptions or {}).get(r['catalog_item_id'],'')) for r in selected],
         key=lambda r:(r['title'].casefold(),r['reference']))
 
 
@@ -37,11 +37,12 @@ def render(records, generated_at):
         publication=' · '.join(v for v in (r['publisher'],r['year']) if v)
         cards.append('<article><h2>'+esc(r['title'])+'</h2><p>'+esc(r['author'])+'</p><p class="muted">'+esc(publication)+'</p>'
           + ('<p class="muted">ISBN '+esc(r['isbn'])+'</p>' if r['isbn'] else '')
+          + ('<details class="book-description"><summary>Book description</summary><p>'+esc(r.get('description',''))+'</p></details>' if r.get('description') else '')
           + '<p class="availability">'+esc(r['availability'])+'</p></article>')
     return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>Our library</title>
-<style>body{max-width:1000px;margin:32px auto;padding:20px;font:17px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,h2{font-family:Georgia;color:#245d49}h1{font-size:2rem}h2{font-size:1.3rem;margin:0}article{background:white;border:1px solid #d4ddd6;border-radius:10px;padding:20px;margin:14px 0}p{margin:6px 0}.muted{color:#606c65;font-size:.9rem}.availability{font-size:.85rem;color:#245d49}input{font:inherit;padding:12px;width:100%;box-sizing:border-box;border:1px solid #97a79e;border-radius:6px}header{margin-bottom:24px}[hidden]{display:none}</style>
-<header><p class="muted">PRIVATE · FRIENDS & FAMILY</p><h1>Our library</h1><p>Browse the books recorded in our completed physical inventory.</p><p>This is a read-only catalog. Books shown here are not reserved or promised; availability needs confirmation with Tom.</p><p class="muted">Updated '''+esc(generated_at)+'''</p></header><label for="search">Search title, author, publisher or ISBN</label><input id="search" type="search" placeholder="Find a book…"><p id="count" role="status" aria-live="polite">'''+str(len(records))+''' catalog records</p><main>'''+''.join(cards)+'''</main><p id="empty" hidden>No matching books.</p>
+<style>body{max-width:1000px;margin:32px auto;padding:20px;font:17px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,h2{font-family:Georgia;color:#245d49}h1{font-size:2rem}h2{font-size:1.3rem;margin:0}button{font:inherit;padding:.45rem .8rem;border:1px solid #245d49;border-radius:6px;background:white;color:#245d49;cursor:pointer}button:disabled{opacity:.55;cursor:default}button[aria-pressed="true"]{background:#245d49;color:white}.family-nav{display:flex;gap:.6rem;margin:1rem 0}.family-nav button{font-weight:600;padding:.6rem 1.1rem}.header-meta{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}.family-table{width:100%;border-collapse:collapse;background:white}.family-table th,.family-table td{text-align:left;vertical-align:top;padding:.7rem;border-bottom:1px solid #d4ddd6}.table-scroll{overflow-x:auto}.family-table small{display:block}.family-table button{white-space:nowrap}textarea{display:block;width:100%;max-width:600px;min-height:5rem;font:inherit;margin:.4rem 0}#signed-in{font-weight:600}.book-description p{white-space:pre-line}.book-description{margin:.5rem 0}article{background:white;border:1px solid #d4ddd6;border-radius:10px;padding:20px;margin:14px 0}p{margin:6px 0}.muted{color:#606c65;font-size:.9rem}.availability{font-size:.85rem;color:#245d49}input{font:inherit;padding:12px;width:100%;box-sizing:border-box;border:1px solid #97a79e;border-radius:6px}header{margin-bottom:24px}[hidden]{display:none}</style>
+<header><div class="header-meta"><p class="muted">PRIVATE · FRIENDS & FAMILY</p><p id="signed-in" role="status">Checking sign-in…</p></div><h1>Our library</h1><p>Browse Pops Sullivan’s books and add the ones you’re interested in to My List.</p><p>When you’re ready, open My List to review your choices and send a request to Pops Sullivan. Adding a book to your list doesn’t reserve it; Pops Sullivan will confirm availability and arrange any gift or sale with you.</p><p class="muted updated" style="text-align:right">Catalog updated '''+esc(generated_at)+'''</p></header><label for="search">Search title, author, publisher, ISBN or book description</label><input id="search" type="search" placeholder="Try a title, author, topic or phrase…"><p id="count" role="status" aria-live="polite">'''+str(len(records))+''' catalog records</p><main>'''+''.join(cards)+'''</main><p id="empty" hidden>No matching books.</p>
 <script>const input=document.querySelector('#search'),cards=[...document.querySelectorAll('article')];input.addEventListener('input',()=>{const q=input.value.toLocaleLowerCase().trim();let n=0;for(const card of cards){card.hidden=!card.textContent.toLocaleLowerCase().includes(q);if(!card.hidden)n++}document.querySelector('#count').textContent=n+' catalog records';document.querySelector('#empty').hidden=n!==0});</script></html>'''
 
 

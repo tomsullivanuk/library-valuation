@@ -28,3 +28,7 @@ The November 10 [personal-list and request service](FAMILY_REQUESTS_20261110.md)
 now supersedes the static-only server. Its private JSON snapshot is the current
 source for browsing; use the request-service installer for refresh. The older
 HTML export command alone no longer refreshes the active service.
+
+### Description-search revision
+
+At the owner's explicit request, the November 10 recipient UX revision permits imported Libib book descriptions in the private family projection and searches/displays them. This supersedes this document's earlier exclusion of descriptions. Private notes, acquisition/purchase data, valuations, locations and raw evidence remain excluded. See FAMILY_REQUESTS_20261110.md for provenance, privacy and verification details.

@@ -21,3 +21,13 @@ def test_fail_closed_scope_and_identity():
  with pytest.raises(ValueError):project([row()],scope)
  with pytest.raises(ValueError):project([row(),row()],replace(scope,catalog_item_ids=('BK1',)))
  with pytest.raises(ValueError):render([{'notes':'PRIVATE'}],'DATE')
+
+def test_explicit_book_description_is_searchable_and_escaped_without_private_notes():
+ scope=CompletedInventoryScope(completed=True,catalog_item_ids=('BK1',))
+ records=project([row()],scope,{'BK1':'Scholarly cosmology <img src=x onerror=alert(1)>','OTHER':'OUTSIDE_SCOPE'})
+ page=render(records,'DATE')
+ assert records[0]['description'].startswith('Scholarly cosmology')
+ assert 'Book description' in page and 'Scholarly cosmology' in page
+ assert '<img src=x' not in page and '&lt;img' in page
+ assert all(secret not in page for secret in ['PRIVATE_NOTE','PRIVATE_DESCRIPTION','PRIVATE_COST','PRIVATE_VALUE','PRIVATE_BOX','OUTSIDE_SCOPE'])
+ assert 'Pops Sullivan' in page and 'id="signed-in"' in page
