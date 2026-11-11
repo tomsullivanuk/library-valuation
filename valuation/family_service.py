@@ -20,6 +20,10 @@ import jwt
 from valuation import family_requests as store
 from valuation.family_catalog import render
 
+def owner_badge(email):
+    import html
+    return '<span style="font-size:.9rem">Signed in as '+html.escape(email,quote=True)+' · Owner</span>'
+
 class Identity:
     def __init__(self,config):
         self.config=config
@@ -105,7 +109,7 @@ class App:
                             if path=='/owner/search-pilot.js' and not write:return self.reply(200,Path(__file__).with_name('family_search_preview.js').read_text(),'text/javascript')
                             if path=='/owner/search-pilot/report' and not write:return self.reply(200,(Path(app.config['search_pilot_dir'])/'report.html').read_bytes(),'text/html')
                             if path=='/owner/search-pilot' and not write:
-                                return self.reply(200,'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private search preview</title><style>body{font:17px system-ui;color:#25372e;max-width:1200px;margin:2rem auto;padding:1rem}h1,h2,h3{color:#245d49}input,button{font:inherit;padding:.6rem}input{width:70%}.columns{display:grid;grid-template-columns:1fr 1fr;gap:2rem}article{border-bottom:1px solid #ccc;padding:1rem 0}small{color:#606c65}@media(max-width:700px){.columns{display:block}}</style><a href="/owner/">Owner workspace</a><h1>Private search preview</h1><p>Compare ranked keywords with local AI. Only family-visible metadata and descriptions are indexed. Related-topic suggestions may be imperfect.</p><a href="/owner/search-pilot/report">42-query comparison report</a><form><label for="query">Find books</label><p><input id="query" maxlength="500" required placeholder="Try a title, ISBN or topic"><button>Compare</button></p></form><p id="notice" role="status"></p><div class="columns"><section id="keyword"></section><section id="hybrid"></section></div><script src="/owner/search-pilot.js" defer></script></html>','text/html')
+                                return self.reply(200,'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private search preview</title><style>body{font:17px system-ui;color:#25372e;max-width:1200px;margin:2rem auto;padding:1rem}h1,h2,h3{color:#245d49}input,button{font:inherit;padding:.6rem}input{width:70%}.columns{display:grid;grid-template-columns:1fr 1fr;gap:2rem}article{border-bottom:1px solid #ccc;padding:1rem 0}small{color:#606c65}@media(max-width:700px){.columns{display:block}}</style><div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap"><a href="/owner/">Owner workspace</a>'+owner_badge(email)+'</div><h1>Private search preview</h1><p>Compare ranked keywords with local AI. Only family-visible metadata and descriptions are indexed. Related-topic suggestions may be imperfect.</p><a href="/owner/search-pilot/report">42-query comparison report</a><form><label for="query">Find books</label><p><input id="query" maxlength="500" required placeholder="Try a title, ISBN or topic"><button>Compare</button></p></form><p id="notice" role="status"></p><div class="columns"><section id="keyword"></section><section id="hybrid"></section></div><script src="/owner/search-pilot.js" defer></script></html>','text/html')
                             return self.reply(404,{'error':'Not found'})
                         local=path[len('/owner'):] or '/'
                         headers={'Origin':'http://127.0.0.1:8765'}
@@ -119,6 +123,9 @@ class App:
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
                             text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"')
+                            text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
+                            if app.config.get('search_pilot_dir'):
+                                text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Main Library search uses the original search rules.</p></header>',1)
                             nonce=secrets.token_urlsafe(20)
                             text=re.sub(r'<script(?=[ >])','<script nonce="'+nonce+'"',text)
                             self.send_response(r.code);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-ancestors 'none'; base-uri 'none'");self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');output=text.encode();self.send_header('Content-Length',str(len(output)));self.end_headers();self.wfile.write(output);return

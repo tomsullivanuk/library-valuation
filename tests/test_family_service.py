@@ -67,3 +67,9 @@ def test_signing_keys_use_verified_ca_bundle(monkeypatch):
  Identity(dict(issuer='https://team.cloudflareaccess.com'))
  assert seen['ssl_context'].verify_mode==ssl.CERT_REQUIRED
  assert seen['ssl_context'].check_hostname is True
+
+def test_owner_badge_uses_verified_email_as_escaped_text():
+ from valuation.family_service import owner_badge
+ badge=owner_badge('owner@example.org')
+ assert 'Signed in as owner@example.org' in badge and 'Owner' in badge
+ assert '<script>' not in owner_badge('<script>')

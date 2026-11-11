@@ -39,3 +39,9 @@ All 847 Python tests pass on laptop and Mini. Coverage includes exact ranking, I
 Use the comparison page and report to judge the topical searches, especially introductory-level suitability and weak related-topic matches. Before enabling the family search field, choose relevance thresholds and UI treatment, validate stale-page/list behavior and end-to-end latency, and add a broader judged query set. No external AI integration or family rollout is implied by this prototype.
 
 Sources: https://www.sqlite.org/fts5.html ; https://www.sbert.net/examples/sentence_transformer/applications/semantic-search/README.html ; https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2 ; https://pypi.org/project/sentence-transformers/ .
+
+## Preview discoverability and owner identity
+
+Added the authenticated owner's escaped email and Owner label to both the remote owner workspace header and the private preview. Added an explicit AI preview link and a note that main Library search still uses its original rules, following confusion between the operational Library tab and the comparison page. The preview does not silently replace main search. The owner identity badge is generated only after signed identity verification; its escaping test passes. No access policy changed.
+
+Verified the exact owner query “an introduction to medieval philosophy” in the live private comparison page. Signed-in identity was visible, hybrid mode returned results, and its first candidate was the matching introductory medieval-philosophy title. Left the comparison tab open with that query. No main-search behavior, request, estimate or inventory record changed.
