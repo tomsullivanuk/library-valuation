@@ -15,7 +15,7 @@ belongs in release notes, the changelog, and architecture documentation.
 
 ## Current Product Baseline
 
-Through v0.11.1, Library Valuation has established:
+Through v0.11.1, Library Valuation established:
 
 - a durable catalog and acquisition history derived from Amazon imports;
 - research prioritization and collector-owned review state;
@@ -123,6 +123,13 @@ Future release plans that change the workspace should reference the
 restate or redefine them.
 
 ### v0.12.0 — Migration, Library Valuation Review, and Family Access
+
+Release checkpoint: November 11, 2026. See [v0.12.0 release notes](RELEASE_NOTES_v0.12.0.md).
+Mini operation, the eBay review pass, private family requests and gift/sale transfers,
+and combined local topic search are delivered. This checkpoint does not close the
+AbeBooks access/coverage work, apply proposed estimates, complete physical grading,
+or expand invitations beyond the two test addresses. Those remain explicit follow-ups.
+
 
 Approved direction: November 5, 2026. Deliver the following milestones in order,
 using v0.11.1 as the stable migration baseline. Each milestone has its own
@@ -247,8 +254,8 @@ now serves 2,565 physically inventoried catalog records through Cloudflare
 Access email PIN, restricted to the two test addresses. Sites did not demonstrate
 account-free access. [Personal lists and durable requests](FAMILY_REQUESTS_20261110.md) now run
 on the Mini with separate recipient drafts and an owner-only inbox. The [unified owner workspace](UNIFIED_OWNER_WORKSPACE_20261110.md) now includes
-Requests with current values, locations, copy assignment, decisions and collection
-tracking. The family view remains restricted; broader invitations still require
+Requests with current values, locations, copy assignment, decisions and permanent
+gift/sale transfer tracking. The family view remains restricted; broader invitations still require
 owner UX review.
 
 #### Deferred collection intelligence

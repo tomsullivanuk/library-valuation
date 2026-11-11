@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.12.0 - 2026-11-11
+
+Release focus: Mac Mini operation, whole-library comparison review, private family requests and local topic search.
+
+- Establish Mini startup, recovery and backup/restore workflows.
+- Complete bounded eBay lookup passes and review proposed ranges without replacing estimates; fresh AbeBooks coverage remains pending approval.
+- Add private family browsing, saved lists and requests, limited to the existing two test addresses.
+- Integrate owner request decisions, copy assignment and permanent gift/sale transfer history in one workspace.
+- Add ranked keywords and local AI topic search in both recipient and owner Library views.
+- Validate with 850 tests, compilation, browser checks and documented operational checks.
+
+See [release notes](docs/RELEASE_NOTES_v0.12.0.md) for delivered scope and remaining limitations.
+
 ## v0.11.1 - 2026-11-05
 
 Release focus: the everyday physical-library workspace and saved research decisions.
