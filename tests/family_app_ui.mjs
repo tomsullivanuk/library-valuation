@@ -10,7 +10,7 @@ class Element {
  setAttribute(k,v){this[k]=v}
  querySelector(selector){return nodes.find(e=>selector==='.form-actions button'&&e.tag==='button'&&e.textContent==='Submit request')}
 }
-const ids=Object.fromEntries(['panel','saved','search','count','empty','mine','browse','search-tools','signed-in','inbox'].map(k=>[k,new Element('div')]));
+const ids=Object.fromEntries(['panel','saved','search','count','empty','mine','browse','search-tools','browse-intro','signed-in','inbox'].map(k=>[k,new Element('div')]));
 let draft={version:1,books:['ref'],message:'OLD MESSAGE'};
 let posts=[];
 let submissions=[{created:'2026-11-10',payload:{books:[{reference:'ref',title:'Test book',author:'Author',request_status:'pending'}],message:'Historic message'}}];
@@ -22,6 +22,7 @@ await new Promise(r=>setTimeout(r,0));
 vm.runInContext('showMine()',context);
 assert.equal(ids['search-tools'].hidden,true);
 assert.equal(ids.updated.hidden,true);
+assert.equal(ids['browse-intro'].hidden,true);
 assert.equal(ids.saved.hidden,true);
 assert.ok(!nodes.some(e=>e.textContent.startsWith('Your saved choices are below.')));
 let notes=nodes.filter(e=>e.tag==='textarea').at(-1);
@@ -37,6 +38,7 @@ nodes.find(e=>e.tag==='button'&&e.textContent==='Continue browsing').onclick();
 assert.equal(posts.length,0);
 assert.equal(ids['search-tools'].hidden,false);
 assert.equal(ids.updated.hidden,false);
+assert.equal(ids['browse-intro'].hidden,false);
 assert.equal(ids.saved.hidden,false);
 vm.runInContext('showMine()',context);
 const submit=nodes.filter(e=>e.tag==='button'&&e.textContent==='Submit request').at(-1);

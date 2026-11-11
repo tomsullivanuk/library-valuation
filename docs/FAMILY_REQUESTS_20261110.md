@@ -61,3 +61,7 @@ Live Safari verification confirmed the exact heading/instructions, relocated tim
 ### My List text reduction
 
 Hide the catalog timestamp and routine autosave note in My List while keeping them in Browse. Remove the saved-choices explanatory paragraph. Submission progress, confirmations and errors remain visible when relevant. Extended the synthetic UI checks to verify these visibility rules and restoration in Browse; all runtime checks and whitespace checks pass. Deployed script only; no saved selections or requests changed.
+
+### Browse-only introduction
+
+Hide the top introductory instructions when My List is selected; preserve the library title, signed-in identity and navigation. Instructions remain in Browse. Catalog render tests and synthetic UI visibility/submission tests pass. Deployed with a family-service restart; no saved records changed.
