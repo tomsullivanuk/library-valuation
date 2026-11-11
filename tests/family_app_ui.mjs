@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const nodes=[];
 class Element {
- constructor(tag){this.tag=tag;this.children=[];this.value='';this.textContent='';nodes.push(this)}
+ constructor(tag){this.tag=tag;this.children=[];this.value='';this.textContent='';this.dataset={};nodes.push(this)}
  append(e){this.children.push(e)}
  replaceChildren(){this.children=[]}
  setAttribute(k,v){this[k]=v}
@@ -14,12 +14,16 @@ const ids=Object.fromEntries(['panel','saved','search','count','empty','mine','b
 let draft={version:1,books:['ref'],message:'OLD MESSAGE'};
 let posts=[];
 let submissions=[{created:'2026-11-10',payload:{books:[{reference:'ref',title:'Test book',author:'Author',request_status:'pending'}],message:'Historic message'}}];
+ids.updated=new Element('p');
 const source=await readFile(new URL('../valuation/family_app.js',import.meta.url),'utf8');
 const context=vm.createContext({document:{querySelector:s=>ids[s.slice(1)],querySelectorAll:()=>[],createElement:t=>new Element(t)},Date,Map,String,JSON,Error,crypto:{randomUUID:()=> 'retry-key'},location:{replace(){throw Error('Unexpected owner redirect')}},fetch:async(path,opts)=>({ok:true,json:async()=>{if(opts.method==='POST'){const payload=JSON.parse(opts.body);posts.push({path,payload});if(path==='/api/list'){draft={version:draft.version+1,books:payload.books,message:payload.message};return draft}return {id:'receipt'}}return {email:'guest@example.org',owner:false,draft,submissions}}})});
 vm.runInContext(source,context);
 await new Promise(r=>setTimeout(r,0));
 vm.runInContext('showMine()',context);
 assert.equal(ids['search-tools'].hidden,true);
+assert.equal(ids.updated.hidden,true);
+assert.equal(ids.saved.hidden,true);
+assert.ok(!nodes.some(e=>e.textContent.startsWith('Your saved choices are below.')));
 let notes=nodes.filter(e=>e.tag==='textarea').at(-1);
 assert.equal(notes.value,'');
 assert.equal(notes.placeholder,'Optional Message to Pops');
@@ -32,6 +36,8 @@ assert.equal(link['aria-expanded'],'false');
 nodes.find(e=>e.tag==='button'&&e.textContent==='Continue browsing').onclick();
 assert.equal(posts.length,0);
 assert.equal(ids['search-tools'].hidden,false);
+assert.equal(ids.updated.hidden,false);
+assert.equal(ids.saved.hidden,false);
 vm.runInContext('showMine()',context);
 const submit=nodes.filter(e=>e.tag==='button'&&e.textContent==='Submit request').at(-1);
 await submit.onclick();

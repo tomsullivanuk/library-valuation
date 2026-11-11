@@ -57,3 +57,7 @@ My List now offers Submit request and Continue browsing. Submit saves the curren
 Prior submissions use one table with submitted date, book, author, status, and Message details links that expand the original message beneath the row. No owner-only fields are exposed. Original submissions and request IDs remain in private storage.
 
 Live Safari verification confirmed the exact heading/instructions, relocated timestamp, hidden search in My List, blank message placeholder, new actions and prior-submission table. No production submit/remove/save action was taken. All 839 Python tests pass on laptop and Mini. The additional tests/family_app_ui.mjs fake-DOM runtime check verifies blank message handling, search hiding/restoration, expandable messages, non-destructive Continue browsing and the direct message-save/submit payload sequence using invented records only. JavaScript syntax and whitespace checks pass. Changes remain in PR #2.
+
+### My List text reduction
+
+Hide the catalog timestamp and routine autosave note in My List while keeping them in Browse. Remove the saved-choices explanatory paragraph. Submission progress, confirmations and errors remain visible when relevant. Extended the synthetic UI checks to verify these visibility rules and restoration in Browse; all runtime checks and whitespace checks pass. Deployed script only; no saved selections or requests changed.
