@@ -60,3 +60,7 @@ Verified the deployed owner layout against the current approved request using th
 ## Gift/sale handover supersedes collection wording
 
 Mark transferred now replaces Mark collected. Approval still reserves a copy; handover requires Gift or Sale and optional USD sale proceeds, followed by explicit departure confirmation. Original requests, purchases, estimates and prior events remain intact. Legacy collection records are displayed as transferred without guessing a transfer type. See [Gift and sale transfers](GIFT_SALE_TRANSFERS_20261110.md) for validation, migration compatibility, and Libib synchronization findings/limitations. No production transfer was recorded during deployment checks; the existing approved request remains approved. Synthetic UI runtime checks passed for form creation, sale amount visibility, cancellation without a write, transfer payload and workspace reload. Full tests: 838 passed on each machine.
+
+### Dropdown indicator spacing
+
+Inset dropdown chevrons from the right border consistently across Requests filters, row controls and the transfer form, reserving text padding to avoid overlap. Controls retain native select interaction and keyboard behavior; forced-color mode restores the native indicator. Verified the deployed filter appearance; JavaScript syntax and whitespace checks pass. No request decision was changed.
