@@ -38,13 +38,14 @@ def test_invalid_stale_or_unrelated_mutations(setup):
  with pytest.raises(r.Conflict):o.update(db,'owner',action(ids[0],'pending'),f)
  assert len(r.submissions(db))==3
 
-def test_collected_overlay_preserves_source_and_updates_current_counts(setup):
+@pytest.mark.parametrize('terminal',['collected','transferred'])
+def test_collected_overlay_preserves_source_and_updates_current_counts(setup,terminal):
  from dataclasses import dataclass
  from valuation.completed_inventory import CompletedInventoryScope
  db,c,f,ids=setup
  for id,slot in zip(ids,['hold:1','hold:2']):
   o.update(db,'owner',action(id,'approved',slot=slot),f)
-  o.update(db,'owner',action(id,'collected',1),f)
+  o.update(db,'owner',dict(action(id,terminal,1),transfer_kind='gift'),f)
  @dataclass(frozen=True)
  class H:holding_id:str='hold';catalog_item_id:str='book';copies:str='2'
  @dataclass(frozen=True)
@@ -76,3 +77,37 @@ def test_inbox_history_is_ordered_and_scoped_to_requested_book(setup):
  assert [e['state'] for e in events]==['approved','pending']
  assert all(e['actor']=='owner' and e['created'] for e in events)
  assert rows[ids[1]]['items'][0]['history']==[]
+
+@pytest.mark.parametrize('kind,amount,expected',[('gift','',None),('sale','35','35.00'),('sale','',None),('sale','0','0.00')])
+def test_transfer_preserves_history_and_removes_only_assigned_copy(setup,kind,amount,expected):
+ db,c,f,ids=setup
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ d=o.update(db,'owner',dict(action(ids[0],'transferred',1),transfer_kind=kind,sale_amount=amount),f)
+ assert d['state']=='transferred' and d['slot']=='hold:1'
+ assert d['transfer']['kind']==kind and d['transfer']['amount']==expected
+ assert 'ref' in o.available(db,c,f)  # second physical copy remains available
+ assert len(r.submissions(db))==3
+ history=next(x for x in o.inbox(db,f) if x['id']==ids[0])['items'][0]['history']
+ assert [e['state'] for e in history]==['approved','transferred']
+ assert history[-1]['transfer']['currency']=='USD'
+ with pytest.raises(r.Conflict):o.update(db,'owner',action(ids[0],'pending',2),f)
+ with pytest.raises(r.Conflict):o.update(db,'owner',action(ids[1],'approved',slot='hold:1'),f)
+
+@pytest.mark.parametrize('kind,amount',[('',None),('loan',None),('gift','1'),('sale','-1'),('sale','NaN'),('sale','Infinity'),('sale','1.234'),('sale','1000000000')])
+def test_invalid_transfer_does_not_change_reservation(setup,kind,amount):
+ db,c,f,ids=setup
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ with pytest.raises(ValueError):o.update(db,'owner',dict(action(ids[0],'transferred',1),transfer_kind=kind,sale_amount=amount),f)
+ assert o.decision(db,ids[0],'ref')['state']=='approved'
+ assert db.execute('SELECT count(*) FROM request_transfers').fetchone()[0]==0
+ assert db.execute('SELECT count(*) FROM request_events').fetchone()[0]==1
+
+def test_transfer_requires_approval_and_survives_backup(setup,tmp_path):
+ db,c,f,ids=setup
+ with pytest.raises(ValueError):o.update(db,'owner',dict(action(ids[0],'transferred'),transfer_kind='gift'),f)
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ o.update(db,'owner',dict(action(ids[0],'transferred',1),transfer_kind='sale',sale_amount='35'),f)
+ restored=r.connect(tmp_path/'transfer-backup.sqlite');db.backup(restored)
+ assert o.decision(restored,ids[0],'ref')['transfer']['amount']=='35.00'
+ assert restored.execute('SELECT count(*) FROM request_events').fetchone()[0]==2
+ restored.close()

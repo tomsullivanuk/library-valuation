@@ -8,6 +8,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from valuation import family_requests as requests
 
@@ -21,13 +22,18 @@ def schema(db):
     db.executescript('''CREATE TABLE IF NOT EXISTS request_decisions(
  submission TEXT NOT NULL,reference TEXT NOT NULL,state TEXT NOT NULL,slot TEXT,
  version INTEGER NOT NULL,updated TEXT NOT NULL,PRIMARY KEY(submission,reference));
-CREATE UNIQUE INDEX IF NOT EXISTS assigned_copy ON request_decisions(slot) WHERE state IN ('approved','collected');
+CREATE UNIQUE INDEX IF NOT EXISTS assigned_copy ON request_decisions(slot) WHERE state IN ('approved','collected','transferred');
+CREATE UNIQUE INDEX IF NOT EXISTS assigned_copy_v2 ON request_decisions(slot) WHERE state IN ('approved','collected','transferred');
+CREATE TABLE IF NOT EXISTS request_transfers(submission TEXT,reference TEXT,kind TEXT NOT NULL,amount TEXT,currency TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(submission,reference));
 CREATE TABLE IF NOT EXISTS request_events(id INTEGER PRIMARY KEY,submission TEXT,reference TEXT,actor TEXT,created TEXT,payload TEXT);''')
 
 
 def decision(db,submission,reference):
     r=db.execute('SELECT * FROM request_decisions WHERE submission=? AND reference=?',(submission,reference)).fetchone()
-    return dict(r) if r else dict(submission=submission,reference=reference,state='pending',slot=None,version=0,updated='')
+    result=dict(r) if r else dict(submission=submission,reference=reference,state='pending',slot=None,version=0,updated='')
+    transfer=db.execute('SELECT kind,amount,currency,created FROM request_transfers WHERE submission=? AND reference=?',(submission,reference)).fetchone()
+    result['transfer']=dict(transfer) if transfer else None
+    return result
 
 
 def live_facts(model,data_dir):
@@ -58,8 +64,8 @@ def inbox(db,facts):
     for row in rows:
         for b in row['payload']['books']:
             d=decision(db,row['id'],b['reference'])
-            if d['state'] not in ('declined','collected'):people.setdefault(b['reference'],set()).add(row['email'])
-    assigned={r['slot']:dict(r) for r in db.execute("SELECT * FROM request_decisions WHERE state IN ('approved','collected')")}
+            if d['state'] not in ('declined','collected','transferred'):people.setdefault(b['reference'],set()).add(row['email'])
+    assigned={r['slot']:dict(r) for r in db.execute("SELECT * FROM request_decisions WHERE state IN ('approved','collected','transferred')")}
     for row in rows:
         details=[]
         for b in row['payload']['books']:
@@ -68,7 +74,7 @@ def inbox(db,facts):
             copies=[dict(c,assignment=assigned.get(c['id'])) for c in f['copies']]
             details.append(dict(reference=ref,**{k:v for k,v in f.items() if k!='copies'},copies=copies,decision=d,
                 other_requesters=sorted(people.get(ref,set())-{row['email']}),
-                history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'])
+                history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'],transfer=json.loads(e['payload'])['after'].get('transfer'))
                     for e in db.execute('SELECT created,actor,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(row['id'],ref))]))
         row['items']=details
     return rows
@@ -77,29 +83,44 @@ def inbox(db,facts):
 def update(db,actor,body,facts):
     schema(db)
     submission,ref,state,version=body['submission'],body['reference'],body['state'],body['version']
-    if state not in ('pending','approved','declined','collected') or type(version) is not int:raise ValueError('Invalid decision')
+    if state not in ('pending','approved','declined','collected','transferred') or type(version) is not int:raise ValueError('Invalid decision')
     with db:
         db.execute('BEGIN IMMEDIATE')
         source=db.execute('SELECT payload FROM submissions WHERE id=?',(submission,)).fetchone()
         if not source or ref not in {b['reference'] for b in json.loads(source['payload'])['books']}:raise ValueError('Unknown request item')
         old=decision(db,submission,ref)
         if version!=old['version']:raise requests.Conflict('This request changed. Refresh before deciding.')
-        if old['state']=='collected':raise requests.Conflict('Collection is recorded permanently. Contact Tom to reconcile a mistaken collection.')
-        slot=body.get('slot') if state=='approved' else old['slot'] if state=='collected' else None
-        if state in ('approved','collected'):
+        if old['state'] in ('collected','transferred'):raise requests.Conflict('Transfer is recorded permanently. Reconcile a mistaken transfer explicitly.')
+        slot=body.get('slot') if state=='approved' else old['slot'] if state in ('collected','transferred') else None
+        if state in ('approved','collected','transferred'):
             if slot not in {c['id'] for c in facts.get(ref,{}).get('copies',[])}:raise requests.Conflict('This copy is no longer eligible. Refresh and check the inventory.')
-            if state=='collected' and old['state']!='approved':raise ValueError('Approve and assign a copy before marking it collected')
-            used=db.execute("SELECT submission,reference FROM request_decisions WHERE slot=? AND state IN ('approved','collected')",(slot,)).fetchone()
-            if used and (used['submission'],used['reference'])!=(submission,ref):raise requests.Conflict('That physical copy is already assigned or collected.')
+            if state in ('collected','transferred') and old['state']!='approved':raise ValueError('Approve and assign a copy before marking it transferred')
+            used=db.execute("SELECT submission,reference FROM request_decisions WHERE slot=? AND state IN ('approved','collected','transferred')",(slot,)).fetchone()
+            if used and (used['submission'],used['reference'])!=(submission,ref):raise requests.Conflict('That physical copy is already assigned or transferred.')
+        transfer=None
+        if state=='transferred':
+            kind=body.get('transfer_kind')
+            if kind not in ('gift','sale'):raise ValueError('Choose Gift or Sale')
+            amount=body.get('sale_amount')
+            if kind=='gift' and amount not in (None,''):raise ValueError('A gift cannot have sale proceeds')
+            if amount not in (None,''):
+                try:
+                    value=Decimal(str(amount))
+                    if not value.is_finite() or value<0 or value>Decimal('999999999.99') or value!=value.quantize(Decimal('.01')):raise ValueError('Enter a non-negative dollar amount with at most two decimal places')
+                    amount=format(value,'.2f')
+                except InvalidOperation:raise ValueError('Invalid sale amount')
+            else:amount=None
+            transfer=dict(kind=kind,amount=amount,currency='USD')
         stamp=datetime.now(timezone.utc).isoformat()
+        if transfer:db.execute('INSERT INTO request_transfers VALUES(?,?,?,?,?,?)',(submission,ref,transfer['kind'],transfer['amount'],transfer['currency'],stamp))
         db.execute('INSERT OR REPLACE INTO request_decisions VALUES(?,?,?,?,?,?)',(submission,ref,state,slot,version+1,stamp))
-        db.execute('INSERT INTO request_events(submission,reference,actor,created,payload) VALUES(?,?,?,?,?)',(submission,ref,actor,stamp,json.dumps(dict(before=old,after=dict(state=state,slot=slot)))))
+        db.execute('INSERT INTO request_events(submission,reference,actor,created,payload) VALUES(?,?,?,?,?)',(submission,ref,actor,stamp,json.dumps(dict(before=old,after=dict(state=state,slot=slot,transfer=transfer)))))
     return decision(db,submission,ref)
 
 
 def available(db,records,facts):
     schema(db)
-    taken={r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state IN ('approved','collected')")}
+    taken={r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state IN ('approved','collected','transferred')")}
     return {ref:book for ref,book in records.items() if ref in facts and any(c['id'] not in taken for c in facts[ref]['copies'])}
 
 
@@ -107,7 +128,7 @@ def collected_overlay(model,config):
     """Current steward display reflects collections without erasing source evidence."""
     if not config or not Path(config['database']).exists():return model
     with closing(requests.connect(config['database'])) as db:
-        schema(db);slots=[r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state='collected'")]
+        schema(db);slots=[r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state IN ('collected','transferred')")]
     counts={}
     for slot in slots:
         holding=slot.rsplit(':',1)[0];counts[holding]=counts.get(holding,0)+1
