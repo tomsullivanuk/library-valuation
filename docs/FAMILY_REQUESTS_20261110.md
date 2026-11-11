@@ -65,3 +65,7 @@ Hide the catalog timestamp and routine autosave note in My List while keeping th
 ### Browse-only introduction
 
 Hide the top introductory instructions when My List is selected; preserve the library title, signed-in identity and navigation. Instructions remain in Browse. Catalog render tests and synthetic UI visibility/submission tests pass. Deployed with a family-service restart; no saved records changed.
+
+### Exception-only availability
+
+Removed My List's Availability column. Saved titles absent from the current available catalog now show a No longer available warning beneath the title; available titles have no repetitive label. Submission validation remains unchanged. Catalog render and synthetic UI checks pass; deployed without modifying saved selections or requests.
