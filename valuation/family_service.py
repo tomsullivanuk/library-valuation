@@ -156,7 +156,9 @@ class App:
                             from valuation import family_owner as owner
                             owner.schema(db);own=store.submissions(db,email)
                             for row in own:
-                                for book in row['payload']['books']:book['request_status']=owner.decision(db,row['id'],book['reference'])['state']
+                                for book in row['payload']['books']:
+                                    book['request_status']=owner.decision(db,row['id'],book['reference'])['state']
+                                    book['owner_messages']=owner.recipient_messages(db,row['id'],book['reference'])
                             return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=own))
                         if path=='/api/inbox':
                             if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})

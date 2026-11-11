@@ -20,6 +20,7 @@ def server(tmp_path):
   try:r=urlopen(req)
   except HTTPError as e:r=e
   return r.code,r.read()
+ call.app=app
  yield call
  srv.shutdown();srv.server_close()
 
@@ -41,6 +42,22 @@ def test_http_ownership_and_csrf(server):
  assert len(json.loads(server('/api/inbox',who='owner@example.org')[1]))==1
  assert server('/../../db.sqlite')[0]==404
  assert b'data-ref="ref"' in server('/')[1]
+
+def test_recipient_api_exposes_only_own_owner_messages(server):
+ from valuation import family_owner as owner,family_requests as requests
+ server('/api/list',data=dict(version=0,books=['ref']))
+ _,raw=server('/api/submit',data=dict(version=1,key='message-test'))
+ submission=json.loads(raw)['id']
+ with requests.connect(server.app.db) as db:
+  owner.update(db,'owner@example.org',dict(submission=submission,reference='ref',state='declined',version=0,message='I am keeping this one.'),{})
+ code,raw=server('/api/me')
+ assert code==200
+ book=json.loads(raw)['submissions'][0]['payload']['books'][0]
+ assert book['request_status']=='declined'
+ assert book['owner_messages'][0]['message']=='I am keeping this one.'
+ assert set(book['owner_messages'][0])=={'created','message'}
+ assert json.loads(server('/api/me',who='owner@example.org')[1])['submissions']==[]
+ assert all(x not in raw.decode() for x in ['sale_amount','correction_reason','slot','private_notes'])
 
 def test_real_signature_claim_validation(monkeypatch):
  import jwt,time

@@ -16,6 +16,21 @@ def setup(tmp_path):
 
 def action(id,state,version=0,slot=None):return dict(submission=id,reference='ref',state=state,version=version,slot=slot)
 
+def test_owner_messages_are_validated_scoped_and_do_not_expose_owner_facts(setup):
+ db,c,f,ids=setup
+ with pytest.raises(ValueError):o.update(db,'owner',dict(action(ids[0],'declined'),message='x'*2001),f)
+ assert o.decision(db,ids[0],'ref')['state']=='pending'
+ o.update(db,'owner',dict(action(ids[0],'approved',slot='hold:1'),message='  Bring it Saturday.  '),f)
+ messages=o.recipient_messages(db,ids[0],'ref')
+ assert messages[0]['message']=='Bring it Saturday.'
+ assert set(messages[0])=={'created','message'}
+ assert o.recipient_messages(db,ids[1],'ref')==[]
+ assert o.recipient_messages(db,ids[0],'another-book')==[]
+ item=next(row for row in o.inbox(db,f) if row['id']==ids[0])['items'][0]
+ assert item['history'][-1]['message']=='Bring it Saturday.'
+ with pytest.raises(r.Conflict):o.update(db,'owner',dict(action(ids[0],'declined'),message='stale'),f)
+ assert o.recipient_messages(db,ids[0],'ref')==messages
+
 def test_correct_test_transfer_restores_copy_and_retains_audit(setup):
  import json
  db,c,f,ids=setup
