@@ -77,3 +77,12 @@ Added an isolated local-AI/keyword comparison prototype at /owner/search-pilot, 
 ## Combined search enabled
 
 With owner approval, Browse now uses the existing local AI plus ranked-keyword engine in one search field. It displays relevant source excerpts, preserves exact title/ISBN priority and current availability checks, ignores stale query responses, and retains keyword/basic-local fallbacks. The owner-only comparison page remains for diagnostics. Search is read-only; My List, submission, purchase and transfer records remain unchanged. See LOCAL_SEARCH_PILOT_20261110.md for rollout verification and rollback.
+
+
+## Clear submitted choices from My List — November 11, 2026
+
+A successful submission now atomically saves its immutable request and clears the sender's draft books and message, advancing the draft version. The interface reloads both draft and submissions, so My List immediately reflects the cleared draft while Prior submissions retains the requested books. Failed submissions retain the draft. Idempotent retries return the earlier request without clearing newer choices; stale windows cannot re-save the submitted draft.
+
+The existing guest draft left behind by the reported six-book submission was cleaned only after verifying its version, references and message exactly matched the latest submitted payload. The Mini ledger was backed up first, and both original submissions remained byte-for-byte unchanged. No new request was submitted during this repair.
+
+Validation: 854 tests pass, plus JavaScript syntax, Python compilation and whitespace checks. Coverage includes draft clearing, immutable requests, persistence/backup, failed submission retention and retry protection for newly saved choices.
