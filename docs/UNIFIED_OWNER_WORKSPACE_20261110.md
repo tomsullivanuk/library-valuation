@@ -64,3 +64,14 @@ Mark transferred now replaces Mark collected. Approval still reserves a copy; ha
 ### Dropdown indicator spacing
 
 Inset dropdown chevrons from the right border consistently across Requests filters, row controls and the transfer form, reserving text padding to avoid overlap. Controls retain native select interaction and keyboard behavior; forced-color mode restores the native indicator. Verified the deployed filter appearance; JavaScript syntax and whitespace checks pass. No request decision was changed.
+
+
+## Combined search in the owner Library
+
+The main owner Library now uses the same ranked keyword and local semantic search as the family catalog. It searches titles, authors, ISBNs, publishers and descriptions, with short source excerpts and relevance ordering. The owner retains values, locations, acquisition details and disposition controls alongside results.
+
+Location and resale-market filters constrain the candidate set before ranking. Up to 30 matches are displayed; explicit sorting and filtered CSV export apply to those results. Clear restores ordinary browsing. Requests are debounced and stale responses discarded; loading is shown explicitly and failures fall back to basic keyword matching. Historical reporting retains its existing search.
+
+Owner search includes reserved books still physically held, while the family search continues to omit unavailable copies. Fully transferred holdings are excluded from the active inventory. Owner catalog identifiers are returned only through the existing owner-protected route; the guest API is unchanged. The model and index remain on the Mini, and estimates and physical grading are unchanged.
+
+Validation: 850 Python tests passed on both machines, including scope and request-protection coverage. Live Chrome verification found the medieval philosophy introduction first for “an introduction to medieval philosophy,” with owner values and locations visible.

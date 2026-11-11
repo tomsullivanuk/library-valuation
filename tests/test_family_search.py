@@ -77,3 +77,22 @@ def test_preview_falls_back_without_exposing_private_fields(records,tmp_path):
  assert out['hybrid']['results'][0]['title']=='Medieval Philosophy'
  assert 'unavailable' in out['hybrid']['notice']
  assert not any('location' in r or 'value' in r for r in out['hybrid']['results'])
+
+def test_owner_search_includes_reserved_holdings_and_maps_only_active_ids(tmp_path,monkeypatch):
+ import json,hashlib
+ from types import SimpleNamespace
+ from valuation.family_service import App
+ ref=hashlib.sha256(b'family-v1:BOOK').hexdigest()[:20]
+ record=book(ref,'Medieval Philosophy')
+ path=tmp_path/'catalog.json';path.write_text(json.dumps([record]))
+ app=App(dict(snapshot=str(path),database=str(tmp_path/'db'),owner_data_dir=str(tmp_path),owner_output_dir=str(tmp_path)),identity=lambda t:'owner')
+ # Family availability excludes a reserved title, while owner active inventory retains it.
+ app.catalog=lambda:({},'hash')
+ monkeypatch.setattr('valuation.workspace_service.load_model',lambda *a:SimpleNamespace(completed_inventory=SimpleNamespace(catalog_item_ids=('BOOK',))))
+ assert app.search_preview('medieval')['hybrid']['results']==[]
+ result=app.search_preview('medieval',owner_scope=True)['hybrid']['results']
+ assert result[0]['catalog_item_id']=='BOOK'
+ assert app.search_preview('medieval',owner_scope=True,catalog_ids=['OTHER'])['hybrid']['results']==[]
+ with pytest.raises(ValueError):app.search_preview('medieval',owner_scope=True,catalog_ids='BOOK')
+ monkeypatch.setattr('valuation.workspace_service.load_model',lambda *a:SimpleNamespace(completed_inventory=SimpleNamespace(catalog_item_ids=())))
+ assert app.search_preview('medieval',owner_scope=True)['hybrid']['results']==[]

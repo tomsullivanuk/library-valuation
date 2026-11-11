@@ -93,6 +93,9 @@ def test_http_requires_local_origin_token_and_restricts_files(tmp_path):
             with pytest.raises(HTTPError) as error:
                 urlopen(Request(base+'/api/state',data=body,headers={'Content-Type':'application/json',**headers}))
             assert error.value.code == 403
+            with pytest.raises(HTTPError) as search_error:
+                urlopen(Request(base+'/api/search',data=json.dumps({'query':'topic'}).encode(),headers={'Content-Type':'application/json',**headers}))
+            assert search_error.value.code == 403
         with urlopen(Request(base+'/api/state', data=body, headers={'Content-Type':'application/json','X-Workspace-Token':state['token'],'Origin':base})) as response:
             assert json.load(response)['dispositions']['BK000001']=='sell'
         for path in ['/../data/acquisitions.csv','/backup_before_followups/data/acquisitions.csv']:

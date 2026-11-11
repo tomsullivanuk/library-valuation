@@ -53,3 +53,14 @@ After the owner approved the combined approach, enabled family_search_enabled in
 The endpoint retains verified invited identity, exact Origin, JSON and X-Family-Request checks. It has no draft/submission side effects and exposes only existing recipient-visible fields. The worker, model/index checks and keyword fallback remain unchanged. If the gateway itself is unavailable, the page falls back to its prior basic local keyword matching with an explicit notice. The owner comparison page remains available; the operational owner Library search still uses its established search rules.
 
 All 849 Python tests pass on laptop and Mini. Added HTTP checks for search identity/origin, recipient-only response fields, query-length validation and unchanged draft version. Extended the synthetic JavaScript tests for stale-response suppression, network fallback and absence of draft writes. Live Safari signed in as the recipient returned hybrid results for the exact medieval-philosophy query, with the expected introductory title first, 30 ranked cards and source excerpts. No production lists or requests were changed. The family allowlist remains the same two addresses. To roll back family enhanced search, set family_search_enabled false; the page falls back to basic matching. The comparison worker can remain available to the owner.
+
+
+## Combined search in the owner Library
+
+The main owner Library now uses the same ranked keyword and local semantic search as the family catalog. It searches titles, authors, ISBNs, publishers and descriptions, with short source excerpts and relevance ordering. The owner retains values, locations, acquisition details and disposition controls alongside results.
+
+Location and resale-market filters constrain the candidate set before ranking. Up to 30 matches are displayed; explicit sorting and filtered CSV export apply to those results. Clear restores ordinary browsing. Requests are debounced and stale responses discarded; loading is shown explicitly and failures fall back to basic keyword matching. Historical reporting retains its existing search.
+
+Owner search includes reserved books still physically held, while the family search continues to omit unavailable copies. Fully transferred holdings are excluded from the active inventory. Owner catalog identifiers are returned only through the existing owner-protected route; the guest API is unchanged. The model and index remain on the Mini, and estimates and physical grading are unchanged.
+
+Validation: 850 Python tests passed on both machines, including scope and request-protection coverage. Live Chrome verification found the medieval philosophy introduction first for “an introduction to medieval philosophy,” with owner values and locations visible.

@@ -452,6 +452,21 @@ def make_server(store, port=8765):
         def do_POST(self):
             if not self.local_request() or self.headers.get("X-Workspace-Token") != store.token:
                 return self.send(403, b'{"error":"Reload the local workspace before saving"}')
+            if self.path == "/api/search" and self.headers.get("Content-Type") == "application/json":
+                try:
+                    from valuation import family_owner as family
+                    from valuation.family_service import App
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 300000:raise ValueError("Invalid search size")
+                    body=json.loads(self.rfile.read(length))
+                    if not hasattr(store,"search_app"):
+                        config=family.settings()
+                        if not config:raise ValueError("Search is not configured")
+                        store.search_app=App(config,identity=lambda token:config['owner_email'])
+                    result=store.search_app.search_preview(body['query'],owner_scope=True,catalog_ids=body.get('catalog_ids'))['hybrid']
+                    return self.send(200,json.dumps(result).encode())
+                except (ValueError,KeyError,TypeError):return self.send(400,b'{"error":"Invalid search request"}')
+                except Exception:return self.send(503,b'{"error":"Enhanced search unavailable"}')
             if self.path == "/api/family-requests" and self.headers.get("Content-Type") == "application/json":
                 try:
                     from valuation import family_owner as family

@@ -55,9 +55,19 @@ class App:
             facts=owner.live_facts(load_model(self.config['owner_data_dir'],self.config['owner_output_dir'],family_overlay=False),self.config['owner_data_dir'])
             with closing(store.connect(self.db)) as db:records=owner.available(db,records,facts)
         return records,snapshot
-    def search_preview(self,query):
+    def search_preview(self,query,owner_scope=False,catalog_ids=None):
         from valuation.family_search import Search,fingerprint
-        records,snapshot=self.raw_catalog();available,_=self.catalog()
+        records,snapshot=self.raw_catalog();mapping={}
+        if owner_scope:
+            from valuation.workspace_service import load_model
+            model=load_model(self.config['owner_data_dir'],self.config['owner_output_dir'])
+            active=set(model.completed_inventory.catalog_item_ids)
+            if catalog_ids is not None:
+                if not isinstance(catalog_ids,list) or any(not isinstance(x,str) for x in catalog_ids) or len(catalog_ids)>10000:raise ValueError('Invalid catalog filters')
+                active&=set(catalog_ids)
+            mapping={hashlib.sha256(('family-v1:'+cid).encode()).hexdigest()[:20]:cid for cid in active}
+            available={ref:r for ref,r in records.items() if ref in mapping}
+        else:available,_=self.catalog()
         with self.search_lock:
             if self.search_fingerprint!=snapshot:
                 self.search_index=Search(list(records.values()));self.search_fingerprint=snapshot
@@ -77,6 +87,7 @@ class App:
         for result in (keyword,hybrid):
             for r in result['results']:
                 book=available[r['reference']];r.update(title=book['title'],author=book['author'])
+                if owner_scope:r['catalog_item_id']=mapping[r['reference']]
         return dict(keyword=keyword,hybrid=hybrid)
 
     def handler(self):
@@ -125,7 +136,7 @@ class App:
                             text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):
-                                text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Main Library search uses the original search rules.</p></header>',1)
+                                text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Library search combines keywords and local AI.</p></header>',1)
                             nonce=secrets.token_urlsafe(20)
                             text=re.sub(r'<script(?=[ >])','<script nonce="'+nonce+'"',text)
                             self.send_response(r.code);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self' 'nonce-"+nonce+"'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-ancestors 'none'; base-uri 'none'");self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');output=text.encode();self.send_header('Content-Length',str(len(output)));self.end_headers();self.wfile.write(output);return
