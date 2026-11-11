@@ -16,6 +16,35 @@ def setup(tmp_path):
 
 def action(id,state,version=0,slot=None):return dict(submission=id,reference='ref',state=state,version=version,slot=slot)
 
+def test_correct_test_transfer_restores_copy_and_retains_audit(setup):
+ import json
+ db,c,f,ids=setup
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ o.update(db,'owner',dict(action(ids[0],'transferred',1),transfer_kind='sale',sale_amount='35'),f)
+ body=dict(action(ids[0],'pending',2),correct_transfer=True,correction_reason='Test only; copy still present')
+ with pytest.raises(ValueError):o.update(db,'owner',dict(body,correction_reason=' '),f)
+ with pytest.raises(r.Conflict):o.update(db,'owner',dict(body,version=1),f)
+ d=o.update(db,'owner',body,f)
+ assert d['state']=='pending' and d['slot'] is None and d['transfer'] is None
+ event=json.loads(db.execute('SELECT payload FROM request_events ORDER BY id DESC').fetchone()[0])
+ assert event['before']['transfer']['amount']=='35.00'
+ assert event['before']['slot']=='hold:1' and event['correction_reason']==body['correction_reason']
+ assert next(row for row in o.inbox(db,f) if row['id']==ids[0])['items'][0]['history'][-1]['correction_reason']==body['correction_reason']
+ o.update(db,'owner',action(ids[1],'approved',slot='hold:1'),f)
+ # The original request can later be genuinely transferred without a stale-row conflict.
+ o.update(db,'owner',action(ids[0],'approved',3,slot='hold:2'),f)
+ o.update(db,'owner',dict(action(ids[0],'transferred',4),transfer_kind='gift'),f)
+ assert o.decision(db,ids[0],'ref')['transfer']['kind']=='gift'
+
+def test_correction_requires_a_recorded_transfer_and_original_copy(setup):
+ db,c,f,ids=setup
+ body=dict(action(ids[0],'pending'),correct_transfer=True,correction_reason='Test')
+ with pytest.raises(ValueError):o.update(db,'owner',body,f)
+ o.update(db,'owner',action(ids[0],'approved',slot='hold:1'),f)
+ o.update(db,'owner',action(ids[0],'collected',1),f)
+ with pytest.raises(r.Conflict):o.update(db,'owner',dict(body,version=2),{})
+ assert o.decision(db,ids[0],'ref')['state']=='collected'
+
 def test_reservation_overlap_release_and_collection(setup):
  db,c,f,ids=setup
  assert len(o.inbox(db,f)[0]['items'][0]['other_requesters'])==2

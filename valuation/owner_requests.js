@@ -36,8 +36,8 @@ const actions=text('td','',tr);actions.className='request-actions';
 const copy=text('td','',tr),select=text('select','',copy);select.setAttribute('aria-label','Assigned copy for '+item.title);text('option','Choose copy',select).value='';
 for(const c of item.copies){const opt=text('option',c.label+(c.assignment?' · '+displayState(c.assignment.state):''),select);opt.value=c.id;opt.disabled=!!c.assignment&&!(c.assignment.submission===row.id&&c.assignment.reference===item.reference);if(item.decision.slot===c.id)opt.selected=true}
 const historyCell=text('td','',tr);
-const change=async(state,extra={})=>{if(state==='transferred'&&!confirm('Confirm that this assigned copy has permanently left your library as a '+extra.transfer_kind+'?'))return;await request('/api/family-requests',{submission:row.id,reference:item.reference,state,version:item.decision.version,slot:select.value,...extra});if(state==='transferred'){location.reload();return}await render()};
-if(['collected','transferred'].includes(item.decision.state)){select.disabled=true;text('small','Transferred'+(item.decision.transfer?' · '+item.decision.transfer.kind:''),actions)}else{
+const change=async(state,extra={})=>{if(state==='transferred'&&!confirm('Confirm that this assigned copy has permanently left your library as a '+extra.transfer_kind+'?'))return;await request('/api/family-requests',{submission:row.id,reference:item.reference,state,version:item.decision.version,slot:select.value,...extra});if(state==='transferred'||extra.correct_transfer){location.reload();return}await render()};
+if(['collected','transferred'].includes(item.decision.state)){select.disabled=true;text('small','Transferred'+(item.decision.transfer?' · '+item.decision.transfer.kind:''),actions);button('Correct transfer',showCorrection,actions)}else{
 const menu=text('select','',actions);menu.setAttribute('aria-label','Action for '+item.title);text('option','Choose action',menu).value='';
 select.disabled=true;
 if(item.decision.state!=='approved')text('option','Approve',menu).value='approved';
@@ -49,6 +49,13 @@ if(item.decision.state==='approved'){select.disabled=true;text('option','Mark tr
 menu.onchange=async()=>{const state=menu.value;select.disabled=state!=='approved';hint.textContent=state==='approved'?'Choose a copy to save approval.':'';if(!state)return;if(state==='approved'){select.focus();return}if(state==='transferred'){showTransfer();return}transferRow.hidden=true;menu.disabled=true;try{await change(state)}catch(e){text('p',e.message,actions).setAttribute('role','alert')}finally{menu.value='';menu.disabled=false}};
 }
 const transferRow=text('tr','',body);transferRow.className='request-detail';transferRow.hidden=true;
+function showCorrection(){
+transferRow.hidden=false;transferRow.replaceChildren();const td=text('td','',transferRow);td.colSpan=8;
+text('p','Correct a transfer recorded by mistake. This restores the copy to the library and returns the request to Pending. The original transfer remains in history. If Libib was already changed, restore that copy there separately.',td);
+const form=text('form','',td),label=text('label','Correction reason',form),reason=text('input','',label);reason.required=true;reason.maxLength=1000;reason.placeholder='For example: Test transfer; book is still here';
+const save=text('button','Restore copy and return to Pending',form);save.type='submit';button('Cancel',()=>{transferRow.hidden=true},form);
+form.onsubmit=async(e)=>{e.preventDefault();if(!form.reportValidity())return;save.disabled=true;try{await change('pending',{correct_transfer:true,correction_reason:reason.value})}catch(err){text('p',err.message,td).setAttribute('role','alert')}finally{save.disabled=false}};reason.focus();
+}
 function showTransfer(){
 transferRow.hidden=false;transferRow.replaceChildren();const td=text('td','',transferRow);td.colSpan=8;
 text('p','Record permanent handover of the assigned copy. This removes it from the active collection and preserves its history.',td);
@@ -65,7 +72,7 @@ const detailRow=text('tr','',body);detailRow.className='request-detail';detailRo
 const history=text('a','Message history',historyCell);history.className='request-history';history.href='#'+detailRow.id;history.setAttribute('aria-expanded','false');history.setAttribute('aria-controls',detailRow.id);history.onclick=(e)=>{e.preventDefault();detailRow.hidden=!detailRow.hidden;history.setAttribute('aria-expanded',String(!detailRow.hidden))};
 const cell=text('td','',detailRow);cell.colSpan=8;text('p','Submitted '+date(row.created),cell);text('p',row.payload.message||'No message included.',cell);
 if(['collected','transferred'].includes(item.decision.state))text('p','Libib update required: remove only this transferred copy from its original collection. Libib has not been updated automatically.',cell);
-if(item.history&&item.history.length){for(const event of item.history)text('p',date(event.created)+' · '+displayState(event.state)+' · '+event.actor+(event.transfer?' · '+event.transfer.kind+(event.transfer.amount!==null?' · $'+event.transfer.amount:''):''),cell)}else text('p','No decisions recorded yet.',cell);
+if(item.history&&item.history.length){for(const event of item.history)text('p',date(event.created)+' · '+displayState(event.state)+' · '+event.actor+(event.correction_reason?' · Transfer corrected: '+event.correction_reason:'')+(event.transfer?' · '+event.transfer.kind+(event.transfer.amount!==null?' · $'+event.transfer.amount:''):''),cell)}else text('p','No decisions recorded yet.',cell);
 }
 }
 states.onchange=()=>{status=states.value;draw()};who.onchange=()=>{person=who.value;draw()};search.oninput=()=>{query=search.value;draw()};draw();
