@@ -31,3 +31,6 @@ def test_explicit_book_description_is_searchable_and_escaped_without_private_not
  assert '<img src=x' not in page and '&lt;img' in page
  assert all(secret not in page for secret in ['PRIVATE_NOTE','PRIVATE_DESCRIPTION','PRIVATE_COST','PRIVATE_VALUE','PRIVATE_BOX','OUTSIDE_SCOPE'])
  assert 'Pops Sullivan' in page and 'id="signed-in"' in page
+ assert '<h1>Thomas D Sullivan Library</h1>' in page
+ assert 'Pops will confirm availability and arrange delivery with you.' in page
+ assert page.index('id="search-tools"') < page.index('id="count"') < page.index('Catalog updated')
