@@ -5,6 +5,14 @@ privacy-conscious collector workflow. It helps identify which books are worth
 researching first, explains why they surfaced, and generates collector-facing
 review artifacts without making generated spreadsheets the source of truth.
 
+## Current release
+
+[v0.12.0](docs/RELEASE_NOTES_v0.12.0.md) adds Mac Mini operation, whole-library
+comparison review, private family lists and requests, owner gift/sale transfers,
+and ranked keyword plus local AI topic search. The live catalog remains private
+and limited to the two test addresses. Existing estimates are unchanged; fresh
+AbeBooks coverage and physical grading remain follow-ups.
+
 ## Current Finding
 
 In the May 2026 sample export, Amazon's `ASIN` field mostly split cleanly:

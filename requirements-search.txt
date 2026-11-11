@@ -1,0 +1,2 @@
+# Optional, isolated Mini search environment; not required by the family application.
+sentence-transformers==6.2.0

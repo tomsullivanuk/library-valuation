@@ -834,6 +834,7 @@ _DOCUMENT = r"""<!doctype html>
     <a href="#library" data-nav="library">Library</a>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
     <a href="#actions" data-nav="actions">Action Items</a>
+    <a href="#requests" data-nav="requests">Requests</a>
     <a href="#reports" data-nav="reports">Reports</a>
     <a href="#settings" data-nav="settings">Settings</a>
   </nav>
@@ -844,6 +845,7 @@ _DOCUMENT = r"""<!doctype html>
   <noscript>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
+  <script defer src="/requests.js"></script>
   <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
@@ -1340,7 +1342,8 @@ _DOCUMENT = r"""<!doctype html>
       const search = node("input", {
         id: "library-search",
         type: "search",
-        placeholder: "Title, author, ISBN, publisher, or description",
+        placeholder: "Title, author, ISBN, publisher, topic, or description",
+        maxlength: "500",
         autocomplete: "off"
       });
       search.value = libraryState.search;
@@ -1377,6 +1380,9 @@ _DOCUMENT = r"""<!doctype html>
         );
       }
       for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
+      const searchNotice = node("p", {class:"muted", role:"status"});
+      append(controls, searchNotice);
+      let enhancedKey="", enhancedData=null, enhancedVersion=0, enhancedTimer, enhancedPending=false, relevance=true;
       const actions = node("div", {class: "library-actions"});
       const sortNames = {
         title: "Title",
@@ -1394,6 +1400,7 @@ _DOCUMENT = r"""<!doctype html>
             ? -libraryState.sortDirection
             : 1;
           libraryState.sort = value;
+          relevance=false;
           sort.removeAttribute("open");
           update();
         });
@@ -1417,18 +1424,42 @@ _DOCUMENT = r"""<!doctype html>
         libraryState.acquisition = "";
         libraryState.market = controls.querySelector("#market-filter").value;
         libraryState.location = controls.querySelector("#location-filter").value;
-        sortSummary.textContent = `Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
-        const books = DATA.books.filter(book => bookMatches(book, libraryState)).sort(bookCompare(libraryState.sort, libraryState.sortDirection));
+        const key=JSON.stringify([libraryState.search,libraryState.market,libraryState.location]);
+        if(!reportScope && key!==enhancedKey){
+          enhancedKey=key;enhancedData=null;enhancedPending=Boolean(libraryState.search);relevance=true;clearTimeout(enhancedTimer);const version=++enhancedVersion;
+          searchNotice.textContent=libraryState.search?"Searching keywords and related topics…":"";
+          if(libraryState.search){
+            const query=libraryState.search;
+            const ids=DATA.books.filter(book=>bookMatches(book,{...libraryState,search:""})).map(book=>book.catalog_item_id);
+            enhancedTimer=setTimeout(async()=>{
+              try{
+                const state=await (await fetch("/api/state",{cache:"no-store"})).json();
+                const response=await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json","X-Workspace-Token":state.token},body:JSON.stringify({query,catalog_ids:ids})});
+                const data=await response.json();if(!response.ok)throw Error(data.error||"Search unavailable");
+                if(version!==enhancedVersion||!controls.isConnected)return;
+                enhancedPending=false;enhancedData=data;searchNotice.textContent=data.notice||(data.engine==="hybrid"?"Results ranked by keywords and related topics. Showing up to 30 matches.":"Results ranked by keywords. Showing up to 30 matches.");update();
+              }catch(error){if(version!==enhancedVersion||!controls.isConnected)return;enhancedPending=false;searchNotice.textContent="Enhanced search unavailable. Showing basic keyword matches.";update();}
+            },300);
+          }
+        }
+        const ranked=enhancedData?new Map(enhancedData.results.map((r,i)=>[r.catalog_item_id,{...r,rank:i}])):null;
+        const books = DATA.books.filter(book => bookMatches(book, {...libraryState,search:ranked?"":libraryState.search}) && (!ranked||ranked.has(book.catalog_item_id)));
+        books.sort(ranked&&relevance?(a,b)=>ranked.get(a.catalog_item_id).rank-ranked.get(b.catalog_item_id).rank:bookCompare(libraryState.sort,libraryState.sortDirection));
+        sortSummary.textContent=ranked&&relevance?"Sort: Relevance":`Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
         libraryState.visibleBooks = books;
         results.replaceChildren();
         const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
-        count.textContent = `${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
+        count.textContent = enhancedPending?"Searching…":`${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
         if (!books.length) {
-          append(results, node("p", {class: "empty"}, "No books match these filters."));
+          append(results, node("p", {class: "empty"}, enhancedPending?"Finding related books…":"No books match these filters."));
           return;
         }
         results.className = "library-card-grid";
-        for (const book of books) append(results, bookCard(book));
+        for (const book of books) {
+          const card=bookCard(book),match=ranked?.get(book.catalog_item_id);
+          if(match)append(card,node("p",{class:"muted"},match.reason+(match.excerpt?" · "+match.excerpt:"")));
+          append(results,card);
+        }
       }
       controls.addEventListener("input", update);
       controls.addEventListener("change", update);
@@ -1950,6 +1981,7 @@ _DOCUMENT = r"""<!doctype html>
       });
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
       else if (route === "recommendations" || route === "actions") renderActions(id);
+      else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();

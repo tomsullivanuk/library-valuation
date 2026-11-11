@@ -52,8 +52,10 @@ def _rows(path):
         return list(csv.DictReader(handle))
 
 
-def load_model(data_dir, output_dir):
+def load_model(data_dir, output_dir, *, family_overlay=True):
     data_dir, output_dir = Path(data_dir), Path(output_dir)
+    if (data_dir / "production_moved.json").exists():
+        raise ValueError("Production has moved to the Mac Mini. Use the remote Library; this local copy is archived.")
     reports = []
     for key, label, fmt in [("physical_book_checks", "Physical book checks", "csv"),
                             ("inventory_followup_resolutions", "Follow-up review evidence", "csv"),
@@ -67,8 +69,12 @@ def load_model(data_dir, output_dir):
     if market.exists():
         from valuation.inventory_workflow import _validate_market_evidence_applicability
         _validate_market_evidence_applicability(market, data_dir / "catalog_items.csv")
-    return build_steward_presentation(data_dir=data_dir, reports=reports,
+    model = build_steward_presentation(data_dir=data_dir, reports=reports,
         market_evidence=DerivedEvidenceInput(market, identity_validated=True) if market.exists() else None)
+    if family_overlay:
+        from valuation.family_owner import collected_overlay, settings
+        model = collected_overlay(model, settings())
+    return model
 
 
 def estimate_research_action(book, market):
@@ -307,6 +313,8 @@ class WorkspaceStore:
 
     def update(self, request):
         with self.write_lock():
+            if (self.data_dir / "production_moved.json").exists():
+                raise ValueError("Production has moved to the Mac Mini. This local copy cannot save changes.")
             state = self.read()
             if type(request.get("revision")) is not int or request["revision"] != state["revision"]:
                 raise RuntimeError("Another change was saved. Reload and try again.")
@@ -411,6 +419,19 @@ def make_server(store, port=8765):
             if not self.local_request():
                 return self.send(403, b'{"error":"Local workspace requests only"}')
             path = unquote(urlsplit(self.path).path)
+            if path == "/requests.js":
+                return self.send(200, Path(__file__).with_name("owner_requests.js").read_bytes(), "text/javascript")
+            if path == "/api/family-requests":
+                try:
+                    from valuation import family_owner as family
+                    from contextlib import closing
+                    config = family.settings()
+                    if not config: return self.send(200,b'[]')
+                    facts=family.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
+                    with closing(family.requests.connect(config['database'])) as db:
+                        return self.send(200,json.dumps(family.inbox(db,facts)).encode())
+                except Exception:
+                    return self.send(503,b'{"error":"Request inbox unavailable; please retry"}')
             if path == "/api/state":
                 return self.send(200, json.dumps(store.snapshot()).encode())
             if path in {"/", "/steward_workspace.html"}:
@@ -431,6 +452,38 @@ def make_server(store, port=8765):
         def do_POST(self):
             if not self.local_request() or self.headers.get("X-Workspace-Token") != store.token:
                 return self.send(403, b'{"error":"Reload the local workspace before saving"}')
+            if self.path == "/api/search" and self.headers.get("Content-Type") == "application/json":
+                try:
+                    from valuation import family_owner as family
+                    from valuation.family_service import App
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 300000:raise ValueError("Invalid search size")
+                    body=json.loads(self.rfile.read(length))
+                    if not hasattr(store,"search_app"):
+                        config=family.settings()
+                        if not config:raise ValueError("Search is not configured")
+                        store.search_app=App(config,identity=lambda token:config['owner_email'])
+                    result=store.search_app.search_preview(body['query'],owner_scope=True,catalog_ids=body.get('catalog_ids'))['hybrid']
+                    return self.send(200,json.dumps(result).encode())
+                except (ValueError,KeyError,TypeError):return self.send(400,b'{"error":"Invalid search request"}')
+                except Exception:return self.send(503,b'{"error":"Enhanced search unavailable"}')
+            if self.path == "/api/family-requests" and self.headers.get("Content-Type") == "application/json":
+                try:
+                    from valuation import family_owner as family
+                    from contextlib import closing
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 16384: raise ValueError("Invalid request size")
+                    body=json.loads(self.rfile.read(length));config=family.settings()
+                    if not config: raise ValueError("Family requests are not configured")
+                    with store.lock:
+                        facts=family.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
+                        with closing(family.requests.connect(config['database'])) as db:
+                            result=family.update(db,config['owner_email'],body,facts)
+                    return self.send(200,json.dumps(result).encode())
+                except family.requests.Conflict as exc:
+                    return self.send(409,json.dumps(dict(error=str(exc))).encode())
+                except (ValueError,KeyError,TypeError):
+                    return self.send(400,b'{"error":"Invalid owner decision"}')
             if self.path != "/api/state" or self.headers.get("Content-Type") != "application/json":
                 return self.send(400, b'{"error":"Invalid request"}')
             try:

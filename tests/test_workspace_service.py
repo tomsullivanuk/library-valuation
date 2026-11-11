@@ -93,6 +93,9 @@ def test_http_requires_local_origin_token_and_restricts_files(tmp_path):
             with pytest.raises(HTTPError) as error:
                 urlopen(Request(base+'/api/state',data=body,headers={'Content-Type':'application/json',**headers}))
             assert error.value.code == 403
+            with pytest.raises(HTTPError) as search_error:
+                urlopen(Request(base+'/api/search',data=json.dumps({'query':'topic'}).encode(),headers={'Content-Type':'application/json',**headers}))
+            assert search_error.value.code == 403
         with urlopen(Request(base+'/api/state', data=body, headers={'Content-Type':'application/json','X-Workspace-Token':state['token'],'Origin':base})) as response:
             assert json.load(response)['dispositions']['BK000001']=='sell'
         for path in ['/../data/acquisitions.csv','/backup_before_followups/data/acquisitions.csv']:
@@ -283,3 +286,14 @@ def test_estimate_research_uses_title_when_no_isbn_and_excludes_history(tmp_path
     assert parse_qs(urlsplit(task['search_links'][0]['url']).query)['tn']==[no_isbn.title]
     scoped=replace(model,completed_inventory=CompletedInventoryScope(completed=True,catalog_item_ids=('BK000001',)))
     assert [t['catalog_item_id'] for t in build_actions(scoped,[])]==['BK000001']
+
+
+def test_migrated_source_cannot_start_or_accept_stale_service_writes(tmp_path):
+    from valuation.workspace_service import load_model
+    store = store_for(tmp_path)
+    (store.data_dir / 'production_moved.json').write_text('{}')
+    with pytest.raises(ValueError, match='Production has moved'):
+        load_model(store.data_dir, tmp_path / 'output')
+    with pytest.raises(ValueError, match='Production has moved'):
+        store.update(dict(kind='disposition', id='BK000001', value='keep', revision=0))
+    assert not store.path.exists()

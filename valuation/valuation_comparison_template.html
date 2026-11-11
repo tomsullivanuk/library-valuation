@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Library valuation comparison</title>
+<style>
+:root{color-scheme:light dark;--bg:#fff;--fg:#24342f;--muted:#617069;--green:#225b49;--line:#d9e2dd;--notice:#fff4d8;--soft:#edf4f0}
+@media(prefers-color-scheme:dark){:root{--bg:#17231e;--fg:#edf3ef;--muted:#b1c2b8;--green:#a1d6ba;--line:#46564c;--notice:#43391f;--soft:#22392d}}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font:16px/1.55 system-ui;margin:0 auto;padding:28px;max-width:1450px}
+h1,h2,h3,a{color:var(--green)}h1{font:700 30px Georgia;margin:0 0 12px}h2{font:700 23px Georgia}h3{font:700 21px Georgia;margin:0}
+p{margin:8px 0}small,.muted{color:var(--muted)}.notice{padding:18px;border-radius:8px;background:var(--notice)}.stats{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0}.stat{background:var(--soft);padding:14px 20px;border-radius:8px;min-width:180px}.stat strong{font-size:25px;display:block}
+input,select,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:7px 10px}button{cursor:pointer}button:disabled{opacity:.5;cursor:default}label{display:grid;gap:5px}input{width:100%}.filters{display:grid;grid-template-columns:2fr 1.6fr 1fr auto;gap:12px;align-items:end;margin:20px 0}.bar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin:16px 0;flex-wrap:wrap}.book{border:1px solid var(--line);border-radius:8px;padding:18px;margin:12px 0}.bookhead{display:flex;justify-content:space-between;gap:18px}.tag{background:var(--soft);padding:4px 10px;border-radius:20px;display:inline-block;font-size:14px}.facts{display:flex;gap:20px;flex-wrap:wrap;margin:12px 0}.flags{padding-left:22px}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);vertical-align:top}th{white-space:nowrap}.limited{color:var(--muted)}details{margin:12px 0}summary{cursor:pointer;font-weight:600}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px ui-monospace;max-height:360px;overflow:auto}.wide{white-space:nowrap}a{overflow-wrap:anywhere}
+@media(max-width:800px){body{padding:16px}.filters{grid-template-columns:1fr}.bookhead{display:block}.stat{flex:1;min-width:130px}table{min-width:750px}}
+</style>
+<h1>Library valuation comparison</h1>
+<p id="scope"></p>
+<p id="unidentified" class="muted"></p>
+<p class="notice"><strong>Current estimates are unchanged.</strong> These are conditional used-book asking-price ranges, per copy and excluding shipping. Actual copies remain ungraded. No condition scenario is selected as your book’s value. Physical grading stays deferred.</p>
+<div class="stats" id="stats"></div>
+<details><summary>How to interpret the comparison</summary>
+<p>A stronger scenario has at least three retained offers with independently returned matching ISBNs, known listing binding, recent evidence, and less than a threefold price spread. Three offers do not establish three independent sellers. All scenario comparisons still require review.</p>
+<p>Every condition and binding remains separate. “All stronger scenarios below/above” describes the available scenarios, not the actual condition of your copy. Mixed results depend on which hypothetical condition and binding applies. No aggregate replacement library value is calculated.</p>
+<p>A large-change flag means at least one same-currency stronger scenario moves either endpoint by 50% or more, or by USD 25 or more. These are review thresholds, not approval rules. Current ranges may use older AbeBooks evidence, whereas these fresh scenarios use eBay; differences are not proof of a market-price change over time.</p>
+<p>The 54 existing whole-batch physical tasks are carried forward from their records-only adjudication. Earlier pilot identity checks are kept separate for reconciliation, rather than automatically adding new owner tasks. Grading is deferred for every book.</p>
+</details>
+<div class="filters">
+<label>Search title, author, ISBN, location or review notes<input id="search" type="search"></label>
+<label>Comparison category<select id="category"><option value="">All catalog records</option></select></label>
+<label>Attention<select id="attention"><option value="">All</option><option value="material">Large endpoint changes</option><option value="research">Needs stronger comparisons</option><option value="physical">Existing physical checks</option></select></label>
+<button id="clear">Clear</button></div>
+<div class="bar"><span id="count"></span><span><a href="book_comparisons.csv" download>Book comparisons CSV</a> · <a href="scenario_comparisons.csv" download>All scenarios CSV</a></span></div>
+<div id="results"></div><div class="bar"><button id="prev">Previous</button><span id="page"></span><button id="next">Next</button></div>
+<details><summary>Sources and verification</summary><p>The current comparison baseline was loaded from the authoritative Mini workspace, including saved manual estimate reviews. The sources below were fingerprinted. All active records are represented, including four original pilot records without a retained reviewed scenario. Scenario counts and bounds were independently recomputed from retained listing decisions before comparison.</p><p><a href="comparison.json" download>Inspect the comparison data and calculation policy</a> · <a href="verification.json" download>Inspect verification receipt</a></p><pre id="sources"></pre></details>
+<script id="data" type="application/json">__COMPARISON_DATA__</script>
+<script>
+const data=JSON.parse(document.querySelector('#data').textContent),$=id=>document.getElementById(id);
+const el=(tag,text,cls)=>{let n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
+const labels={no_scenario:'No retained used-price scenario',limited_only:'Only limited or uncertain comparisons',no_current:'Stronger scenario; no comparable current estimate',lower:'All stronger scenarios below current range',higher:'All stronger scenarios above current range',mixed:'Result depends on condition or binding',overlap:'Stronger scenarios overlap current range'};
+const human=s=>s.replaceAll('_',' '),money=(c,l,h)=>l&&h?`${c} ${Number(l).toFixed(2)}–${Number(h).toFixed(2)}`:'No usable estimate';
+const change=s=>s.delta_low!==''?`${Number(s.delta_low)>=0?'+':''}${Number(s.delta_low).toFixed(2)} / ${Number(s.delta_high)>=0?'+':''}${Number(s.delta_high).toFixed(2)}`:'Not comparable';
+$('scope').textContent=`${data.summary.records.toLocaleString()} inventoried catalog records · ${data.summary.physical_copies.toLocaleString()} physical copies · comparison as of ${data.as_of}`;
+$('unidentified').textContent=`${data.summary.linked_physical_copies.toLocaleString()} copies link to these catalog records. ${data.summary.unidentified_inventory_entries} inventory entries still need identification and are outside the catalog-record comparisons.`;
+for(const [k,label] of [['records','Catalog records'],['books_with_stronger_scenarios','With a stronger scenario'],['material_change_books','With a large-change flag']]){let n=el('div',undefined,'stat');n.append(el('strong',data.summary[k].toLocaleString()),el('span',label));$('stats').append(n);}
+for(const [key,label] of Object.entries(labels)){let n=el('option',`${label} (${data.summary.categories[key]||0})`);n.value=key;$('category').append(n);}
+$('sources').textContent=JSON.stringify({policy:data.policy,source_files:data.input_hashes,code_sha256:data.comparison_code_sha256,records_coverage:data.records_coverage},null,2);
+let page=0,filtered=[];const size=25;
+function draw(){let query=$('search').value.toLocaleLowerCase(),cat=$('category').value,attention=$('attention').value;
+ filtered=data.books.filter(b=>(!cat||b.category===cat)&&(!query||[b.title,b.author,b.isbn,b.location,...b.flags].join(' ').toLocaleLowerCase().includes(query))&&(!attention||(attention==='material'&&b.material_change)||(attention==='research'&&['no_scenario','limited_only'].includes(b.category))||(attention==='physical'&&b.physical_tasks.length)));
+ const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages-1);$('results').replaceChildren();
+ for(const b of filtered.slice(page*size,(page+1)*size)){
+  let card=el('article',undefined,'book'),head=el('div',undefined,'bookhead');head.append(el('h3',b.title),el('span',b.priority,'tag'));card.append(head,el('p',`${b.author||'Author not recorded'} · ISBN ${b.isbn||'not recorded'} · Location ${b.location}`,'muted'));
+  let facts=el('div',undefined,'facts');facts.append(el('span',`Current: ${b.usable?money(b.currency,b.low,b.high):'No usable current estimate'}`),el('span',`${b.scenario_count} scenarios · ${b.stronger_scenarios} stronger`),el('span',b.category_label));card.append(facts);
+  if(b.flags.length){let ul=el('ul',undefined,'flags');for(const f of b.flags)ul.append(el('li',f));card.append(ul);}
+  if(b.scenarios.length){let details=el('details'),wrap=el('div',undefined,'scroll'),table=el('table'),thead=el('thead'),tr=el('tr');details.append(el('summary','Compare all condition scenarios and listing evidence'));
+   for(const h of ['If condition is…','Listing binding','Asking-price range','Offers','Support','Versus current','Endpoint changes','Evidence'])tr.append(el('th',h));thead.append(tr);table.append(thead);let body=el('tbody');
+   for(const s of b.scenarios){let row=el('tr');if(!s.stronger)row.className='limited';for(const v of [human(s.hypothetical_grade),s.listing_binding,money(s.currency,s.low,s.high),String(s.listing_count),s.stronger?'Stronger conditional scenario':s.support_notes,human(s.comparison),change(s)])row.append(el('td',v));let cell=el('td'),e=el('details');e.append(el('summary','Listing links'));
+    for(const offer of s.offers){let p=el('p'),a=el('a',`${s.currency} ${offer.price} · ${offer.date.slice(0,10)}`);if(/^https:\/\/(www\.)?ebay\./.test(offer.url)){a.href=offer.url;a.target='_blank';a.rel='noopener noreferrer';}p.append(a,el('small',` · ISBN ${offer.isbn}`));e.append(p);}cell.append(e);row.append(cell);body.append(row);}
+   table.append(body);wrap.append(table);details.append(wrap);card.append(details);
+  }else card.append(el('p','Further market research is needed; no used-book range is invented.'));
+  if(b.physical_tasks.length){let d=el('details');d.append(el('summary','Existing physical checks — deferred until handling'));for(const t of b.physical_tasks)d.append(el('p',`${t.location}: ${t.question}`));card.append(d);}
+  if(b.pilot_identification_checks.length){let d=el('details');d.append(el('summary','Earlier pilot identity checks — reconcile existing records first'));for(const t of b.pilot_identification_checks)d.append(el('p',t.question));card.append(d);}
+  $('results').append(card);
+ }
+ if(!filtered.length)$('results').append(el('p','No records match these filters.'));
+ $('count').textContent=`${filtered.length.toLocaleString()} catalog records`; $('page').textContent=`Page ${page+1} of ${pages}`;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;
+}
+for(const name of ['search','category','attention'])$(name).addEventListener(name==='search'?'input':'change',()=>{page=0;draw();});
+$('clear').onclick=()=>{for(const id of ['search','category','attention'])$(id).value='';page=0;draw();};$('prev').onclick=()=>{page--;draw();};$('next').onclick=()=>{page++;draw();};draw();
+</script></html>
