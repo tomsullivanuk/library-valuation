@@ -14,7 +14,7 @@ const ids=Object.fromEntries(['panel','saved','search','count','empty','mine','b
 let draft={version:1,books:['ref'],message:'OLD MESSAGE'};
 let posts=[];
 let submissions=[{created:'2026-11-10',payload:{books:[{reference:'ref',title:'Test book',author:'Author',request_status:'pending'}],message:'Historic message'}}];
-ids.updated=new Element('p');
+ids.updated=new Element('p');ids.search.parentElement=new Element('div');
 const source=await readFile(new URL('../valuation/family_app.js',import.meta.url),'utf8');
 const context=vm.createContext({document:{querySelector:s=>ids[s.slice(1)],querySelectorAll:()=>[],createElement:t=>new Element(t)},Date,Map,String,JSON,Error,crypto:{randomUUID:()=> 'retry-key'},location:{replace(){throw Error('Unexpected owner redirect')}},fetch:async(path,opts)=>({ok:true,json:async()=>{if(opts.method==='POST'){const payload=JSON.parse(opts.body);posts.push({path,payload});if(path==='/api/list'){draft={version:draft.version+1,books:payload.books,message:payload.message};return draft}return {id:'receipt'}}return {email:'guest@example.org',owner:false,draft,submissions}}})});
 vm.runInContext(source,context);
@@ -51,3 +51,17 @@ assert.equal(posts[1].payload.version,2);
 assert.equal(posts[1].payload.key,'retry-key');
 assert.equal(ids.saved.textContent,'Request submitted to Pops Sullivan. See Prior submissions below.');
 console.log('Family UI checks passed: blank message, hidden search, message toggle, non-destructive browsing and direct submission.');
+
+// Read-only query responses must not overwrite a newer query or alter drafts.
+context.testResponse={results:[{reference:'ref',reason:'Related topics',excerpt:'Source text'}],engine:'hybrid',notice:''};
+vm.runInContext("api=async()=>testResponse;searchVersion=2;search.value='new topic'",context);
+await vm.runInContext("runSearch(1,'old topic')",context);
+assert.equal(vm.runInContext('searchHits',context),null);
+await vm.runInContext("runSearch(2,'new topic')",context);
+assert.equal(vm.runInContext('searchHits.length',context),1);
+vm.runInContext("api=async()=>{throw Error('offline')}",context);
+await vm.runInContext("runSearch(2,'new topic')",context);
+assert.equal(vm.runInContext('searchHits',context),null);
+assert.ok(nodes.find(e=>e.id==='search-feedback').textContent.includes('basic keyword'));
+assert.equal(posts.length,2);
+console.log('Search UI checks passed: latest response wins, offline fallback, no draft writes.');

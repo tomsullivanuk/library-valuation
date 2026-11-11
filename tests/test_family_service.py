@@ -10,7 +10,7 @@ from valuation.family_catalog import FIELDS
 @pytest.fixture
 def server(tmp_path):
  snap=tmp_path/'catalog.json';snap.write_text(json.dumps([dict(zip(FIELDS,['ref','Title','Author','Press','2020','isbn','Physically inventoried']))]))
- config=dict(database=str(tmp_path/'db.sqlite'),snapshot=str(snap),origin='https://family.example',allowed_emails=['owner@example.org','guest@example.org'],owner_email='owner@example.org')
+ config=dict(database=str(tmp_path/'db.sqlite'),snapshot=str(snap),origin='https://family.example',allowed_emails=['owner@example.org','guest@example.org'],owner_email='owner@example.org',family_search_enabled=True)
  def identity(token):
   if token not in ['owner@example.org','guest@example.org']:raise ValueError()
   return token
@@ -73,3 +73,15 @@ def test_owner_badge_uses_verified_email_as_escaped_text():
  badge=owner_badge('owner@example.org')
  assert 'Signed in as owner@example.org' in badge and 'Owner' in badge
  assert '<script>' not in owner_badge('<script>')
+
+
+def test_family_search_requires_identity_origin_and_is_read_only(server):
+ assert server('/api/search',who='forged',data={'query':'Title'})[0]==403
+ assert server('/api/search',origin='https://evil.example',data={'query':'Title'})[0]==403
+ code,raw=server('/api/search',data={'query':'Title'})
+ assert code==200
+ body=json.loads(raw)
+ assert body['engine']=='keyword' and body['results'][0]['reference']=='ref'
+ assert all(k not in raw.decode() for k in ['purchase_price','sale_amount','location','private_notes'])
+ assert json.loads(server('/api/me')[1])['draft']['version']==0
+ assert server('/api/search',data={'query':'x'*501})[0]==400

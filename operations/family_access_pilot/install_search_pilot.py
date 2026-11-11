@@ -10,7 +10,7 @@ from valuation.family_search import fingerprint
 REVISION='1110a243fdf4706b3f48f1d95db1a4f5529b4d41'
 
 
-def install(home):
+def install(home,enable_family=False):
     home=Path(home);root=home/'library-access-pilot';private=root/'search-pilot'
     private.mkdir(exist_ok=True,mode=0o700);private.chmod(0o700)
     config_path=root/'state/config.json';config=json.loads(config_path.read_text())
@@ -36,7 +36,10 @@ def install(home):
     backup=private/'config-before-preview.json'
     if not backup.exists():backup.write_bytes(config_path.read_bytes());backup.chmod(0o600)
     config['search_pilot_dir']=str(private)
+    if enable_family:config['family_search_enabled']=True
     temp=config_path.with_suffix('.tmp');temp.write_text(json.dumps(config));temp.chmod(0o600);temp.replace(config_path)
-    print(json.dumps(dict(owner_preview_configured=True,family_search_unchanged=True)))
+    print(json.dumps(dict(owner_preview_configured=True,family_search_enabled=bool(config.get('family_search_enabled')))))
 
-if __name__=='__main__':install(Path.home())
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser();parser.add_argument('--enable-family',action='store_true');args=parser.parse_args();install(Path.home(),args.enable_family)

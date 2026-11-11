@@ -135,6 +135,9 @@ class App:
                     catalog,snapshot=app.catalog()
                     with closing(store.connect(app.db)) as db:
                         if write:
+                            if path=='/api/search':
+                                if not app.config.get('family_search_enabled'):return self.reply(404,{'error':'Search not enabled'})
+                                return self.reply(200,app.search_preview(body['query'])['hybrid'])
                             if path=='/api/list':return self.reply(200,store.save(db,email,body['version'],body['books'],body.get('message',''),catalog))
                             if path=='/api/submit':return self.reply(200,store.submit(db,email,body['version'],body['key'],catalog,snapshot))
                             return self.reply(404,{'error':'Not found'})
