@@ -27,6 +27,10 @@ def test_http_ownership_and_csrf(server):
  assert server('/api/me',who='forged')[0]==403
  assert server('/api/inbox')[0]==403
  assert server('/owner/')[0]==403
+ assert server('/owner/search-pilot')[0]==403
+ assert server('/owner/search-pilot/report')[0]==403
+ assert server('/owner/search-pilot/query',data={'query':'faith'})[0]==403
+ assert server('/owner/search-pilot.js')[0]==403
  assert server('/owner/api/state')[0]==403
  assert server('/owner/api/family-requests',data={})[0]==403
  assert server('/api/list',data=dict(version=0,books=['ref']),origin='https://evil.example')[0]==403

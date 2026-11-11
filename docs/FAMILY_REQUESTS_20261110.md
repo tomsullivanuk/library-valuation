@@ -69,3 +69,7 @@ Hide the top introductory instructions when My List is selected; preserve the li
 ### Exception-only availability
 
 Removed My List's Availability column. Saved titles absent from the current available catalog now show a No longer available warning beneath the title; available titles have no repetitive label. Submission validation remains unchanged. Catalog render and synthetic UI checks pass; deployed without modifying saved selections or requests.
+
+## Owner-only AI search comparison
+
+Added an isolated local-AI/keyword comparison prototype at /owner/search-pilot, with a private 42-query replay report. Family Browse search remains unchanged until the topic results are reviewed. See LOCAL_SEARCH_PILOT_20261110.md for model pinning, privacy boundaries, replay results, startup/fallback verification, dependencies and rollout gate. No production requests or estimates were changed.

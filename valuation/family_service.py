@@ -9,6 +9,8 @@ import ssl
 import requests
 import secrets
 import re
+import time
+import threading
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
@@ -33,6 +35,7 @@ class Identity:
 class App:
     def __init__(self,config,identity=None):
         self.config=config;self.identity=identity or Identity(config)
+        self.search_lock=threading.Lock();self.search_index=None;self.search_fingerprint=None
         self.db=Path(config['database']);self.db.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         store.connect(self.db).close();os.chmod(self.db,0o600)
     def raw_catalog(self):
@@ -48,6 +51,30 @@ class App:
             facts=owner.live_facts(load_model(self.config['owner_data_dir'],self.config['owner_output_dir'],family_overlay=False),self.config['owner_data_dir'])
             with closing(store.connect(self.db)) as db:records=owner.available(db,records,facts)
         return records,snapshot
+    def search_preview(self,query):
+        from valuation.family_search import Search,fingerprint
+        records,snapshot=self.raw_catalog();available,_=self.catalog()
+        with self.search_lock:
+            if self.search_fingerprint!=snapshot:
+                self.search_index=Search(list(records.values()));self.search_fingerprint=snapshot
+            index=self.search_index
+        start=time.monotonic();keyword=index.search(query,allowed=available,mode='keyword');keyword['elapsed_ms']=round((time.monotonic()-start)*1000,1)
+        start=time.monotonic()
+        try:
+            root=Path(self.config['search_pilot_dir'])
+            token=(root/'worker-token').read_text().strip()
+            req=Request('http://127.0.0.1:8878/search',data=json.dumps(dict(query=query,allowed=list(available),fingerprint=fingerprint(list(records.values())))).encode(),headers={'Content-Type':'application/json','X-Search-Token':token})
+            with urlopen(req,timeout=8) as response:hybrid=json.loads(response.read())
+            # Never trust a stale worker to grant availability or inject unknown records.
+            hybrid['results']=[r for r in hybrid['results'] if r['reference'] in available]
+        except Exception:
+            hybrid=dict(keyword,notice='Local AI worker unavailable; showing keyword results.')
+        hybrid['elapsed_ms']=round((time.monotonic()-start)*1000,1)
+        for result in (keyword,hybrid):
+            for r in result['results']:
+                book=available[r['reference']];r.update(title=book['title'],author=book['author'])
+        return dict(keyword=keyword,hybrid=hybrid)
+
     def handler(self):
         app=self
         class Handler(BaseHTTPRequestHandler):
@@ -72,6 +99,14 @@ class App:
                         body=json.loads(self.rfile.read(length))
                     if path=='/owner' or path.startswith('/owner/'):
                         if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
+                        if path.startswith('/owner/search-pilot'):
+                            if not app.config.get('search_pilot_dir'):return self.reply(404,{'error':'Preview not enabled'})
+                            if path=='/owner/search-pilot/query' and write:return self.reply(200,app.search_preview(body['query']))
+                            if path=='/owner/search-pilot.js' and not write:return self.reply(200,Path(__file__).with_name('family_search_preview.js').read_text(),'text/javascript')
+                            if path=='/owner/search-pilot/report' and not write:return self.reply(200,(Path(app.config['search_pilot_dir'])/'report.html').read_bytes(),'text/html')
+                            if path=='/owner/search-pilot' and not write:
+                                return self.reply(200,'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private search preview</title><style>body{font:17px system-ui;color:#25372e;max-width:1200px;margin:2rem auto;padding:1rem}h1,h2,h3{color:#245d49}input,button{font:inherit;padding:.6rem}input{width:70%}.columns{display:grid;grid-template-columns:1fr 1fr;gap:2rem}article{border-bottom:1px solid #ccc;padding:1rem 0}small{color:#606c65}@media(max-width:700px){.columns{display:block}}</style><a href="/owner/">Owner workspace</a><h1>Private search preview</h1><p>Compare ranked keywords with local AI. Only family-visible metadata and descriptions are indexed. Related-topic suggestions may be imperfect.</p><a href="/owner/search-pilot/report">42-query comparison report</a><form><label for="query">Find books</label><p><input id="query" maxlength="500" required placeholder="Try a title, ISBN or topic"><button>Compare</button></p></form><p id="notice" role="status"></p><div class="columns"><section id="keyword"></section><section id="hybrid"></section></div><script src="/owner/search-pilot.js" defer></script></html>','text/html')
+                            return self.reply(404,{'error':'Not found'})
                         local=path[len('/owner'):] or '/'
                         headers={'Origin':'http://127.0.0.1:8765'}
                         payload=None
