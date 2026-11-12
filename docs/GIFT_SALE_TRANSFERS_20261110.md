@@ -24,3 +24,14 @@ A later supported item/copy API, if Libib confirms one, could support an idempot
 ## Validation
 
 838 tests pass on the Mini and laptop, including new gift/sale, optional proceeds, amount validation, atomic rollback, exclusive assignment, transfer-count overlays, terminal-state protection and SQLite backup coverage. A private SQLite backup passed integrity checking before deployment. Both launch-managed services were restarted to use the same transfer-aware availability rules. Access remains restricted to the existing two test addresses. Estimates and physical grading remain unchanged.
+
+
+## Correcting a mistaken transfer — November 11, 2026
+
+Transferred requests now offer **Correct transfer** in the owner Requests table. The owner enters a required reason and chooses **Restore copy and return to Pending**. This clears the effective transfer and assignment, restores the copy through the current-inventory overlay, and preserves the original transfer, proceeds, assigned copy, actor and time in the append-only event history. The correction is also visible in Message history. The original submission remains intact. A later genuine transfer can be recorded normally.
+
+The correction requires a current version and the original physical copy in the underlying inventory. Ordinary status changes still cannot reverse terminal transfers. This corrects a recording mistake; it does not assert that a genuinely delivered book has been returned, refund a sale or change Libib. If Libib was independently changed, reconcile it separately.
+
+At the owner's request, the test request for Schrödinger's “Nature and the Greeks” and “Science and Humanism” was corrected to Pending with reason “Test transfer; book never left the library.” The Mini request database was backed up first. The former sale remains in event history, the copy is unassigned, and the physical total is restored to 2,727. Source data hashes remained unchanged; no estimate or purchase history was edited. The live owner table showed Pending afterward.
+
+Validation: 852 full-suite tests pass; JavaScript syntax and Python compilation pass. Added coverage checks stale edits, required reasons, preserving original sale data, releasing copies, later valid transfers and refusing corrections when the original copy is missing. The independent AbeBooks collection process was not restarted or altered.

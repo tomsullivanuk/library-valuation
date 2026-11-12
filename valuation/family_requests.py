@@ -39,6 +39,9 @@ def submit(db,email,version,key,catalog,snapshot):
         payload=dict(books=[catalog[r] for r in d['books']],message=d['message'],catalog_snapshot=snapshot,draft_version=version)
         id=str(uuid.uuid4());created=datetime.now(timezone.utc).isoformat()
         db.execute('INSERT INTO submissions VALUES(?,?,?,?,?)',(id,email,key,created,json.dumps(payload)))
+        # Submit and clear the draft atomically. An idempotent retry returns above
+        # and must never clear choices subsequently added in another window.
+        db.execute('INSERT OR REPLACE INTO drafts VALUES(?,?,?)',(email,version+1,json.dumps(dict(books=[],message=''))))
     return dict(id=id,created=created,payload=payload)
 
 def submissions(db,email=None):

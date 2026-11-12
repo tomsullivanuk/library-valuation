@@ -77,3 +77,27 @@ Added an isolated local-AI/keyword comparison prototype at /owner/search-pilot, 
 ## Combined search enabled
 
 With owner approval, Browse now uses the existing local AI plus ranked-keyword engine in one search field. It displays relevant source excerpts, preserves exact title/ISBN priority and current availability checks, ignores stale query responses, and retains keyword/basic-local fallbacks. The owner-only comparison page remains for diagnostics. Search is read-only; My List, submission, purchase and transfer records remain unchanged. See LOCAL_SEARCH_PILOT_20261110.md for rollout verification and rollback.
+
+
+## Clear submitted choices from My List — November 11, 2026
+
+A successful submission now atomically saves its immutable request and clears the sender's draft books and message, advancing the draft version. The interface reloads both draft and submissions, so My List immediately reflects the cleared draft while Prior submissions retains the requested books. Failed submissions retain the draft. Idempotent retries return the earlier request without clearing newer choices; stale windows cannot re-save the submitted draft.
+
+The existing guest draft left behind by the reported six-book submission was cleaned only after verifying its version, references and message exactly matched the latest submitted payload. The Mini ledger was backed up first, and both original submissions remained byte-for-byte unchanged. No new request was submitted during this repair.
+
+Validation: 854 tests pass, plus JavaScript syntax, Python compilation and whitespace checks. Coverage includes draft clearing, immutable requests, persistence/backup, failed submission retention and retry protection for newly saved choices.
+
+
+## Request messages, saved decisions and sorting — November 11, 2026
+
+My List is explicitly counted as books awaiting submission; the history heading is now Submitted requests. The recipient table sorts Submitted, Book, Author, Status and Message via keyboard-operable column buttons with direction arrows and aria-sort. Newest submissions are the default. Message sorting groups rows by whether a requester or owner message is available. Owner messages appear in each book's Message details, labelled Pops Sullivan with a timestamp; the initial requester message is retained.
+
+Owner actions are now staged: selecting Approve enables choosing a copy, then Save decision persists the status, reservation and optional requester message together. Decline, Return to pending and Add message use the same explicit save flow. Cancel discards the staged change. Transfers retain their separate final confirmation and now accept an optional requester message too. Messages are stored with the decision event, scoped to submission and book; the guest endpoint returns only message text and timestamp, never owner values, locations, actors, copy IDs or sale proceeds. These are in-app messages; no email is sent.
+
+The owner table adds Submitted date and sorts Submitted, Requested by, Book, Estimate, Location and Status. Estimate sorting uses the first numeric USD amount, with missing estimates last; location uses numeric-aware text ordering. Action and Assigned copy remain controls. Newest first is the default.
+
+Both interfaces check for status updates every 15 seconds while visible and on window focus/tab return. Recipient refresh replaces only changed submitted-request rows, preserving the draft and unsaved message. Owner refresh waits while an action form or editable control is active. Sorting and filters are preserved, and owner controls do not discard a staged decision. Polling failures leave the last displayed state available; it is not an instantaneous push channel.
+
+Validation: 856 tests pass, including scoped message history, privacy-safe API responses, invalid-message validation and stale-version rejection. Script syntax and compilation checks pass. Live owner verification confirmed Book ascending sorting and a staged approval/copy selection leaving the existing Declined decision unchanged until save; the form was cancelled without a production write.
+
+Live Safari verification also confirmed the Submitted requests heading, “0 books awaiting submission” label and Book ascending sort. All existing request states were retained; no production decision or message was sent during verification.

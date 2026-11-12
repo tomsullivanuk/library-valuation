@@ -74,7 +74,7 @@ def inbox(db,facts):
             copies=[dict(c,assignment=assigned.get(c['id'])) for c in f['copies']]
             details.append(dict(reference=ref,**{k:v for k,v in f.items() if k!='copies'},copies=copies,decision=d,
                 other_requesters=sorted(people.get(ref,set())-{row['email']}),
-                history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'],transfer=json.loads(e['payload'])['after'].get('transfer'))
+                history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'],transfer=json.loads(e['payload'])['after'].get('transfer'),correction_reason=json.loads(e['payload']).get('correction_reason'),message=json.loads(e['payload']).get('message',''))
                     for e in db.execute('SELECT created,actor,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(row['id'],ref))]))
         row['items']=details
     return rows
@@ -82,6 +82,9 @@ def inbox(db,facts):
 
 def update(db,actor,body,facts):
     schema(db)
+    message=body.get('message','')
+    if not isinstance(message,str) or len(message)>2000:raise ValueError('Message must be at most 2000 characters')
+    message=message.strip()
     submission,ref,state,version=body['submission'],body['reference'],body['state'],body['version']
     if state not in ('pending','approved','declined','collected','transferred') or type(version) is not int:raise ValueError('Invalid decision')
     with db:
@@ -90,7 +93,14 @@ def update(db,actor,body,facts):
         if not source or ref not in {b['reference'] for b in json.loads(source['payload'])['books']}:raise ValueError('Unknown request item')
         old=decision(db,submission,ref)
         if version!=old['version']:raise requests.Conflict('This request changed. Refresh before deciding.')
-        if old['state'] in ('collected','transferred'):raise requests.Conflict('Transfer is recorded permanently. Reconcile a mistaken transfer explicitly.')
+        correction_reason=None
+        if body.get('correct_transfer') is True:
+            correction_reason=body.get('correction_reason','')
+            if old['state'] not in ('collected','transferred') or state!='pending':raise ValueError('Only a recorded transfer can be corrected to Pending')
+            if not isinstance(correction_reason,str) or not correction_reason.strip() or len(correction_reason)>1000:raise ValueError('Enter a correction reason (up to 1000 characters)')
+            correction_reason=correction_reason.strip()
+            if old['slot'] not in {c['id'] for c in facts.get(ref,{}).get('copies',[])}:raise requests.Conflict('The original copy is missing from inventory. Reconcile the inventory before correcting this transfer.')
+        elif old['state'] in ('collected','transferred'):raise requests.Conflict('Use Correct transfer to restore a mistakenly transferred copy.')
         slot=body.get('slot') if state=='approved' else old['slot'] if state in ('collected','transferred') else None
         if state in ('approved','collected','transferred'):
             if slot not in {c['id'] for c in facts.get(ref,{}).get('copies',[])}:raise requests.Conflict('This copy is no longer eligible. Refresh and check the inventory.')
@@ -112,9 +122,12 @@ def update(db,actor,body,facts):
             else:amount=None
             transfer=dict(kind=kind,amount=amount,currency='USD')
         stamp=datetime.now(timezone.utc).isoformat()
+        # The complete former transfer remains in the append-only correction event.
+        # Remove only its effective-state row so a later genuine transfer can be saved.
+        if correction_reason:db.execute('DELETE FROM request_transfers WHERE submission=? AND reference=?',(submission,ref))
         if transfer:db.execute('INSERT INTO request_transfers VALUES(?,?,?,?,?,?)',(submission,ref,transfer['kind'],transfer['amount'],transfer['currency'],stamp))
         db.execute('INSERT OR REPLACE INTO request_decisions VALUES(?,?,?,?,?,?)',(submission,ref,state,slot,version+1,stamp))
-        db.execute('INSERT INTO request_events(submission,reference,actor,created,payload) VALUES(?,?,?,?,?)',(submission,ref,actor,stamp,json.dumps(dict(before=old,after=dict(state=state,slot=slot,transfer=transfer)))))
+        db.execute('INSERT INTO request_events(submission,reference,actor,created,payload) VALUES(?,?,?,?,?)',(submission,ref,actor,stamp,json.dumps(dict(before=old,after=dict(state=state,slot=slot,transfer=transfer),correction_reason=correction_reason,message=message))))
     return decision(db,submission,ref)
 
 
@@ -138,3 +151,10 @@ def collected_overlay(model,config):
     effective=sum(min(int(h.copies),counts.get(h.holding_id,0)) for h in model.holdings if h.holding_id in model.completed_inventory.holding_ids)
     scope=replace(model.completed_inventory,source_copies=max(0,model.completed_inventory.source_copies-effective),catalog_item_ids=tuple(x for x in model.completed_inventory.catalog_item_ids if x in remaining),holding_ids=tuple(h.holding_id for h in holdings if h.holding_id in model.completed_inventory.holding_ids and int(h.copies)>0))
     return replace(model,holdings=holdings,books=books,completed_inventory=scope)
+
+
+def recipient_messages(db, submission, reference):
+    """Only requester-visible text; never expose owner facts or transfer proceeds."""
+    return [dict(created=row['created'], message=payload['message'])
+            for row in db.execute('SELECT created,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(submission,reference))
+            if (payload:=json.loads(row['payload'])).get('message')]
