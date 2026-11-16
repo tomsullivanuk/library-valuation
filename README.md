@@ -850,8 +850,10 @@ Run `.venv/bin/python -m valuation.workspace_service` and open
 [the local Library](http://127.0.0.1:8765). Add `--background` to keep the service running independently of the launcher.
 Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
-views. Action Items combines physical book checks with optional research and saves
-Complete, Defer, Dismiss, Reopen and answers/notes. Select a disposition in book
+views. Action Items defaults to **Needs your input**, showing open physical book
+checks. **Research queue — assistant**, **Proposed estimates**, and
+**Resolved from records** are separate queues. It saves Complete, Defer, Dismiss,
+Reopen and answers/notes. Select a disposition in book
 details and press **Save**. Generated HTML remains a read-only fallback.
 
 Saved decisions remain in the local data repositories across reloads and workspace
@@ -864,14 +866,15 @@ The service runs in the background, so the launcher window can be closed. If the
 service is already running, the launcher reuses it. Reopen it after restarting the
 computer; saved decisions remain in place.
 
-Action Items now includes **Estimate research**: concrete next steps and search
-links for physical books without supported estimates. Existing book checks remain
+The assistant research queue includes concrete next steps and search links for
+books whose reviewed evidence does not yet support a replacement range. Existing book checks remain
 the next step where an edition/binding question blocks research. Generic research
 scores are retained in the underlying assessment records but removed from book
 details. Save findings in the task's answer/note; completing it records progress
 without silently changing the catalog or estimate.
 
-From an **Estimate research** task, enter findings in **Answer or note**, expand
+For optional individual investigation from a research or proposed-estimate task,
+expand **Optional individual investigation**, enter findings in **Answer or note**, then expand
 **Review and save a revised estimate**, and enter the per-copy low/high range,
 currency, research date and source links. **Review estimate** previews the previous
 and revised ranges. **Save estimate and complete task** updates the Library and
@@ -882,3 +885,10 @@ Reviewed ranges are stored separately from observed listings in
 `data/reviewed_estimates.json`. Exact prices, purchase history and prior estimates
 are retained. Catalog-identity changes prevent an old reviewed range from being
 automatically applied to a different edition.
+
+The private research-review input is `data/workspace_reviews/current.json`. It
+projects recent outcomes into Action Items without writing catalog records,
+purchase history, saved estimates or task decisions. Include it in private data
+backups and migration. Missing review input is visibly reported; changed book
+identities do not inherit proposals or cleared checks. Previous answers remain
+visible when a changed question needs review. No private review input belongs in Git.

@@ -242,9 +242,14 @@ class WorkspaceStore:
     def __init__(self, data_dir, output_dir, *, model=None):
         self.data_dir, self.output_dir = Path(data_dir), Path(output_dir)
         self.model = model or load_model(self.data_dir, self.output_dir)
-        self.actions = build_actions(self.model, load_book_checks(self.data_dir, self.model))
+        self.actions = self.review_actions(self.model)
         self.lock = threading.RLock()
         self.token = secrets.token_urlsafe(32)
+
+    def review_actions(self, model):
+        from valuation.workspace_action_review import apply_review
+        tasks, self.action_review = apply_review(self.data_dir, model, build_actions(model, load_book_checks(self.data_dir, model)))
+        return tasks
 
     @property
     def path(self):
@@ -274,17 +279,19 @@ class WorkspaceStore:
             books = {b.catalog_item_id:b for b in self.model.books}
             for task in self.all_tasks(state).values():
                 saved = state["actions"].get(task["id"], {})
+                previous_answer = saved.get("note", "")
                 if saved.get("fingerprint") != task["fingerprint"]:
                     saved = {}
-                actions.append(dict(task, status=saved.get("status", "open"),
-                    deferred_until=saved.get("deferred_until", ""), note=saved.get("note", "")))
+                actions.append(dict(task, status=saved.get("status", task.get("default_status", "open")),
+                    deferred_until=saved.get("deferred_until", ""), note=saved.get("note", ""),
+                    previous_answer=previous_answer if not saved else ""))
                 book = books.get(task["catalog_item_id"])
                 if book and book.reviewed_estimate_id and saved.get("estimate_review_id"):
                     actions[-1]["reason"] = "This research task has a saved, reviewed estimate. You can review and revise it again below."
             observed = {h.latest_inventory_observation_id for h in self.model.holdings if h.holding_id in self.model.completed_inventory.holding_ids}
             observed.update(self.model.completed_inventory.unresolved_observation_ids)
             titles = {" ".join(unicodedata.normalize("NFKC", o.title).casefold().split()) for o in self.model.observations if o.inventory_observation_id in observed and o.title.strip()}
-            return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
+            return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions, action_review=self.action_review,
                 dispositions={r["catalog_item_id"]: ("gift_donate" if r["disposition"] in {"gift", "donate"} else r["disposition"]) for r in reviews},
                 disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles),
                 estimate_currencies=list(estimate_reviews.CURRENCIES),
@@ -343,7 +350,7 @@ class WorkspaceStore:
                 event = dict(kind=kind, id=task["id"], **value)
             elif kind == "estimate":
                 task = self.all_tasks(state).get(request.get("id"))
-                if not task or task["category"] != "Estimate research" or task["fingerprint"] != request.get("fingerprint"):
+                if not task or task["category"] not in {"Estimate research", "Proposed estimates"} or task["fingerprint"] != request.get("fingerprint"):
                     raise ValueError("This research task changed. Reload before saving an estimate.")
                 if request.get("reviewed") is not True:
                     raise ValueError("Review the revised estimate before saving")
@@ -394,7 +401,7 @@ class WorkspaceStore:
             publish_files(payloads)
             if kind == "estimate":
                 self.model = replace(self.model, books=tuple(project_reviewed_estimate(b,row) if b.catalog_item_id==book.catalog_item_id else b for b in self.model.books))
-                self.actions = build_actions(self.model, load_book_checks(self.data_dir,self.model))
+                self.actions = self.review_actions(self.model)
             return self.snapshot()
 
 
@@ -439,7 +446,7 @@ def make_server(store, port=8765):
                 with store.lock:
                     model = load_model(store.data_dir, store.output_dir)
                     store.model = model
-                    store.actions = build_actions(model, load_book_checks(store.data_dir, model))
+                    store.actions = store.review_actions(model)
                 return self.send(200, render_steward_workspace(model, action_items=store.actions), "text/html; charset=utf-8")
             allowed = {r.public_path: r for r in store.model.reports if r.public_path}
             if path.lstrip("/") in allowed:

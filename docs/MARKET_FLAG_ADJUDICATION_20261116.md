@@ -38,3 +38,29 @@ The private records are under `output/market_flag_resolution_20261116/`: scope, 
 The owner confirmed the available 140-photo set is the only retained set. On-device text indexing, manual image review and title/author/identifier checks matched 14 of the 64 checklist entries. One edition-identifier question is resolved by a clear, valid primary publisher-line paperback ISBN; conflicting printed strings remain preserved exactly, including their separate checksum results. This does not visually verify the exterior cover or assign condition. Thirteen matched entries still lack conclusive binding evidence. No reliable matching photo was located for the other 50 entries.
 
 A separate private checklist now contains 63 remaining entries and photo findings/references where available. The prior 64-row checklist and market-review artifacts remain intact. Distinct photographed editions of the same work are not merged by title. Private source photographs, OCR output, bibliographic findings and the revised checklist stay outside GitHub; the original evidence for the resolved identifier is privately preserved with matching hashes. Saved values and canonical catalog/task records remain unchanged. General binding/condition confirmation during handling remains separate from the cleared edition-identifier recheck.
+
+## Action Items integration
+
+The November 16 review is now installed as a private, explicit workspace input.
+Action Items defaults to **Needs your input** with 63 remaining physical checks,
+using the narrowed questions and retained photo evidence. One resolved identifier
+check is available under **Resolved from records** as a completed reference.
+
+The separate **Proposed estimates** queue covers 1,165 books with conditional
+research ranges. **Research queue — assistant** covers 1,400 remaining catalog
+books, including the 32 unresolved cases in the flagged subset and books outside
+that subset. This full-library backlog is not an owner investigation checklist.
+Optional individual investigation and explicit estimate review remain available.
+No range is applied automatically.
+
+The projection validates book identities, preserves existing answers and decisions,
+and retains previous answers when changed questions reopen. Saved manually
+reviewed estimates are protected from new research tasks. Missing private input
+is reported visibly. The full suite passes 879 tests, including review projection,
+identity changes, invalid proposal rejection, answer preservation and explicit
+individual estimate saving. Live UI verification confirmed all four queue counts.
+
+The Mini installation preserved its newer user-management routes. Installation
+checks confirmed all pre-existing catalog, inventory, purchase and saved-value
+data files were unchanged. Only reusable code, tests and aggregate documentation
+are committed; private book identities, prices and review inputs remain private.
