@@ -69,3 +69,9 @@ Decline selected stages the same pending selections for decline with a shared op
 ## Storage picking list
 
 Requests → choose Requested by → Picking list produces a read-only list of all saved approved requests for that person, independent of status/search filters. It groups by assigned-copy location in numeric order, then title, and includes author, assigned copy, pull checkboxes, timestamp and totals. Print / Save PDF uses the browser print dialog. Checkboxes are temporary and do not record transfer or change inventory. With Everyone selected, each book also shows its requester.
+
+## Bulk permanent handover
+
+Filter Requests to Approved and the requester, select the books actually handed over, then Transfer selected. The existing assigned copies are retained and locked. Choose Gift or Sale, enter one optional shared message, and check the permanent-handover confirmation before Save transfers. Pulling books from storage alone is not a transfer. Bulk sales record no proceeds; use individual transfers when recording sale amounts.
+
+Each save uses existing version checks and transfer accounting. Successful transfers refresh the active library; partial failures remain selected and offer Refresh library after transfers. Library/purchase history and correction records are preserved; Libib still requires a separate update. Browser verification used synthetic requests only, including blocked save without handover confirmation and three confirmed transfers. Full suite: 878 passing.
