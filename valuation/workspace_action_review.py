@@ -17,7 +17,27 @@ def fingerprint(task):
     return hashlib.sha256(json.dumps(fields,sort_keys=True).encode()).hexdigest()
 
 
-def apply_review(data_dir, model, legacy):
+def estimate_basis(book):
+    """Invalidate a retained-baseline classification if its saved range changes."""
+    fields = ('estimated_value_precise_low', 'estimated_value_precise_high',
+              'estimated_value_currency', 'usable_market_estimate')
+    return {key: getattr(book, key) for key in fields}
+
+
+def classify_remaining(*, has_proposals, awaiting_physical, unresolved_price_flags,
+                       usable_estimate):
+    """Route reviewed outcomes; absence of a replacement is not a research task."""
+    if has_proposals:
+        return 'proposed'
+    if awaiting_physical:
+        return 'awaiting_physical'
+    if unresolved_price_flags or not usable_estimate:
+        return 'further_evidence'
+    return 'retain_current'
+
+
+def apply_review(data_dir, model, legacy, decisions=None):
+    decisions = decisions or {}
     path=Path(data_dir)/FILE_NAME
     if not path.exists():
         tasks=[dict(t,audience='owner' if t['category']=='Book checks' else 'assistant') for t in legacy]
@@ -83,11 +103,31 @@ def apply_review(data_dir, model, legacy):
                         proposals=proposals,reviewed_on=doc['reviewed_on'],
                         next_step='Confirm the applicable copy details when handling the book. Individual estimate review is optional; no range is applied automatically.')
         else:
-            task.update(category='Estimate research',action='Further market research is tracked with the assistant.',
+            classification=review.get('classification','further_evidence') if applicable else 'further_evidence'
+            if classification not in {'retain_current','awaiting_physical','further_evidence'}:
+                raise ValueError('Invalid no-proposal research classification')
+            if classification=='retain_current' and (not book.usable_market_estimate or review.get('estimate_basis')!=estimate_basis(book)):
+                classification='further_evidence'
+            owner_tasks=[t for t in tasks if t['category']=='Book checks' and t['catalog_item_id']==cid]
+            pending_tasks=[t for t in owner_tasks if not (decisions.get(t['id'],{}).get('fingerprint')==t['fingerprint'] and decisions[t['id']].get('status')=='complete' and decisions[t['id']].get('note','').strip())]
+            if classification=='awaiting_physical' and (not applicable or not pending_tasks):
+                classification='further_evidence'
+            if classification=='retain_current':
+                task.update(category='Retain current estimate',audience='reference',read_only=True,default_status='complete',
+                            action='Retain the current saved estimate provisionally; no replacement is justified by this review.',
+                            reason='The saved estimate is usable under the existing catalog rules, and this review has no unresolved price-disagreement flag for this book. This is not a fresh independent verification of its value.',
+                            next_step='No active research task. Revisit when stronger edition-matched evidence becomes available or before a sale.',
+                            reviewed_on=doc['reviewed_on'])
+            elif classification=='awaiting_physical':
+                task.update(category='Awaiting physical check',audience='reference',read_only=True,
+                            action='Estimate research is waiting for the existing physical-book check.',
+                            reason='The copy details needed to select comparable listings remain unresolved. This is not a second owner task.',
+                            next_step='Answer the linked check under Needs your input; then the assistant can reassess the market evidence.',
+                            blocking_check_ids=[t['id'] for t in pending_tasks])
+            else:
+                task.update(category='Estimate research',action='Further market research is tracked with the assistant.',
                         reason='The reviewed evidence does not yet support a replacement range.' if applicable else 'This book is new or its identity changed since the research review; its evidence needs reassessment.',
                         next_step=review.get('research_next_step','Check edition-matched offers, binding, seller condition and source-price differences.') if applicable else 'Reconcile the current edition with the research evidence before proposing a range.')
-            if book.reviewed_estimate_id:
-                task.update(reason='The saved manually reviewed estimate is protected. Research proposals have not replaced it.',next_step='Reassess only if new evidence warrants revisiting the saved manual review.')
         task['fingerprint']=fingerprint(task);tasks.append(task)
     return tasks,dict(loaded=True,review_id=doc['review_id'],reviewed_on=doc['reviewed_on'],
                       changed_or_new_books=len(changed),message='Research outcomes are installed. Saved book values are unchanged.')

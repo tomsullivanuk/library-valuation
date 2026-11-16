@@ -852,7 +852,9 @@ Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
 views. Action Items defaults to **Needs your input**, showing open physical book
 checks. **Research queue — assistant**, **Proposed estimates**, and
-**Resolved from records** are separate queues. It saves Complete, Defer, Dismiss,
+**Resolved from records** are separate queues. **Awaiting physical check** tracks
+assistant dependencies on existing owner checks; **Retain current estimate** is a
+reference list of provisionally retained usable ranges, not active research. It saves Complete, Defer, Dismiss,
 Reopen and answers/notes. Select a disposition in book
 details and press **Save**. Generated HTML remains a read-only fallback.
 
@@ -892,3 +894,10 @@ purchase history, saved estimates or task decisions. Include it in private data
 backups and migration. Missing review input is visibly reported; changed book
 identities do not inherit proposals or cleared checks. Previous answers remain
 visible when a changed question needs review. No private review input belongs in Git.
+
+Research classification distinguishes absent replacements from unfinished work.
+Usable existing ranges without unresolved price flags can be provisionally retained;
+this does not freshly validate their value. Physical dependencies point to existing
+owner checks. A current completed check with a recorded answer returns its dependent
+research to the assistant queue; no estimate is applied. Changed saved baselines
+invalidate retained classifications and require reassessment.

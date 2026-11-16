@@ -85,3 +85,47 @@ def test_explicit_individual_save_from_proposal_keeps_completed_history(tmp_path
     state=store.update(dict(request,reviewed=True))
     saved=next(t for t in state['actions'] if t['id']==task['id'])
     assert saved['status']=='complete' and state['estimate_updates'][model.books[0].catalog_item_id]['estimated_value_precise_low']=='12.00'
+
+
+def test_classification_routes_supported_baseline_gaps_and_dependencies():
+    from valuation.workspace_action_review import classify_remaining
+    for proposal,physical,flag,usable,expected in [
+        (True,True,True,False,'proposed'),
+        (False,True,True,True,'awaiting_physical'),
+        (False,False,True,True,'further_evidence'),
+        (False,False,False,False,'further_evidence'),
+        (False,False,False,True,'retain_current'),
+    ]:
+        assert classify_remaining(has_proposals=proposal,awaiting_physical=physical,
+            unresolved_price_flags=flag,usable_estimate=usable)==expected
+
+
+def test_retained_range_is_reference_and_changed_range_requires_reassessment(tmp_path):
+    from valuation.workspace_action_review import estimate_basis
+    model,m,path=setup(tmp_path,False)
+    book=replace(model.books[0],usable_market_estimate=True,
+        estimated_value_precise_low='10',estimated_value_precise_high='20',estimated_value_currency='USD')
+    model=replace(model,books=(book,));row=m['books'][book.catalog_item_id]
+    row.update(classification='retain_current',estimate_basis=estimate_basis(book));path.write_text(json.dumps(m))
+    state=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model).snapshot()
+    t=next(a for a in state['actions'] if a['id'].startswith('estimate-research:'))
+    assert t['category']=='Retain current estimate' and t['status']=='complete' and t['read_only']
+    changed=replace(model,books=(replace(book,estimated_value_precise_high='30'),))
+    state=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=changed).snapshot()
+    assert next(a for a in state['actions'] if a['id']==t['id'])['category']=='Estimate research'
+    assert model.books[0].estimated_value_precise_high=='20'
+
+
+def test_physical_dependency_unblocks_only_with_current_completed_answer(tmp_path):
+    model,m,path=setup(tmp_path,False);m['books'][model.books[0].catalog_item_id]['classification']='awaiting_physical';path.write_text(json.dumps(m))
+    store=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model)
+    research=lambda:next(t for t in store.snapshot()['actions'] if t['id'].startswith('estimate-research:'))
+    task=next(t for t in store.actions if t['id']=='check:one')
+    assert research()['category']=='Awaiting physical check'
+    store.update(dict(kind='action',id=task['id'],fingerprint=task['fingerprint'],revision=0,status='complete',note=''))
+    assert research()['category']=='Awaiting physical check'
+    store.update(dict(kind='action',id=task['id'],fingerprint=task['fingerprint'],revision=1,status='complete',note='Paperback; cover ISBN confirmed'))
+    assert research()['category']=='Estimate research'
+    assert not (tmp_path/'data'/'reviewed_estimates.json').exists()
+    m['owner_checks'][0]['question']='Read a different identifier';path.write_text(json.dumps(m))
+    assert research()['category']=='Awaiting physical check'

@@ -1290,15 +1290,15 @@ _DOCUMENT = r"""<!doctype html>
       filter.querySelector("select").value = actionFilter;
       filter.addEventListener("change", () => { actionFilter = filter.querySelector("select").value; renderActions(); });
       append(main, filter);
-      const category = selectControl("action-category", "Queue", [...new Set(workspaceState.actions.map(t => t.category))], value => ({"Book checks":"Needs your input","Estimate research":"Research queue — assistant","Optional research":"Other research — assistant","Proposed estimates":"Proposed estimates","Resolved from records":"Resolved from records"}[value] || value));
+      const category = selectControl("action-category", "Queue", [...new Set(workspaceState.actions.map(t => t.category))], value => ({"Book checks":"Needs your input","Estimate research":"Research queue — assistant","Optional research":"Other research — assistant","Proposed estimates":"Proposed estimates","Resolved from records":"Resolved from records","Retain current estimate":"Retain current estimate — reference","Awaiting physical check":"Awaiting physical check — assistant"}[value] || value));
       category.querySelector("select").value = actionCategory;
-      category.addEventListener("change", () => { const previousCategory=actionCategory;actionCategory = category.querySelector("select").value; if(actionCategory === "Resolved from records") actionFilter="complete"; else if(previousCategory === "Resolved from records") actionFilter="open"; actionLimit = 50; renderActions(); });
+      category.addEventListener("change", () => { const previousCategory=actionCategory;actionCategory = category.querySelector("select").value; if(["Resolved from records","Retain current estimate"].includes(actionCategory)) actionFilter="complete"; else if(["Resolved from records","Retain current estimate"].includes(previousCategory)) actionFilter="open"; actionLimit = 50; renderActions(); });
       append(main, category);
-      const queueNotes = {"Book checks":"These checks need facts from your physical books. Record the answer, then mark the check complete.","Estimate research":"This is the assistant’s research backlog, not a list of investigations for you. Optional individual investigation remains available below.","Proposed estimates":"Research findings for later review. Ranges remain conditional on binding and condition; no saved value has changed.","Resolved from records":"Questions answered from existing records or photos. Kept here for reference."};
+      const queueNotes = {"Book checks":"These checks need facts from your physical books. Record the answer, then mark the check complete.","Estimate research":"This is the assistant’s research backlog, not a list of investigations for you. Optional individual investigation remains available below.","Proposed estimates":"Research findings for later review. Ranges remain conditional on binding and condition; no saved value has changed.","Resolved from records":"Questions answered from existing records or photos. Kept here for reference.","Retain current estimate":"No active investigation: existing usable estimates retained provisionally, without fresh independent valuation or a saved-value change.","Awaiting physical check":"Assistant research paused until the existing physical-book check is answered. These are dependencies, not additional tasks for you."};
       if (queueNotes[actionCategory]) append(main,node("p",{class:"notice"},queueNotes[actionCategory]));
       if (workspaceState.action_review && !workspaceState.action_review.loaded) append(main,node("p",{class:"notice"},workspaceState.action_review.message));
       const tasks = workspaceState.actions.filter(task => selectedId ? task.id === selectedId : (!actionFilter || actionStatus(task) === actionFilter) && (!actionCategory || task.category === actionCategory));
-      append(main, node("p", {role:"status"}, `${tasks.length.toLocaleString()} items`));
+      append(main, node("p", {role:"status"}, `${tasks.length.toLocaleString()} ${tasks.length === 1 ? "item" : "items"}`));
       if (!tasks.length) append(main, node("p", {class:"empty"}, "No items in this view."));
       for (const task of tasks.slice(0, actionLimit)) {
         const card = node("article", {class:"panel"});
@@ -1321,6 +1321,7 @@ _DOCUMENT = r"""<!doctype html>
             append(card,links);
           }
         }
+        if (task.blocking_check_ids?.length) for (const id of task.blocking_check_ids) append(card,routeLink("View physical check","actions/"+id));
         if (task.read_only) { append(card,routeLink("View book or inventory record",task.route));append(main,card);continue; }
         const investigation=node("div");
         const noteLabel = node("label", {}, "Answer or note "); const note = node("textarea", {rows:"2", "aria-label":`Answer or note for ${task.title}`}); note.value = task.note || ""; append(noteLabel, note);

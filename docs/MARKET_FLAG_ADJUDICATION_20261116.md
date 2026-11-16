@@ -64,3 +64,30 @@ The Mini installation preserved its newer user-management routes. Installation
 checks confirmed all pre-existing catalog, inventory, purchase and saved-value
 data files were unchanged. Only reusable code, tests and aggregate documentation
 are committed; private book identities, prices and review inputs remain private.
+
+## Remaining-work classification
+
+The original 1,400-record assistant queue was a complement of books with proposals,
+not a determination that each record needed an active investigation. The explicit
+classification now assigns those records as follows:
+
+| Classification | Records | Meaning |
+| --- | ---: | --- |
+| Further market evidence — assistant | 733 | 701 lack a usable saved estimate and a supported replacement; 32 retain unresolved detailed-review price questions |
+| Awaiting physical check — assistant | 57 | Research depends on an existing owner check, rather than another investigation |
+| Retain current estimate — reference | 610 | Existing usable range and no unresolved price-review flag; provisionally retained, not freshly independently valued |
+
+The owner default remains 63 physical checks. There are still 1,165 conditional
+proposal records and one resolved reference. Those proposal records and owner
+checks can overlap; queue counts are not a sum of distinct books. The 57 physical
+dependencies are book-level references, not 57 additional owner tasks.
+
+The retained classification uses the existing usable-estimate rules and the
+review's unresolved-flag scope. It does not claim that a missing proposal verifies
+an old price. Baseline range/identity changes require reassessment. Completing a
+current physical check with an answer returns the dependent record to assistant
+research; dismissal or completion without an answer does not assert edition facts.
+Saved task decisions and answers remain intact. No catalog, purchase or saved-value
+record is modified by classification. The private manifest contains the per-book
+classification and saved-range basis; only aggregate results and reusable logic
+are published. Full verification: 882 tests pass.

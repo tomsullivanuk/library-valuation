@@ -248,7 +248,7 @@ class WorkspaceStore:
 
     def review_actions(self, model):
         from valuation.workspace_action_review import apply_review
-        tasks, self.action_review = apply_review(self.data_dir, model, build_actions(model, load_book_checks(self.data_dir, model)))
+        tasks, self.action_review = apply_review(self.data_dir, model, build_actions(model, load_book_checks(self.data_dir, model)), self.read()["actions"])
         return tasks
 
     @property
@@ -273,6 +273,8 @@ class WorkspaceStore:
     def snapshot(self):
         with self.lock:
             state = self.read()
+            if self.action_review.get("loaded"):
+                self.actions = self.review_actions(self.model)
             reviews = CollectorReviewRepository(self.data_dir / "collector_reviews.csv").load()
             estimate_history = estimate_reviews.load_reviews(self.data_dir)
             actions = []
