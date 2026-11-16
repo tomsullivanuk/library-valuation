@@ -57,3 +57,9 @@ The live connection was verified with a provider GET and matching memberships. A
 Prepare invitation opens one full-width panel beneath the selected guest. The editable message expands to show its content; Copy invitation and Open email draft use the current edited text. Close returns focus to the guest’s invitation control. No email is sent automatically.
 
 Settings contains connection status and the renewal date. Users shows a renewal reminder only within 30 days of expiry (or after expiry). Browser checks verified the single-panel behavior, edited draft link and live Settings details.
+
+## Bulk request approvals
+
+In Requests, filter to the requester and Pending, then Select All (only matching pending requests) or use individual checkboxes. Approve selected stages the decisions without saving. Available single-copy books are assigned automatically; books with multiple inventory copies require an explicit choice even when only one remains available. Reserved/transferred copies are disabled.
+
+One optional message applies to every saved selection and remains in each book’s requester-visible history. Save ready approvals saves only assigned selections; unassigned or failed requests remain selected with the message retained. Each save uses the existing version and reservation checks; this is a sequence of individually committed approvals, so a conflict does not undo other successful approvals. Clear All abandons staged selections. No live requests were approved during implementation.
