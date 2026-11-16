@@ -91,3 +91,54 @@ Saved task decisions and answers remain intact. No catalog, purchase or saved-va
 record is modified by classification. The private manifest contains the per-book
 classification and saved-range basis; only aggregate results and reusable logic
 are published. Full verification: 882 tests pass.
+
+## Follow-up on the remaining 733 research records
+
+All 733 records were reviewed against their retained detailed eBay evidence,
+source-page notes, purchase/inventory identities and 1,349 distinct AbeBooks
+listing references. Of those listing pages, 87 had retained same-day receipts;
+1,262 additional distinct pages were inspected. Incomplete page loads were
+rechecked, and final coverage contains no blocked or missing page metadata.
+
+| Outcome | Records |
+| --- | ---: |
+| Additional supported conditional proposals | 81 |
+| Too few comparable used offers | 357 |
+| Comparable prices remain too widely spread | 64 |
+| No eligible used offers in the retained evidence | 153 |
+| Source publication profile needs better-matched listing evidence | 78 |
+| Total reviewed | 733 |
+
+The 81 books yield 90 conditional scenarios: 88 use both marketplaces, one uses
+eBay alone and one uses AbeBooks alone. No seller condition is assigned to the
+owned copy. The existing minimum of three distinct comparable offers and strict
+less-than-threefold spread are unchanged. Seller-native labels stay in separate
+groups and are not translated into eBay grades. Forty-one unavailable listing
+references are context only; mismatched ISBNs, unsuitable special items, missing
+binding and unverified edition matches cannot support a proposal. Exclusion
+reasons can overlap, so they are not book totals.
+
+The three missing older pilot review files were reconciled from retained current
+records: two have matching purchase/scanned ISBNs, and the third has preserved
+facsimile publication notes. The previously photo-resolved primary ISBN is used
+only as a research target, without changing the catalog identifier or claiming
+the exterior binding is verified. Existing publication notes are retained for
+older books without ISBNs; these do not become generic requests to inspect the
+same pages again. No new owner question was justified by this pass.
+
+Action Items now has 1,246 proposal records and 652 assistant research records.
+The 652 each show their actual evidence gap and next step, rather than an
+unverified-search-result reminder. The owner default stays at 63 physical checks;
+57 assistant dependencies, 610 retained-estimate references and one photo-resolved
+reference are unchanged. All rows outside the 733-case scope and all owner
+questions are preserved exactly in the private review input. The 652 unresolved
+records require additional or better-matched market evidence; they have been
+reviewed, not assigned to the owner.
+
+Private reproducible inputs, page receipts, review results and validation live
+under `output/remaining_market_research_20261116/`. Independent validation traces
+every one of the 90 supported scenario bounds to distinct eligible source offers,
+checks edition/grade/binding/currency separation, verifies all input fingerprints,
+and reconciles the complete scope and workspace classifications. Only reusable
+logic, synthetic tests and these aggregate findings are published to GitHub.
+Full-suite verification: 892 tests pass. Saved values remain unchanged.

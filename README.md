@@ -901,3 +901,11 @@ this does not freshly validate their value. Physical dependencies point to exist
 owner checks. A current completed check with a recorded answer returns its dependent
 research to the assistant queue; no estimate is applied. Changed saved baselines
 invalidate retained classifications and require reassessment.
+
+The remaining-research follow-up reviews each queued record using retained detail
+evidence and explicit listing-page receipts. Its private results distinguish
+insufficient offer counts, excessive spread, absent eligible used offers and
+edition-profile matching work. Supported proposals remain conditional. Missing
+ISBNs already documented in page notes do not automatically create owner checks.
+See [the aggregate market review](docs/MARKET_FLAG_ADJUDICATION_20261116.md) for
+coverage and outcomes; private source inputs and prices are excluded from Git.

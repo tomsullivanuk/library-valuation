@@ -125,9 +125,10 @@ def apply_review(data_dir, model, legacy, decisions=None):
                             next_step='Answer the linked check under Needs your input; then the assistant can reassess the market evidence.',
                             blocking_check_ids=[t['id'] for t in pending_tasks])
             else:
-                task.update(category='Estimate research',action='Further market research is tracked with the assistant.',
-                        reason='The reviewed evidence does not yet support a replacement range.' if applicable else 'This book is new or its identity changed since the research review; its evidence needs reassessment.',
+                task.update(category='Estimate research',action='Existing records and listings have been reviewed; further market evidence is needed.' if applicable and review.get('research_outcome') else 'Further market research is tracked with the assistant.',
+                        reason=review.get('research_reason','The reviewed evidence does not yet support a replacement range.') if applicable else 'This book is new or its identity changed since the research review; its evidence needs reassessment.',
                         next_step=review.get('research_next_step','Check edition-matched offers, binding, seller condition and source-price differences.') if applicable else 'Reconcile the current edition with the research evidence before proposing a range.')
+        if applicable and review.get('research_evidence'):task['evidence']=review['research_evidence']
         task['fingerprint']=fingerprint(task);tasks.append(task)
     return tasks,dict(loaded=True,review_id=doc['review_id'],reviewed_on=doc['reviewed_on'],
                       changed_or_new_books=len(changed),message='Research outcomes are installed. Saved book values are unchanged.')
