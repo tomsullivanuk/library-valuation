@@ -65,3 +65,7 @@ In Requests, filter to the requester and Pending, then Select All (only matching
 One optional message applies to every saved selection and remains in each book’s requester-visible history. Save ready approvals saves only assigned selections; unassigned or failed requests remain selected with the message retained. Each save uses the existing version and reservation checks; this is a sequence of individually committed approvals, so a conflict does not undo other successful approvals. Clear All abandons staged selections. No live requests were approved during implementation.
 
 Decline selected stages the same pending selections for decline with a shared optional message. Copy fields are disabled and no assignment is required. Save declines is the only step that persists those decisions. Switching between Approve selected and Decline selected preserves the message; Clear All cancels the staged selection. Isolated browser verification saved three synthetic declines without copy assignments; production requests were not changed.
+
+## Storage picking list
+
+Requests → choose Requested by → Picking list produces a read-only list of all saved approved requests for that person, independent of status/search filters. It groups by assigned-copy location in numeric order, then title, and includes author, assigned copy, pull checkboxes, timestamp and totals. Print / Save PDF uses the browser print dialog. Checkboxes are temporary and do not record transfer or change inventory. With Everyone selected, each book also shows its requester.
