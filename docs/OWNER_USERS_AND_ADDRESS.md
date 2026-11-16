@@ -51,3 +51,9 @@ The final laptop suite passes 878 tests. The affected administration/service tes
 Tests cover guest/owner route isolation, stale edits, owner lockout prevention, individual-address validation, concurrent initialization, provider failure and retry, rejection of policy drift, retained native policy settings, immediate local disable, protected-origin redirects, archive/restore behavior, selective cleanup, concurrent/new request preservation and validated backup recovery. Browser checks exercised synthetic guest creation and invitation instructions, then verified the real owner Users page, display-name save, connected status and request-history cleanup.
 
 The live connection was verified with a provider GET and matching memberships. An optional same-payload policy PUT test was blocked by automatic approval review and was not performed. Real add/disable operations were not exercised against production identities; those flows were tested with isolated synthetic users and a simulated provider. The application's existing guest identities and protected owner remained active throughout.
+
+## Invitation layout and connection settings
+
+Prepare invitation opens one full-width panel beneath the selected guest. The editable message expands to show its content; Copy invitation and Open email draft use the current edited text. Close returns focus to the guest’s invitation control. No email is sent automatically.
+
+Settings contains connection status and the renewal date. Users shows a renewal reminder only within 30 days of expiry (or after expiry). Browser checks verified the single-panel behavior, edited draft link and live Settings details.
