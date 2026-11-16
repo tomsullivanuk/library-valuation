@@ -102,3 +102,33 @@ def test_family_search_requires_identity_origin_and_is_read_only(server):
  assert all(k not in raw.decode() for k in ['purchase_price','sale_amount','location','private_notes'])
  assert json.loads(server('/api/me')[1])['draft']['version']==0
  assert server('/api/search',data={'query':'x'*501})[0]==400
+
+def test_guest_cannot_access_user_administration(server):
+ for path in ['/owner/api/users','/owner/users.js']:
+  assert server(path)[0]==403
+ assert server('/owner/api/users',data={'action':'add','email':'new@example.org'})[0]==403
+ assert server('/api/users')[0]==404
+
+
+def test_disabled_guest_session_is_rejected_immediately(server):
+ from valuation import family_users
+ config=server.app.config;x=next(u for u in family_users.state(config)['users'] if u['email']=='guest@example.org')
+ class Provider:
+  def sync(self,*args):raise family_users.SyncFailed('offline')
+ family_users.update(config,'owner@example.org',dict(action='disable',email=x['email'],version=x['version']),Provider())
+ assert server('/api/me')[0]==403
+ assert server('/api/list',data={'version':0,'books':[]})[0]==403
+
+
+def test_legacy_origin_redirect_is_fixed_and_rejects_old_writes(server):
+ server.app.config['redirect_hosts']=['old.example.org']
+ # Direct handler simulation avoids a real external redirect.
+ import http.client
+ # Use the already running fixture's call to test unknown Host denial and
+ # explicit redirects through a second bound loopback server.
+ from http.server import ThreadingHTTPServer
+ srv=ThreadingHTTPServer(('127.0.0.1',0),server.app.handler());threading.Thread(target=srv.serve_forever,daemon=True).start()
+ try:
+  c=http.client.HTTPConnection('127.0.0.1',srv.server_port);c.request('GET','/owner/#users',headers={'Host':'old.example.org'});res=c.getresponse();assert res.status==302 and res.getheader('Location')=='https://family.example/owner/#users';res.read();c.close()
+  c=http.client.HTTPConnection('127.0.0.1',srv.server_port);c.request('POST','/api/list',body='{}',headers={'Host':'old.example.org'});res=c.getresponse();assert res.status==409;res.read();c.close()
+ finally:srv.shutdown();srv.server_close()

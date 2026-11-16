@@ -59,8 +59,8 @@ def live_facts(model,data_dir):
     return result
 
 
-def inbox(db,facts):
-    schema(db);rows=requests.submissions(db);people={}
+def inbox(db,facts,include_archived=False):
+    schema(db);rows=requests.submissions(db,include_archived=include_archived);people={}
     for row in rows:
         for b in row['payload']['books']:
             d=decision(db,row['id'],b['reference'])
@@ -77,6 +77,7 @@ def inbox(db,facts):
                 history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'],transfer=json.loads(e['payload'])['after'].get('transfer'),correction_reason=json.loads(e['payload']).get('correction_reason'),message=json.loads(e['payload']).get('message',''))
                     for e in db.execute('SELECT created,actor,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(row['id'],ref))]))
         row['items']=details
+        row['archived']=bool(db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_archives'").fetchone() and db.execute('SELECT 1 FROM request_archives WHERE submission=?',(row['id'],)).fetchone())
     return rows
 
 

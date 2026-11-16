@@ -419,6 +419,13 @@ def make_server(store, port=8765):
             if not self.local_request():
                 return self.send(403, b'{"error":"Local workspace requests only"}')
             path = unquote(urlsplit(self.path).path)
+            if path == "/users.js":
+                return self.send(200, Path(__file__).with_name("owner_users.js").read_bytes(), "text/javascript")
+            if path == "/api/users":
+                from valuation import family_users, family_owner
+                config = family_owner.settings()
+                if not config: return self.send(503,b'{"error":"Family access is not configured"}')
+                return self.send(200,json.dumps(family_users.state(config)).encode())
             if path == "/requests.js":
                 return self.send(200, Path(__file__).with_name("owner_requests.js").read_bytes(), "text/javascript")
             if path == "/api/family-requests":
@@ -429,7 +436,7 @@ def make_server(store, port=8765):
                     if not config: return self.send(200,b'[]')
                     facts=family.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
                     with closing(family.requests.connect(config['database'])) as db:
-                        return self.send(200,json.dumps(family.inbox(db,facts)).encode())
+                        return self.send(200,json.dumps(family.inbox(db,facts,include_archived="archived=1" in self.path)).encode())
                 except Exception:
                     return self.send(503,b'{"error":"Request inbox unavailable; please retry"}')
             if path == "/api/state":
@@ -452,6 +459,17 @@ def make_server(store, port=8765):
         def do_POST(self):
             if not self.local_request() or self.headers.get("X-Workspace-Token") != store.token:
                 return self.send(403, b'{"error":"Reload the local workspace before saving"}')
+            if self.path == "/api/users" and self.headers.get("Content-Type") == "application/json":
+                from valuation import family_users, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 16384:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    result=family_users.update(config,config['owner_email'],body)
+                    return self.send(200,json.dumps(result).encode())
+                except family_users.ledger.Conflict as e:return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e:return self.send(400,json.dumps(dict(error=str(e))).encode())
             if self.path == "/api/search" and self.headers.get("Content-Type") == "application/json":
                 try:
                     from valuation import family_owner as family
@@ -467,6 +485,18 @@ def make_server(store, port=8765):
                     return self.send(200,json.dumps(result).encode())
                 except (ValueError,KeyError,TypeError):return self.send(400,b'{"error":"Invalid search request"}')
                 except Exception:return self.send(503,b'{"error":"Enhanced search unavailable"}')
+            if self.path == "/api/request-archive" and self.headers.get("Content-Type") == "application/json":
+                from valuation import request_maintenance, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 16384:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    with family_owner.requests.connect(config['database']) as db:
+                        result=request_maintenance.archive(db,config['owner_email'],body['submission'],body['archived'])
+                    return self.send(200,json.dumps(result).encode())
+                except family_owner.requests.Conflict as e:return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e:return self.send(400,json.dumps(dict(error=str(e))).encode())
             if self.path == "/api/family-requests" and self.headers.get("Content-Type") == "application/json":
                 try:
                     from valuation import family_owner as family

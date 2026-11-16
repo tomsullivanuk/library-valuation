@@ -33,7 +33,8 @@ class Identity:
         key=self.keys.get_signing_key_from_jwt(token)
         c=jwt.decode(token,key.key,algorithms=['RS256'],audience=self.config['audience'],issuer=self.config['issuer'],options={'require':['exp','iat','sub','email','aud','iss']})
         email=c['email'].lower()
-        if email not in self.config['allowed_emails']:raise ValueError('Not authorized')
+        from valuation.family_users import allowed
+        if not (allowed(self.config,email) if self.config.get('database') else email in self.config['allowed_emails']):raise ValueError('Not authorized')
         return email
 
 class App:
@@ -99,13 +100,18 @@ class App:
                 self.send_response(status);self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             def handle_request(self,write=False):
                 try:
-                    if self.headers.get('Host')!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
+                    hostname=self.headers.get('Host')
+                    if hostname in app.config.get('redirect_hosts',[]):
+                        if write:return self.reply(409,{'error':'Open the new library address before saving'})
+                        self.send_response(302);self.send_header('Location',app.config['origin']+self.path);self.send_header('Cache-Control','no-store');self.send_header('Content-Length','0');self.end_headers();return
+                    if hostname!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
                     try:email=app.identity(self.headers.get('Cf-Access-Jwt-Assertion',''))
                     except jwt.PyJWKClientConnectionError:
                         return self.reply(503,'<!doctype html><html lang="en"><title>Sign-in temporarily unavailable</title><h1>Sign-in temporarily unavailable</h1><p>We could not verify your sign-in right now. Please try again shortly.</p><a href="/">Try again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(503,{'error':'Sign-in verification temporarily unavailable. Please retry.'})
                     except Exception:
                         return self.reply(403,'<!doctype html><html lang="en"><title>Sign in required</title><h1>Sign in required</h1><p>Please sign in using one of the invited email addresses.</p><a href="/cdn-cgi/access/logout">Sign in again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(403,{'error':'Sign in with an invited email address.'})
-                    if email not in app.config['allowed_emails']:return self.reply(403,{'error':'Not authorized'})
+                    from valuation.family_users import allowed
+                    if not allowed(app.config,email,touch=True):return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
                     if write:
                         if self.headers.get('Origin')!=app.config['origin'] or self.headers.get('Content-Type')!='application/json' or (not path.startswith('/owner/') and self.headers.get('X-Family-Request')!='1'):return self.reply(403,{'error':'Invalid request origin'})
@@ -122,7 +128,7 @@ class App:
                             if path=='/owner/search-pilot' and not write:
                                 return self.reply(200,'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private search preview</title><style>body{font:17px system-ui;color:#25372e;max-width:1200px;margin:2rem auto;padding:1rem}h1,h2,h3{color:#245d49}input,button{font:inherit;padding:.6rem}input{width:70%}.columns{display:grid;grid-template-columns:1fr 1fr;gap:2rem}article{border-bottom:1px solid #ccc;padding:1rem 0}small{color:#606c65}@media(max-width:700px){.columns{display:block}}</style><div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap"><a href="/owner/">Owner workspace</a>'+owner_badge(email)+'</div><h1>Private search preview</h1><p>Compare ranked keywords with local AI. Only family-visible metadata and descriptions are indexed. Related-topic suggestions may be imperfect.</p><a href="/owner/search-pilot/report">42-query comparison report</a><form><label for="query">Find books</label><p><input id="query" maxlength="500" required placeholder="Try a title, ISBN or topic"><button>Compare</button></p></form><p id="notice" role="status"></p><div class="columns"><section id="keyword"></section><section id="hybrid"></section></div><script src="/owner/search-pilot.js" defer></script></html>','text/html')
                             return self.reply(404,{'error':'Not found'})
-                        local=path[len('/owner'):] or '/'
+                        local=(path[len('/owner'):] or '/')+('?' + urlsplit(self.path).query if urlsplit(self.path).query else '')
                         headers={'Origin':'http://127.0.0.1:8765'}
                         payload=None
                         if write:
@@ -133,7 +139,7 @@ class App:
                         except HTTPError as exc:r=exc
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
-                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"')
+                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):
                                 text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Library search combines keywords and local AI.</p></header>',1)

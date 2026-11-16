@@ -835,6 +835,7 @@ _DOCUMENT = r"""<!doctype html>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
     <a href="#actions" data-nav="actions">Action Items</a>
     <a href="#requests" data-nav="requests">Requests</a>
+    <a href="#users" data-nav="users">Users</a>
     <a href="#reports" data-nav="reports">Reports</a>
     <a href="#settings" data-nav="settings">Settings</a>
   </nav>
@@ -846,6 +847,7 @@ _DOCUMENT = r"""<!doctype html>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
   <script defer src="/requests.js"></script>
+  <script defer src="/users.js"></script>
   <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
@@ -1982,6 +1984,7 @@ _DOCUMENT = r"""<!doctype html>
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
       else if (route === "recommendations" || route === "actions") renderActions(id);
       else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
+      else if (route === "users") { main.replaceChildren(); window.dispatchEvent(new Event("owner-users")); }
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();

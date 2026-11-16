@@ -44,6 +44,8 @@ def submit(db,email,version,key,catalog,snapshot):
         db.execute('INSERT OR REPLACE INTO drafts VALUES(?,?,?)',(email,version+1,json.dumps(dict(books=[],message=''))))
     return dict(id=id,created=created,payload=payload)
 
-def submissions(db,email=None):
-    rows=db.execute('SELECT id,email,created,payload FROM submissions '+('WHERE email=? ' if email else '')+'ORDER BY created DESC', (email,) if email else ()).fetchall()
+def submissions(db,email=None,include_archived=False):
+    has_archive=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_archives'").fetchone()
+    where='WHERE email=? ' if email else ('WHERE id NOT IN (SELECT submission FROM request_archives) ' if has_archive and not include_archived else '')
+    rows=db.execute('SELECT id,email,created,payload FROM submissions '+where+'ORDER BY created DESC', (email,) if email else ()).fetchall()
     return [dict(r)|dict(payload=json.loads(r['payload'])) for r in rows]

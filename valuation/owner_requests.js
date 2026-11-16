@@ -2,6 +2,7 @@
 (()=>{
 const base=location.pathname.startsWith('/owner')?'/owner':'';
 const main=document.querySelector('#main-content');
+let includeArchived=false;
 let status='pending',person='',query='',generation=0,sortKey='submitted',sortDirection=-1,editing=false,lastRows='',polling=false;
 function text(tag,value,parent){const x=document.createElement(tag);x.textContent=value;parent.append(x);return x}
 async function request(path,data){const headers={'Content-Type':'application/json'};if(data){const state=await (await fetch(base+'/api/state',{cache:'no-store'})).json();headers['X-Workspace-Token']=state.token}const r=await fetch(base+path,{method:data?'POST':'GET',headers,body:data?JSON.stringify(data):undefined,cache:'no-store'});const body=await r.json();if(!r.ok)throw Error(body.error||'Unable to save decision');return body}
@@ -16,12 +17,13 @@ const style=text('style',`#main-content .request-heading{font-size:1.8rem;margin
 text('h1','Book requests',main).className='request-heading';
 text('p','Choose an action, assign a copy when approving, and save your decision with an optional message.',main);
 try{
-const rows=await request('/api/family-requests');lastRows=JSON.stringify(rows);if(location.hash!=='#requests'||current!==generation)return;
+const rows=await request('/api/family-requests'+(includeArchived?'?archived=1':''));lastRows=JSON.stringify(rows);if(location.hash!=='#requests'||current!==generation)return;
 const tools=text('div','',main);tools.className='request-tools';
 const stateLabel=text('label','Status',tools),states=text('select','',stateLabel);
 for(const s of ['pending','approved','transferred','declined','all']){const o=text('option',s[0].toUpperCase()+s.slice(1),states);o.value=s}states.value=status;
 const whoLabel=text('label','Requested by',tools),who=text('select','',whoLabel);text('option','Everyone',who).value='';for(const email of [...new Set(rows.map(r=>r.email))].sort())text('option',email,who).value=email;who.value=person;
 const searchLabel=text('label','Search books or messages',tools),search=text('input','',searchLabel);search.type='search';search.value=query;search.placeholder='Title, author or message';
+button(includeArchived?'Hide archived':'Show archived',()=>{includeArchived=!includeArchived;return render()},tools);
 button('Refresh',render,tools);
 const count=text('p','',main);count.setAttribute('aria-live','polite');const wrap=text('div','',main);wrap.className='request-scroll';
 function draw(){
@@ -30,6 +32,7 @@ count.textContent=entries.length+' requested '+(entries.length===1?'book':'books
 const sortValue=e=>({submitted:e.row.created,person:e.row.email,book:e.item.title,estimate:e.item.value,location:e.item.location,status:displayState(e.item.decision.state)})[sortKey];
 entries.sort((a,b)=>{let av=sortValue(a),bv=sortValue(b);if(sortKey==='estimate'){const n=v=>{const m=String(v).match(/(?:\$|USD\s*)([\d,]+(?:\.\d+)?)/);return m?Number(m[1].replaceAll(',','')):null};av=n(av);bv=n(bv);if(av===null||bv===null)return av===bv?0:av===null?1:-1;return sortDirection*(av-bv)}return sortDirection*String(av||'').localeCompare(String(bv||''),undefined,{numeric:true,sensitivity:'base'})||a.row.id.localeCompare(b.row.id)||a.item.reference.localeCompare(b.item.reference)});
 const table=text('table','',wrap);table.className='request-table';const head=text('tr','',text('thead','',table));for(const [label,key] of [['Submitted','submitted'],['Requested by','person'],['Book','book'],['Estimate','estimate'],['Location','location'],['Status','status'],['Action',''],['Assigned copy',''],['','']]){const th=text('th','',head);th.scope='col';if(key){th.setAttribute('aria-sort',key===sortKey?(sortDirection===1?'ascending':'descending'):'none');button(label+(sortKey===key?(sortDirection===1?' ↑':' ↓'):''),()=>{if(editing)return;sortDirection=sortKey===key?-sortDirection:key==='submitted'?-1:1;sortKey=key;draw()},th)}else th.textContent=label}const body=text('tbody','',table);
+const archiveShown=new Set();
 for(const {row,item} of entries){
 const tr=text('tr','',body);text('td',date(row.created),tr);text('td',row.email,tr);
 const book=text('td','',tr);book.className='request-book';const a=text('a',item.title,book);a.href='#book/'+encodeURIComponent(item.catalog_item_id||'');text('small',item.author,book);if(item.other_requesters.length)text('small','Also requested by '+item.other_requesters.join(', '),book).className='request-overlap';
@@ -38,6 +41,7 @@ const actions=text('td','',tr);actions.className='request-actions';
 const copy=text('td','',tr),select=text('select','',copy);select.setAttribute('aria-label','Assigned copy for '+item.title);text('option','Choose copy',select).value='';
 for(const c of item.copies){const opt=text('option',c.label+(c.assignment?' · '+displayState(c.assignment.state):''),select);opt.value=c.id;opt.disabled=!!c.assignment&&!(c.assignment.submission===row.id&&c.assignment.reference===item.reference);if(item.decision.slot===c.id)opt.selected=true}
 const historyCell=text('td','',tr);
+if(!archiveShown.has(row.id)&&row.items.every(x=>['declined','transferred','collected'].includes(x.decision.state))){archiveShown.add(row.id);button(row.archived?'Restore submission':'Archive submission',async()=>{await request('/api/request-archive',{submission:row.id,archived:!row.archived});await render()},historyCell)}
 const change=async(state,extra={})=>{if(state==='transferred'&&!confirm('Confirm that this assigned copy has permanently left your library as a '+extra.transfer_kind+'?'))return;await request('/api/family-requests',{submission:row.id,reference:item.reference,state,version:item.decision.version,slot:select.value,...extra});editing=false;if(state==='transferred'||extra.correct_transfer){location.reload();return}await render()};
 if(['collected','transferred'].includes(item.decision.state)){select.disabled=true;text('small','Transferred'+(item.decision.transfer?' · '+item.decision.transfer.kind:''),actions);button('Correct transfer',showCorrection,actions)}else{
 const menu=text('select','',actions);menu.setAttribute('aria-label','Action for '+item.title);text('option','Choose action',menu).value='';
@@ -90,7 +94,7 @@ if(item.history&&item.history.length){for(const event of item.history)text('p',d
 states.onchange=()=>{if(editing){states.value=status;return}status=states.value;draw()};who.onchange=()=>{if(editing){who.value=person;return}person=who.value;draw()};search.oninput=()=>{if(editing){search.value=query;return}query=search.value;draw()};draw();
 }catch(e){text('p','Unable to load requests: '+e.message,main).setAttribute('role','alert')}
 }
-async function refreshRequests(){if(location.hash!=='#requests'||editing||polling||document.hidden||(main.contains(document.activeElement)&&document.activeElement.matches('input,textarea,select')))return;polling=true;try{const rows=await request('/api/family-requests');if(!editing&&JSON.stringify(rows)!==lastRows)await render()}catch(e){}finally{polling=false}}
+async function refreshRequests(){if(location.hash!=='#requests'||editing||polling||document.hidden||(main.contains(document.activeElement)&&document.activeElement.matches('input,textarea,select')))return;polling=true;try{const rows=await request('/api/family-requests'+(includeArchived?'?archived=1':''));if(!editing&&JSON.stringify(rows)!==lastRows)await render()}catch(e){}finally{polling=false}}
 setInterval(refreshRequests,15000);window.addEventListener('focus',refreshRequests);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshRequests()});
 window.addEventListener('hashchange',()=>{if(location.hash!=='#requests')editing=false});
 window.addEventListener('owner-requests',render);if(location.hash==='#requests')render();
