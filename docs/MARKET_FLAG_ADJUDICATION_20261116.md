@@ -172,3 +172,23 @@ their presentation changes. No findings, purchase history, saved task decisions
 or saved values are removed or rewritten. Verification includes all 893 Python
 tests, JavaScript compilation and category/recommendation behavior checks, followed
 by live owner-view and book-history inspection.
+
+## Plain-language book research summaries
+
+An optional, identity-bound authored summary now separates **What we know**,
+**What remains uncertain**, and **What happens next** in a book's Research history.
+It includes observation dates and expandable source references, distinguishes
+new-copy asking prices from used-copy evidence and completed sales, and states
+whether owner action or further searching is actually scheduled. The first
+private summary clarifies one existing no-estimate case using retained receipts;
+no additional marketplace search is performed or implied.
+
+The authored note is preserved in the private review input and its reproducible
+private assembler. Book-level text, prices and sources are excluded from GitHub.
+Its identity guard prevents application to another edition, and source links are
+validated before rendering as text. No owner task is created, no physical grade
+is inferred, and no saved value is written. Installation changes only that
+private review input; all 13 other private CSV/JSON data files remain unchanged.
+All 894 tests pass, including identity-bound summary projection, unsafe-link
+rejection and saved-value preservation. Live inspection verifies the full finding
+and its explicit no-action/no-scheduled-search conclusion.

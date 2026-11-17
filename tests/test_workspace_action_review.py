@@ -129,3 +129,19 @@ def test_physical_dependency_unblocks_only_with_current_completed_answer(tmp_pat
     assert not (tmp_path/'data'/'reviewed_estimates.json').exists()
     m['owner_checks'][0]['question']='Read a different identifier';path.write_text(json.dumps(m))
     assert research()['category']=='Awaiting physical check'
+
+
+def test_authored_history_summary_is_identity_bound_and_does_not_apply_prices(tmp_path):
+    model,m,path=setup(tmp_path,False)
+    summary=dict(reviewed_on='2026-11-16',what_we_know=['Recorded identifiers agree.'],
+        what_is_uncertain=['Used value is not established.'],next_step='No owner action or automatic search.',
+        sources=[dict(label='Retained listing',url='https://example.test/listing')])
+    m['books'][model.books[0].catalog_item_id]['history_summary']=summary;path.write_text(json.dumps(m))
+    before=path.read_bytes();store=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model)
+    task=next(a for a in store.snapshot()['actions'] if a['id'].startswith('estimate-research:'))
+    assert task['history_summary']==summary and store.model.books==model.books and path.read_bytes()==before
+    changed=replace(model,books=(replace(model.books[0],title='Another edition'),))
+    state=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=changed).snapshot()
+    assert not any('history_summary' in a for a in state['actions'])
+    summary['sources'][0]['url']='javascript:bad';path.write_text(json.dumps(m))
+    with pytest.raises(ValueError,match='Unsafe'):WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model)

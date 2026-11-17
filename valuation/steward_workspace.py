@@ -1292,10 +1292,24 @@ _DOCUMENT = r"""<!doctype html>
     }
     function taskCard(task, history = false, selectedId = "") {
         const card = node("article", {class:"panel",id:"research-"+task.id});
-        append(card, node(history ? "h3" : "h2", {}, history ? researchLabel(task) : task.title), node("p", {class:"muted"}, history ? (task.location ? `Location ${displayLocation(task.location)}` : "Recorded research") : `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, task.action));
-        if (task.reason) append(card, definitionList([["Why", task.reason]]));
-        if (history && researchRecommendation(task)) append(card,definitionList([["Practical meaning",researchRecommendation(task)]]));
-        else if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+        append(card, node(history ? "h3" : "h2", {}, history ? researchLabel(task) : task.title), node("p", {class:"muted"}, history ? (task.location ? `Location ${displayLocation(task.location)}` : "Recorded research") : `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, history && task.history_summary ? "Review complete for the retained evidence. Used-copy value not established." : task.action));
+        if (history && task.history_summary) {
+          const summary=task.history_summary;
+          append(card,definitionList([["Evidence reviewed",summary.reviewed_on]]));
+          for (const [label,items] of [["What we know",summary.what_we_know],["What remains uncertain",summary.what_is_uncertain]]) {
+            const list=node("ul");for (const item of items) append(list,node("li",{},item));
+            append(card,node("h4",{},label),list);
+          }
+          append(card,node("h4",{},"What happens next"),node("p",{},summary.next_step));
+          if (summary.sources?.length) {
+            const list=node("ul");for (const source of summary.sources) append(list,append(node("li"),node("a",{href:source.url,target:"_blank",rel:"noopener noreferrer"},source.label)));
+            append(card,detailSection("Listing references and observation dates",list));
+          }
+        } else {
+          if (task.reason) append(card, definitionList([["Why", task.reason]]));
+          if (history && researchRecommendation(task)) append(card,definitionList([["Practical meaning",researchRecommendation(task)]]));
+          else if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+        }
         if (history && task.reviewed_on && !task.proposals?.length) append(card,definitionList([["Research reviewed",task.reviewed_on]]));
         if (history && task.note) append(card,definitionList([["Your recorded note",task.note]]));
         if (task.search_links?.length) {

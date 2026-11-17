@@ -128,6 +128,17 @@ def apply_review(data_dir, model, legacy, decisions=None):
                 task.update(category='Estimate research',action='Existing records and listings have been reviewed; further market evidence is needed.' if applicable and review.get('research_outcome') else 'Further market research is tracked with the assistant.',
                         reason=review.get('research_reason','The reviewed evidence does not yet support a replacement range.') if applicable else 'This book is new or its identity changed since the research review; its evidence needs reassessment.',
                         next_step=review.get('research_next_step','Check edition-matched offers, binding, seller condition and source-price differences.') if applicable else 'Reconcile the current edition with the research evidence before proposing a range.')
+        if applicable and review.get('history_summary'):
+            summary=review['history_summary']
+            from datetime import date
+            date.fromisoformat(summary['reviewed_on'])
+            if not all(isinstance(summary[k],list) and all(isinstance(v,str) and v.strip() for v in summary[k]) for k in ('what_we_know','what_is_uncertain')) or not isinstance(summary.get('next_step'),str):
+                raise ValueError('Invalid book research summary')
+            for source in summary.get('sources',[]):
+                u=urlsplit(source['url'])
+                if u.scheme not in {'http','https'} or not u.hostname or u.username or u.password or not isinstance(source.get('label'),str):
+                    raise ValueError('Unsafe book research summary source')
+            task['history_summary']=summary
         if applicable and review.get('research_evidence'):task['evidence']=review['research_evidence']
         task['fingerprint']=fingerprint(task);tasks.append(task)
     return tasks,dict(loaded=True,review_id=doc['review_id'],reviewed_on=doc['reviewed_on'],
