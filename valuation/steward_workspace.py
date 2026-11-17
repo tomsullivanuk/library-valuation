@@ -1155,11 +1155,65 @@ _DOCUMENT = r"""<!doctype html>
       for (const h of DATA.holdings) if (completedInventory.holding_ids.includes(h.holding_id)) ids.add(h.latest_inventory_observation_id);
       return new Set(DATA.observations.filter(o => ids.has(o.inventory_observation_id) && o.title.trim()).map(o => o.title.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim())).size;
     }
+    let libraryRequests = new Map(), requestStatusLoaded = false, requestStatusBusy = false, requestStatusStamp = 0;
+    function requestLabel(entry) {
+      const state = entry.state === "approved" ? "Reserved for" : ["transferred", "collected"].includes(entry.state) ? "Transferred to" : "Requested by";
+      return `${state} ${entry.person}`;
+    }
+    function requestSummary(book) {
+      return [...new Set((libraryRequests.get(book.catalog_item_id)?.events || []).map(requestLabel))].join("; ");
+    }
+    async function refreshLibraryRequests() {
+      if (main.contains(document.activeElement) && document.activeElement.matches("input,textarea,select")) return;
+      if (!/^https?:$/.test(location.protocol) || requestStatusBusy || Date.now() - requestStatusStamp < 2000) return;
+      requestStatusBusy = true; requestStatusStamp = Date.now();
+      try {
+        const base = location.pathname.startsWith("/owner") ? "/owner" : "";
+        const responses = await Promise.allSettled([fetch(base + "/api/family-requests?archived=1", {cache:"no-store"}), fetch(base + "/api/users", {cache:"no-store"})]);
+        const response = responses[0].status === "fulfilled" ? responses[0].value : null;
+        if (!response?.ok) throw new Error("Request status unavailable");
+        const rows = await response.json(); let names = {};
+        if (responses[1].status === "fulfilled" && responses[1].value.ok) {
+          const users = await responses[1].value.json(); names = Object.fromEntries(users.users.map(u => [u.email, u.name || u.email]));
+        }
+        const next = new Map();
+        for (const row of rows) for (const item of row.items) {
+          const id = item.catalog_item_id; if (!id) continue;
+          if (!next.has(id)) next.set(id, {events:[], copies:item.copies});
+          const entry = next.get(id);
+          if (["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
+        }
+        const changed = !requestStatusLoaded || JSON.stringify([...next]) !== JSON.stringify([...libraryRequests]);
+        libraryRequests = next; requestStatusLoaded = true;
+        if (changed && ["library", "book", "home", "explore", "catalog-report"].includes(currentRoute()[0])) renderRoute();
+      } catch (error) { requestStatusLoaded = false; }
+      finally { requestStatusBusy = false; }
+    }
+    setInterval(() => { if (!document.hidden && ["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); }, 15000);
+    window.addEventListener("focus", () => { if (["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); });
+    function requestCopyDetails(book) {
+      const data = libraryRequests.get(book.catalog_item_id), section = node("section", {class:"panel"});
+      append(section, node("h3", {}, "Requests and assigned copies"));
+      if (!requestStatusLoaded) append(section, node("p", {}, "Live request status is unavailable. Check Requests before assigning a copy."));
+      else if (!data) append(section, node("p", {}, "No requests recorded for this book."));
+      else {
+        for (const event of data.events.filter(e => e.state === "pending")) append(section, node("p", {}, requestLabel(event) + " — awaiting your decision."));
+        for (const copy of data.copies) {
+          const assigned = data.events.find(e => e.slot === copy.id && e.state !== "pending");
+          const status = assigned ? requestLabel(assigned) : copy.assignment ? "Assigned — check Requests" : "Available";
+          append(section, node("p", {}, `${copy.label}: ${status}`));
+        }
+        const available = data.copies.filter(c => !c.assignment).length;
+        append(section, node("p", {}, `${available} ${available === 1 ? "copy available" : "copies available"}.`));
+      }
+      append(section, routeLink("View requests", "requests")); return section;
+    }
     function dispositionValue(value) { return ["gift", "donate"].includes(value) ? "gift_donate" : value; }
     function dispositionText(value) { return dispositionValue(value) === "gift_donate" ? "Gift / Donate" : human(value); }
     function dispositionLabel(book) {
       const value = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
-      return value && value !== "information_not_included" ? dispositionText(value) : "";
+      const saved = value && value !== "information_not_included" ? dispositionText(value) : "";
+      return [requestSummary(book), saved ? `Saved disposition: ${saved}` : ""].filter(Boolean).join(" · ");
     }
     function applyEstimateUpdates() {
       for (const [id, values] of Object.entries(workspaceState.estimate_updates || {})) {
@@ -1554,7 +1608,7 @@ _DOCUMENT = r"""<!doctype html>
         append(main, node("p", {class: "panel"}, book.description));
       }
       append(main, definitionList([["Location", book.location_summary], ["Copies", String(book.copy_count)], ["Acquired", book.purchase_summary], ["Resale market", book.resale_market_summary]]));
-      append(main, node("h2", {}, "Disposition"), dispositionEditor(book));
+      append(main, node("h2", {}, "Disposition"), requestCopyDetails(book), node("p", {class:"muted"}, "Saved disposition (your separate plan for this book)"), dispositionEditor(book));
       append(main, node("h2", {}, "Physical copies"));
       const currentHoldings = book.holding_ids.map(id => index.holdings.get(id)).filter(Boolean).filter(h => !completedInventory.completed || completedInventory.holding_ids.includes(h.holding_id));
       if (!currentHoldings.length) append(main, node("p", {}, "No current physical copy is linked."));
@@ -1975,6 +2029,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     function renderRoute() {
       const [route, id] = currentRoute();
+      if (["library", "book", "home", "explore", "catalog-report"].includes(route)) refreshLibraryRequests();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
           || (["recommendations", "recommendation"].includes(route) && link.dataset.nav === "actions")

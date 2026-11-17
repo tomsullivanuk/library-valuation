@@ -75,3 +75,9 @@ Requests → choose Requested by → Picking list produces a read-only list of a
 Filter Requests to Approved and the requester, select the books actually handed over, then Transfer selected. The existing assigned copies are retained and locked. Choose Gift or Sale, enter one optional shared message, and check the permanent-handover confirmation before Save transfers. Pulling books from storage alone is not a transfer. Bulk sales record no proceeds; use individual transfers when recording sale amounts.
 
 Each save uses existing version checks and transfer accounting. Successful transfers refresh the active library; partial failures remain selected and offer Refresh library after transfers. Library/purchase history and correction records are preserved; Libib still requires a separate update. Browser verification used synthetic requests only, including blocked save without handover confirmation and three confirmed transfers. Full suite: 878 passing.
+
+## Owner Library request status
+
+Library cards combine current Requested by / Reserved for / Transferred to summaries with any separate saved disposition. Book details list pending requesters, each inventory copy’s reservation or transfer, and the count of unassigned copies. Names come from the private user registry, falling back to email. Archived submission decisions remain visible in copy history. The display reads existing owner-only APIs and never rewrites dispositions, requests, inventory or purchase records.
+
+Status refreshes on entering Library/book views and periodically while visible, avoiding focused form inputs. Offline/unavailable status is explicitly noted in book details. Browser verification checked the real approved reservation read-only; synthetic checks verified one reserved and one available copy alongside an unchanged saved Keep disposition.
