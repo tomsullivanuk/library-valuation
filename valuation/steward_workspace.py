@@ -1320,6 +1320,7 @@ _DOCUMENT = r"""<!doctype html>
         if (task.evidence) append(card, detailSection("Recorded evidence", node("p", {}, task.evidence)));
         if (task.previous_answer) append(card,detailSection("Previous answer retained",node("p",{},task.previous_answer)));
         if (task.proposals?.length) {
+          if (history && task.history_summary?.comparison_note) append(card,node("p",{class:"notice"},task.history_summary.comparison_note));
           append(card,definitionList([["Current saved range",index.books.get(task.catalog_item_id)?.resale_market_summary || "Not recorded"],["Research reviewed",task.reviewed_on]]));
           for (const p of task.proposals) {
             append(card,definitionList([["Conditional range",`${p.currency} ${p.low}–${p.high} per copy`],["Binding",p.binding],["Seller condition",human(p.grade)],["Sources",p.sources.map(v => v === "abebooks" ? "AbeBooks" : "eBay").join(", ")]]));

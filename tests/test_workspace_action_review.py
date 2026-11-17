@@ -133,7 +133,7 @@ def test_physical_dependency_unblocks_only_with_current_completed_answer(tmp_pat
 
 def test_authored_history_summary_is_identity_bound_and_does_not_apply_prices(tmp_path):
     model,m,path=setup(tmp_path,False)
-    summary=dict(reviewed_on='2026-11-16',what_we_know=['Recorded identifiers agree.'],
+    summary=dict(reviewed_on='2026-11-16',headline='Earlier comparisons need review.',comparison_note='Retained historical comparison; not endorsed.',what_we_know=['Recorded identifiers agree.'],
         what_is_uncertain=['Used value is not established.'],next_step='No owner action or automatic search.',
         sources=[dict(label='Retained listing',url='https://example.test/listing')])
     m['books'][model.books[0].catalog_item_id]['history_summary']=summary;path.write_text(json.dumps(m))

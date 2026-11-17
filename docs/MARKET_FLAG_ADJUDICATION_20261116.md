@@ -222,3 +222,35 @@ confirms identical task identities, fingerprints, statuses, answers, book values
 dispositions, estimate history and revision. All 14 private CSV/JSON files remain
 byte-for-byte unchanged. All 904 tests pass; live inspection covers comparison
 ranges, provisional retention, physical dependencies and resolved findings.
+
+## Bounded review of a substantial edition discrepancy
+
+One book-specific follow-up rechecks the evidence behind a large saved/proposed
+range difference. The older title/author comparisons currently identify earlier
+editions, so the saved baseline is not verified for the owned edition. This is
+not proof that the earlier pages always carried the same metadata or that the
+book appreciated by the difference. Fresh ISBN-matched listings were also
+examined for shared retailer inventory, direct purchase versus rental pricing,
+and availability. A lower out-of-stock listing is retained only as context;
+repeated inventory is not described as independent corroboration.
+
+The completed-sale lookup reached a human-verification screen and was stopped;
+no bypass or claim of absent sales was made. The authored private history now
+explains why neither the old baseline nor the retained higher asking-price
+envelope is a settled resale value, what was verified, what remains missing,
+and why no new physical identification check is required. A bounded follow-up
+would need accessible completed-sale evidence or additional independent,
+available offers before an approved replacement range is justified. No further
+search is scheduled.
+
+An optional comparison note labels superseded or unapproved comparison ranges
+as retained provenance beneath the latest findings. The original scenario and
+all saved values remain intact. The book-specific text, prices, listing receipts
+and validation hashes stay private; only the generic display support, synthetic
+regression coverage and this aggregate explanation are committed.
+
+The guarded installation changes only one private book-history entry and the
+generic provenance label. Existing proposal bounds are retained, not overwritten
+or approved. All 13 other private CSV/JSON files and all 63 owner checks remain
+unchanged. Verification: 904 full-suite tests pass, followed by the focused
+authored-history regression check and live history inspection.
