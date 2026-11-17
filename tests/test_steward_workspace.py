@@ -978,6 +978,24 @@ def test_book_details_replace_legacy_priority_with_actionable_next_steps(tmp_pat
     detail=html.split('function renderBook(',1)[1].split('function renderHolding(',1)[0]
     assert '"Research priority"' not in detail
     assert 'research points' not in detail
-    assert 'book.usable_market_estimate ? "Action items" : "Next steps"' in detail
+    assert '"Physical book checks"' in detail and '"Research history"' in detail
     assert '["Why", task.reason]' in html and '["Next step", task.next_step]' in html
     assert 'task.search_links' in html
+
+
+def test_owner_only_presentation_keeps_all_research_findings_and_notes(tmp_path):
+    model=model_for(tmp_path,[catalog_row()])
+    categories=['Book checks','Resolved from records','Retain current estimate',
+                'Proposed estimates','Estimate research','Awaiting physical check']
+    tasks=[dict(id=f'test:{i}',catalog_item_id=model.books[0].catalog_item_id,
+        category=category,title='Synthetic book',note='Preserved answer <checked>',
+        evidence='Existing edition evidence',status='complete' if i==1 else 'open')
+        for i,category in enumerate(categories)]
+    before={str(p):p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    html=render_steward_workspace(model,action_items=tasks).decode()
+    payload=re.search(r'<script id="action-data" type="application/json">(.*?)</script>',html,re.S)
+    assert json.loads(payload[1])==tasks
+    assert before=={str(p):p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    assert 'action-category' not in html
+    assert 'tasks.filter(task => !needsOwnerInput(task))' in html
+    assert 'renderBook(selectedTask.catalog_item_id)' in html

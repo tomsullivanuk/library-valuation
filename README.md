@@ -850,12 +850,11 @@ Run `.venv/bin/python -m valuation.workspace_service` and open
 [the local Library](http://127.0.0.1:8765). Add `--background` to keep the service running independently of the launcher.
 Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
-views. Action Items defaults to **Needs your input**, showing open physical book
-checks. **Research queue — assistant**, **Proposed estimates**, and
-**Resolved from records** are separate queues. **Awaiting physical check** tracks
-assistant dependencies on existing owner checks; **Retain current estimate** is a
-reference list of provisionally retained usable ranges, not active research. It saves Complete, Defer, Dismiss,
-Reopen and answers/notes. Select a disposition in book
+views. Action Items shows only physical-book checks that need your input, with
+Open, Deferred, Complete and Dismissed views. The Queue pulldown is removed.
+Research findings, conditional comparisons, retained-estimate references, resolved
+questions and assistant dependencies appear in each book's **Research history**.
+Answers and Complete, Defer, Dismiss and Reopen decisions remain saved. Select a disposition in book
 details and press **Save**. Generated HTML remains a read-only fallback.
 
 Saved decisions remain in the local data repositories across reloads and workspace
@@ -868,14 +867,14 @@ The service runs in the background, so the launcher window can be closed. If the
 service is already running, the launcher reuses it. Reopen it after restarting the
 computer; saved decisions remain in place.
 
-The assistant research queue includes concrete next steps and search links for
-books whose reviewed evidence does not yet support a replacement range. Existing book checks remain
+Each book’s Research history includes concrete evidence gaps and research links
+where the reviewed evidence does not yet support a replacement range. Existing book checks remain
 the next step where an edition/binding question blocks research. Generic research
 scores are retained in the underlying assessment records but removed from book
 details. Save findings in the task's answer/note; completing it records progress
 without silently changing the catalog or estimate.
 
-For optional individual investigation from a research or proposed-estimate task,
+For optional individual investigation in a book’s Research history,
 expand **Optional individual investigation**, enter findings in **Answer or note**, then expand
 **Review and save a revised estimate**, and enter the per-copy low/high range,
 currency, research date and source links. **Review estimate** previews the previous

@@ -142,3 +142,33 @@ checks edition/grade/binding/currency separation, verifies all input fingerprint
 and reconciles the complete scope and workspace classifications. Only reusable
 logic, synthetic tests and these aggregate findings are published to GitHub.
 Full-suite verification: 892 tests pass. Saved values remain unchanged.
+
+## Owner-only Action Items revision
+
+The owner walkthrough established that references and assistant work are not
+owner action items. The Queue pulldown is removed, including Resolved from
+records, Retain current estimate, Proposed estimates, Research queue — assistant,
+and Awaiting physical check — assistant. Action Items shows physical-book checks
+only, retaining its status filter and existing Complete, Defer, Dismiss and
+Reopen controls. The 63 owner checks and their underlying records are unchanged.
+
+Each book now directly displays **Research history**, containing its conditional
+ranges, sources, recorded evidence, retained-estimate reasoning, resolved findings,
+research gaps and links to physical dependencies. Previous answers and saved notes
+remain accessible. Legacy research-task URLs open the associated book’s history
+instead of restoring an assistant queue in Action Items. Optional explicit
+estimate review remains in book history and requires preview and confirmation;
+this interface change itself does not save a value.
+
+Where every same-currency proposed comparison lies within a usable saved range,
+the history explains that retaining the current estimate requires no immediate
+action and condition can be checked before sale. Other proposals remain research
+findings for a future valuation review. A missing used-value estimate is recorded
+as an evidence gap; no automatic search, invented used-price discount or permanent
+owner assignment is introduced. Bounded new research may be requested separately.
+
+All research classifications remain in the private input for provenance; only
+their presentation changes. No findings, purchase history, saved task decisions
+or saved values are removed or rewritten. Verification includes all 893 Python
+tests, JavaScript compilation and category/recommendation behavior checks, followed
+by live owner-view and book-history inspection.
