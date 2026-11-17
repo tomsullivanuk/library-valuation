@@ -290,6 +290,8 @@ class WorkspaceStore:
                 book = books.get(task["catalog_item_id"])
                 if book and book.reviewed_estimate_id and saved.get("estimate_review_id"):
                     actions[-1]["reason"] = "This research task has a saved, reviewed estimate. You can review and revise it again below."
+            from valuation.research_history import project
+            actions = project(actions, books, self.action_review.get("reviewed_on", ""))
             observed = {h.latest_inventory_observation_id for h in self.model.holdings if h.holding_id in self.model.completed_inventory.holding_ids}
             observed.update(self.model.completed_inventory.unresolved_observation_ids)
             titles = {" ".join(unicodedata.normalize("NFKC", o.title).casefold().split()) for o in self.model.observations if o.inventory_observation_id in observed and o.title.strip()}
@@ -449,7 +451,7 @@ def make_server(store, port=8765):
                     model = load_model(store.data_dir, store.output_dir)
                     store.model = model
                     store.actions = store.review_actions(model)
-                return self.send(200, render_steward_workspace(model, action_items=store.actions), "text/html; charset=utf-8")
+                return self.send(200, render_steward_workspace(model, action_items=store.snapshot()["actions"]), "text/html; charset=utf-8")
             allowed = {r.public_path: r for r in store.model.reports if r.public_path}
             if path.lstrip("/") in allowed:
                 file = (store.output_dir / path.lstrip("/")).resolve()

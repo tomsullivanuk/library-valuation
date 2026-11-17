@@ -1292,10 +1292,10 @@ _DOCUMENT = r"""<!doctype html>
     }
     function taskCard(task, history = false, selectedId = "") {
         const card = node("article", {class:"panel",id:"research-"+task.id});
-        append(card, node(history ? "h3" : "h2", {}, history ? researchLabel(task) : task.title), node("p", {class:"muted"}, history ? (task.location ? `Location ${displayLocation(task.location)}` : "Recorded research") : `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, history && task.history_summary ? "Review complete for the retained evidence. Used-copy value not established." : task.action));
+        append(card, node(history ? "h3" : "h2", {}, history ? researchLabel(task) : task.title), node("p", {class:"muted"}, history ? (task.location ? `Location ${displayLocation(task.location)}` : "Recorded research") : `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, history && task.history_summary ? (task.history_summary.headline || "Research findings from retained evidence.") : task.action));
         if (history && task.history_summary) {
           const summary=task.history_summary;
-          append(card,definitionList([["Evidence reviewed",summary.reviewed_on]]));
+          append(card,definitionList([["Review recorded",summary.reviewed_on || "Date not recorded"]]));
           for (const [label,items] of [["What we know",summary.what_we_know],["What remains uncertain",summary.what_is_uncertain]]) {
             const list=node("ul");for (const item of items) append(list,node("li",{},item));
             append(card,node("h4",{},label),list);

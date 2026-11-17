@@ -142,6 +142,7 @@ def test_authored_history_summary_is_identity_bound_and_does_not_apply_prices(tm
     assert task['history_summary']==summary and store.model.books==model.books and path.read_bytes()==before
     changed=replace(model,books=(replace(model.books[0],title='Another edition'),))
     state=WorkspaceStore(tmp_path/'data',tmp_path/'output',model=changed).snapshot()
-    assert not any('history_summary' in a for a in state['actions'])
+    assert not any(a.get('history_summary')==summary for a in state['actions'])
+    assert any('metadata' in ' '.join(a.get('history_summary',{}).get('what_is_uncertain',[])) or 'identity changed' in ' '.join(a.get('history_summary',{}).get('what_is_uncertain',[])) for a in state['actions'])
     summary['sources'][0]['url']='javascript:bad';path.write_text(json.dumps(m))
     with pytest.raises(ValueError,match='Unsafe'):WorkspaceStore(tmp_path/'data',tmp_path/'output',model=model)

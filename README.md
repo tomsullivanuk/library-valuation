@@ -908,3 +908,10 @@ edition-profile matching work. Supported proposals remain conditional. Missing
 ISBNs already documented in page notes do not automatically create owner checks.
 See [the aggregate market review](docs/MARKET_FLAG_ADJUDICATION_20261116.md) for
 coverage and outcomes; private source inputs and prices are excluded from Git.
+
+Every book’s Research history uses **What we know**, **What remains uncertain**,
+and **What happens next**. The summaries are a read-only presentation of retained
+findings and saved state: they do not reopen decisions, collect fresh listings or
+apply estimates. Specific authored findings remain intact. Review dates retain
+their original meaning; generated wording does not imply current listing
+availability. Existing physical checks are referenced without duplication.

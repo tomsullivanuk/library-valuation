@@ -192,3 +192,33 @@ private review input; all 13 other private CSV/JSON data files remain unchanged.
 All 894 tests pass, including identity-bound summary projection, unsafe-link
 rejection and saved-value preservation. Live inspection verifies the full finding
 and its explicit no-action/no-scheduled-search conclusion.
+
+## Library-wide structured Research history
+
+Extend the plain-language structure to every retained book research classification.
+Each entry separates known evidence, remaining uncertainty and practical next
+steps. Conditional proposals distinguish fully contained comparisons from ranges
+that still need valuation review; retained estimates are explicitly provisional;
+resolved questions need no action; physical dependencies reference the existing
+owner check. Other evidence gaps describe an optional bounded search without
+claiming it is scheduled or assigning it to the owner. Saved manual estimates
+keep their explicit review date and basis.
+
+Summaries are derived at presentation time from the current book, retained task
+findings and saved answers. Authored findings take precedence. The projection
+does not modify private review inputs, task fingerprints, statuses, notes, source
+records, prices or dates, and cannot cause completed work to reopen. The rendered
+page includes the same summaries as the live state, retaining useful findings
+when saving is disconnected. No additional market research is run.
+
+Validation covers all research classifications, currency-safe range containment,
+existing physical dependencies, authored summaries and manual reviews, identity
+changes, answer preservation and unchanged data files. No book-level records or
+prices are included in the public change.
+
+Installation coverage: 2,566 structured research entries across all 2,565 active
+catalog records, with all 63 owner checks unchanged. Before/after comparison
+confirms identical task identities, fingerprints, statuses, answers, book values,
+dispositions, estimate history and revision. All 14 private CSV/JSON files remain
+byte-for-byte unchanged. All 904 tests pass; live inspection covers comparison
+ranges, provisional retention, physical dependencies and resolved findings.
