@@ -254,3 +254,68 @@ generic provenance label. Existing proposal bounds are retained, not overwritten
 or approved. All 13 other private CSV/JSON files and all 63 owner checks remain
 unchanged. Verification: 904 full-suite tests pass, followed by the focused
 authored-history regression check and live history inspection.
+
+## Other large-discrepancy edition and seller review
+
+Freeze 617 other active records using the established threshold of a 50% or
+USD 25 endpoint difference: 566 earlier large-change flags plus 51 additional
+records meeting the threshold with later conditional proposals. The individually
+reviewed example remains excluded and its authored history is preserved. All
+617 saved amounts reconcile to the earlier summaries using the original range
+or midpoint presentation. Individual baseline links are available for 592; the
+other 25 are explicitly marked as provenance gaps, not edition mismatches.
+
+The read-only pass inspects 2,980 distinct retained AbeBooks references for
+bibliographic identity, current availability, retailer and inventory metadata.
+All final page receipts have bibliographic metadata; incomplete initial loads
+were rechecked, with no access block in the completed AbeBooks pass.
+
+| Finding | Books |
+| --- | ---: |
+| Older baseline pages currently identify a different ISBN | 157 |
+| Repeated retailer family in older or newer references | 193 |
+| Shared inventory reference in older or newer references | 57 |
+| Same-ISBN publication-year variation needing qualification | 98 |
+| Earlier baseline links not recovered | 25 |
+
+These categories overlap. Of the retailer findings, 147 concern older baseline
+pages and 53 concern eligible newer comparison groups; shared inventory affects
+21 older-baseline and 37 newer-comparison cases. No explicit different-volume
+conflict is found in the checked titles. Different ISBNs are not presented as
+proof of historical appreciation; same-ISBN year differences can reflect a
+printing variation or metadata error. Seller/inventory repetition is not proof
+that separate physical copies do not exist. Older-page seller metadata is dated
+now and does not establish historical seller identity.
+
+Normalized earlier eBay exports deliberately omitted seller identities. This
+pass does not verify their seller independence, cross-marketplace duplication
+or completed-sale prices. No unsupported independent-seller count is inferred
+from marketplace URLs, and no attempt is made to bypass an access checkpoint.
+New, unavailable, wrong-edition and incompatible condition/binding/currency
+contexts are not treated as active used comparables. Repeated product ISBNs
+alone are not stock-overlap evidence; literal inventory references and retailer
+identities are evaluated separately within the relevant groups.
+
+The 617 private Research histories now explain the specific mismatch, overlap,
+year variation or source gap found, preserve earlier comparison bounds as
+unapproved provenance, and state what further independent evidence would be
+needed before applying a replacement range. Existing physical questions are
+referenced conditionally without adding duplicates or reopening answered checks.
+Presentation-only findings do not change task fingerprints, so prior completed
+research decisions and saved answers remain applicable. The two previous authored
+histories and all records outside this scope remain intact. No range, catalog
+identity, physical grade or saved value is changed.
+
+Private scope, original baseline rows/summaries, timestamped page receipts,
+reproducible review and independent validation are retained under
+`output/large_discrepancy_review_20261117/`. Public changes contain reusable logic,
+synthetic tests and aggregate findings only. Full-suite verification: 914 tests
+pass, including edition, volume/year, availability, retailer-family distinction,
+stock overlap, incomplete coverage and completed-decision preservation checks.
+
+The guarded live installation verifies exactly 617 updated research histories,
+unchanged saved book values and comparison bounds, identical task fingerprints,
+statuses and answers, and all 63 owner checks unchanged. The private review input
+is the only changed data file; all 13 other private CSV/JSON files remain
+byte-for-byte unchanged. A live example confirms the specific older-ISBN and
+shared-retailer/stock findings and the no-automatic-follow-up guidance.

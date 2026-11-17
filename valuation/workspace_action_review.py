@@ -13,7 +13,7 @@ FILE_NAME='workspace_reviews/current.json'
 
 
 def fingerprint(task):
-    fields={k:v for k,v in task.items() if k not in {'fingerprint','audience','read_only'}}
+    fields={k:v for k,v in task.items() if k not in {'fingerprint','audience','read_only'} and not (k=='history_summary' and isinstance(v,dict) and v.get('presentation_only') is True)}
     return hashlib.sha256(json.dumps(fields,sort_keys=True).encode()).hexdigest()
 
 

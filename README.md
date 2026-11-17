@@ -915,3 +915,10 @@ findings and saved state: they do not reopen decisions, collect fresh listings o
 apply estimates. Specific authored findings remain intact. Review dates retain
 their original meaning; generated wording does not imply current listing
 availability. Existing physical checks are referenced without duplication.
+
+Large-discrepancy reviews retain edition-mismatch, repeated-retailer and shared
+inventory findings in book history, without equating multiple URLs to independent
+sellers. Publication-year variation and missing baseline provenance are labelled
+separately. Presentation-only history findings preserve task fingerprints and
+completed answers; existing ranges remain unapproved provenance until explicitly
+reviewed and saved.
