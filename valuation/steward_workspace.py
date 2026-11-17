@@ -858,7 +858,6 @@ _DOCUMENT = r"""<!doctype html>
     const REPORT_GROUPS = JSON.parse(document.getElementById("report-data").textContent);
     let workspaceState = {connected:false, revision:0, token:"", dispositions:{}, actions:JSON.parse(document.getElementById("action-data").textContent)};
     let actionFilter = "open";
-    let actionCategory = "Book checks";
     let actionLimit = 50;
     let libraryFilterObserver = null;
     let dispositionObserver = null;
@@ -1269,7 +1268,7 @@ _DOCUMENT = r"""<!doctype html>
           node("p",{},"Saving updates the book's range and completes this research task. Earlier estimates and source evidence remain in history."));
         const save=node("button",{type:"button",class:"primary"},"Save estimate and complete task");
         save.addEventListener("click",async()=>{
-          if (await saveWorkspace(payload,status,save)) { estimateSaveMessage="Revised estimate saved. The book's value range is updated and this research task is complete."; renderActions(task.id); }
+          if (await saveWorkspace(payload,status,save)) { estimateSaveMessage="Revised estimate saved. The book's value range is updated and this research task is complete."; renderBook(book.catalog_item_id); }
         });
         const edit=node("button",{type:"button"},"Back to editing"); edit.addEventListener("click",()=>{preview.replaceChildren();low.focus();});
         append(preview,save,edit);
@@ -1280,48 +1279,95 @@ _DOCUMENT = r"""<!doctype html>
       if (task.status === "deferred" && task.deferred_until <= new Date().toLocaleDateString("en-CA", {timeZone:"America/Chicago"})) return "open";
       return task.status || "open";
     }
-    function renderActions(selectedId = "") {
-      const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
-      if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
-      clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
-      if (estimateSaveMessage) { append(main,node("p",{role:"status","aria-live":"polite"},estimateSaveMessage)); estimateSaveMessage=""; }
-      if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
-      const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
-      filter.querySelector("select").value = actionFilter;
-      filter.addEventListener("change", () => { actionFilter = filter.querySelector("select").value; renderActions(); });
-      append(main, filter);
-      const category = selectControl("action-category", "Task type", [...new Set(workspaceState.actions.map(t => t.category))], value => value);
-      category.querySelector("select").value = actionCategory;
-      category.addEventListener("change", () => { actionCategory = category.querySelector("select").value; actionLimit = 50; renderActions(); });
-      append(main, category);
-      const tasks = workspaceState.actions.filter(task => selectedId ? task.id === selectedId : (!actionFilter || actionStatus(task) === actionFilter) && (!actionCategory || task.category === actionCategory));
-      append(main, node("p", {role:"status"}, `${tasks.length.toLocaleString()} items`));
-      if (!tasks.length) append(main, node("p", {class:"empty"}, "No items in this view."));
-      for (const task of tasks.slice(0, actionLimit)) {
-        const card = node("article", {class:"panel"});
-        append(card, node("h2", {}, task.title), node("p", {class:"muted"}, `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, task.action));
-        if (task.reason) append(card, definitionList([["Why", task.reason]]));
-        if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+    function needsOwnerInput(task) { return task.category === "Book checks"; }
+    function researchLabel(task) {
+      return {"Proposed estimates":"Conditional comparison ranges","Estimate research":"Market evidence incomplete","Retain current estimate":"Current estimate retained","Resolved from records":"Question resolved from records","Awaiting physical check":"Research waiting on a physical check"}[task.category] || task.category;
+    }
+    function researchRecommendation(task) {
+      if (task.category !== "Proposed estimates") return task.next_step;
+      const book=index.books.get(task.catalog_item_id);
+      const low=Number(book?.estimated_value_precise_low),high=Number(book?.estimated_value_precise_high);
+      const contained=book?.usable_market_estimate && low>0 && high>=low && task.proposals?.length && task.proposals.every(p=>p.currency===book.estimated_value_currency && Number(p.low)>=low && Number(p.high)<=high);
+      return contained ? "Keep the current estimate. New comparisons fall within the existing range. Check condition when preparing the book for sale; no action is needed now." : "Keep these conditional comparisons as research findings for the next valuation review. No immediate action is required from you; check the copy’s condition when preparing it for sale. No saved value has changed.";
+    }
+    function taskCard(task, history = false, selectedId = "") {
+        const card = node("article", {class:"panel",id:"research-"+task.id});
+        append(card, node(history ? "h3" : "h2", {}, history ? researchLabel(task) : task.title), node("p", {class:"muted"}, history ? (task.location ? `Location ${displayLocation(task.location)}` : "Recorded research") : `${task.category}${task.location ? " • Location " + displayLocation(task.location) : ""} • ${human(actionStatus(task))}`), node("p", {}, history && task.history_summary ? (task.history_summary.headline || "Research findings from retained evidence.") : task.action));
+        if (history && task.history_summary) {
+          const summary=task.history_summary;
+          append(card,definitionList([["Review recorded",summary.reviewed_on || "Date not recorded"]]));
+          for (const [label,items] of [["What we know",summary.what_we_know],["What remains uncertain",summary.what_is_uncertain]]) {
+            const list=node("ul");for (const item of items) append(list,node("li",{},item));
+            append(card,node("h4",{},label),list);
+          }
+          append(card,node("h4",{},"What happens next"),node("p",{},summary.next_step));
+          if (summary.sources?.length) {
+            const list=node("ul");for (const source of summary.sources) append(list,append(node("li"),node("a",{href:source.url,target:"_blank",rel:"noopener noreferrer"},source.label)));
+            append(card,detailSection("Listing references and observation dates",list));
+          }
+        } else {
+          if (task.reason) append(card, definitionList([["Why", task.reason]]));
+          if (history && researchRecommendation(task)) append(card,definitionList([["Practical meaning",researchRecommendation(task)]]));
+          else if (task.next_step) append(card, definitionList([["Next step", task.next_step]]));
+        }
+        if (history && task.reviewed_on && !task.proposals?.length) append(card,definitionList([["Research reviewed",task.reviewed_on]]));
+        if (history && task.note) append(card,definitionList([["Your recorded note",task.note]]));
         if (task.search_links?.length) {
           const searches = node("div", {class:"card-actions"});
           for (const link of task.search_links) append(searches, node("a", {href:link.url, target:"_blank", rel:"noopener noreferrer", class:"button-link secondary"}, link.label));
           append(card, searches);
         }
         if (task.evidence) append(card, detailSection("Recorded evidence", node("p", {}, task.evidence)));
+        if (task.previous_answer) append(card,detailSection("Previous answer retained",node("p",{},task.previous_answer)));
+        if (task.proposals?.length) {
+          if (history && task.history_summary?.comparison_note) append(card,node("p",{class:"notice"},task.history_summary.comparison_note));
+          append(card,definitionList([["Current saved range",index.books.get(task.catalog_item_id)?.resale_market_summary || "Not recorded"],["Research reviewed",task.reviewed_on]]));
+          for (const p of task.proposals) {
+            append(card,definitionList([["Conditional range",`${p.currency} ${p.low}–${p.high} per copy`],["Binding",p.binding],["Seller condition",human(p.grade)],["Sources",p.sources.map(v => v === "abebooks" ? "AbeBooks" : "eBay").join(", ")]]));
+            const links=node("div",{class:"card-actions"});
+            for (const [i,url] of (p.source_urls||[]).entries()) append(links,node("a",{href:url,target:"_blank",rel:"noopener noreferrer"},`Evidence ${i+1}`));
+            append(card,links);
+          }
+        }
+        if (task.blocking_check_ids?.length) for (const id of task.blocking_check_ids) append(card,routeLink("View physical check","actions/"+id));
+        if (task.read_only) { if(!history) append(card,routeLink("View book or inventory record",task.route));return card; }
+        const investigation=node("div");
         const noteLabel = node("label", {}, "Answer or note "); const note = node("textarea", {rows:"2", "aria-label":`Answer or note for ${task.title}`}); note.value = task.note || ""; append(noteLabel, note);
         const dateLabel = node("label", {}, "Defer until "); const until = node("input", {type:"date", "aria-label":`Defer until for ${task.title}`}); until.value = task.deferred_until || ""; append(dateLabel, until);
-        append(card, noteLabel, dateLabel);
-        if (task.category === "Estimate research" && index.books.has(task.catalog_item_id)) append(card,detailSection("Review and save a revised estimate",estimateEditor(task,note)));
+        append(investigation, noteLabel, dateLabel);
+        if (["Estimate research","Proposed estimates"].includes(task.category) && index.books.has(task.catalog_item_id)) append(investigation,detailSection("Review and save a revised estimate",estimateEditor(task,note)));
         const status = node("p", {role:"status", "aria-live":"polite"});
         const buttons = node("div", {class:"card-actions"});
         for (const [value, text] of [["complete","Complete"],["deferred","Defer"],["dismissed","Dismiss"],["open","Reopen"]]) {
           const button = node("button", {type:"button"}, text); button.disabled = !workspaceState.connected;
-          button.addEventListener("click", async () => { await saveWorkspace({kind:"action", id:task.id, fingerprint:task.fingerprint, status:value, deferred_until:until.value, note:note.value}, status, button); if (status.textContent === "Saved.") { renderActions(selectedId); } });
+          button.addEventListener("click", async () => { await saveWorkspace({kind:"action", id:task.id, fingerprint:task.fingerprint, status:value, deferred_until:until.value, note:note.value}, status, button); if (status.textContent === "Saved.") { if(history) renderBook(task.catalog_item_id); else renderActions(selectedId); } });
           append(buttons, button);
         }
-        append(card, buttons, status, routeLink("View book or inventory record", task.route));
-        append(main, card);
+        append(investigation,buttons,status);
+        append(card,task.audience === "assistant" ? detailSection("Optional individual investigation",investigation) : investigation);
+        if(!history) append(card,routeLink("View book or inventory record",task.route));
+        return card;
+    }
+    function renderActions(selectedId = "") {
+      const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
+      if (selectedTask && !needsOwnerInput(selectedTask) && index.books.has(selectedTask.catalog_item_id)) {
+        renderBook(selectedTask.catalog_item_id);
+        document.getElementById("research-"+selectedTask.id)?.scrollIntoView();
+        return;
       }
+      if (selectedTask && needsOwnerInput(selectedTask)) actionFilter = actionStatus(selectedTask);
+      clear(); heading("Action Items", "Physical book checks that need your input. Research findings are kept in each book’s Research history.");
+      if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
+      const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
+      filter.querySelector("select").value = actionFilter;
+      filter.addEventListener("change", () => { actionFilter = filter.querySelector("select").value; renderActions(); });
+      append(main, filter);
+      append(main,node("p",{class:"notice"},"Read the specific question and existing evidence, record only the missing detail, then mark the check complete. This records your answer without changing the book’s saved value."));
+      if (workspaceState.action_review && !workspaceState.action_review.loaded) append(main,node("p",{class:"notice"},workspaceState.action_review.message));
+      const tasks = workspaceState.actions.filter(task => needsOwnerInput(task) && (selectedId ? task.id === selectedId : !actionFilter || actionStatus(task) === actionFilter));
+      append(main, node("p", {role:"status"}, `${tasks.length.toLocaleString()} ${tasks.length === 1 ? "check" : "checks"}`));
+      if (!tasks.length) append(main, node("p", {class:"empty"}, "No physical book checks in this view."));
+      for (const task of tasks.slice(0, actionLimit)) append(main,taskCard(task,false,selectedId));
       if (tasks.length > actionLimit) {
         const more = node("button", {type:"button"}, "Show next 50");
         more.addEventListener("click", () => { actionLimit += 50; renderActions(selectedId); });
@@ -1583,10 +1629,16 @@ _DOCUMENT = r"""<!doctype html>
       if (market) append(main, definitionList([[book.reviewed_estimate_id ? "Original asking-price range" : "Estimate", book.reviewed_estimate_id ? (market.likely_low && market.likely_high ? `${acquisitionCost(market.likely_low,market.currency)}–${acquisitionCost(market.likely_high,market.currency)}` : acquisitionCost(market.likely_mid || market.likely_low || market.likely_high,market.currency)) : book.resale_market_summary], ["Sources", market.observed_sources], ["Listings", market.listing_count], ["Confidence", market.confidence_display || human(market.market_confidence)], ["Evidence status", market.evidence_status_display || human(market.evidence_status)], ["Research date", market.generated_at.slice(0,10)], ["Notes", market.review_reason_display || human(market.review_reason)]]), node("p", {class:"muted"}, "Asking-price evidence is not a confirmed sale price."));
       else append(main, node("p", {}, "Not researched."));
       const tasks = workspaceState.actions.filter(task => task.catalog_item_id === bookId);
-      if (tasks.length) {
-        append(main, node("h2", {}, book.usable_market_estimate ? "Action items" : "Next steps"));
-        for (const task of tasks) append(main, routeLink(`${task.action} — ${human(actionStatus(task))}`, `actions/${encodeURIComponent(task.id)}`));
+      const checks = tasks.filter(needsOwnerInput);
+      if (checks.length) {
+        append(main,node("h2",{},"Physical book checks"));
+        for (const task of checks) append(main,routeLink(`${task.action} — ${human(actionStatus(task))}`,`actions/${encodeURIComponent(task.id)}`));
       }
+      append(main,node("h2",{id:"research-history"},"Research history"),node("p",{class:"muted"},"Findings, comparisons and unresolved evidence are retained here for reference. They do not require action from you unless a specific physical book check is listed above. Saved values change only after an explicit review and save."));
+      if (estimateSaveMessage) { append(main,node("p",{role:"status"},estimateSaveMessage));estimateSaveMessage=""; }
+      const research = tasks.filter(task => !needsOwnerInput(task));
+      if (!research.length) append(main,node("p",{},"No additional research findings recorded."));
+      for (const task of research) append(main,taskCard(task,true));
       append(main, routeLink("About this record", `about/${encodeURIComponent(bookId)}`));
     }
 
@@ -1980,7 +2032,7 @@ _DOCUMENT = r"""<!doctype html>
         else link.removeAttribute("aria-current");
       });
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
-      else if (route === "recommendations" || route === "actions") renderActions(id);
+      else if (route === "recommendations" || route === "actions") { if(!id){actionFilter="open";actionLimit=50;} renderActions(id); }
       else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");

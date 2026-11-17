@@ -1,0 +1,321 @@
+# Large-change and source-disagreement adjudication — November 16, 2026
+
+Reviewed all 788 books flagged in the combined packet, using retained detailed eBay records, prior baseline observations, source-page transcriptions and 2,709 distinct existing AbeBooks listing pages. No new search cohort, web page, estimate publication, physical grade or canonical task-status change was introduced.
+
+## Outcomes
+
+| Outcome in the flagged subset | Books |
+| --- | ---: |
+| At least one supported conditional range uses both sources | 605 |
+| Supported conditional ranges remain single-source | 151 |
+| Market research retained; no supported pooled replacement | 32 |
+| Total | 788 |
+
+There are 1,246 supported conditional groups in this subset. Unflagged books from the earlier packet were not silently re-adjudicated. A conditional range remains an observed asking-price envelope for a specified binding, seller label and currency; it is not a confirmed grade of the owned copy or permission to publish.
+
+For 129 books, at least one retained offer behind the older title/author baseline now identifies another ISBN. This makes the old range an unreliable verified same-edition baseline; it does not prove the listing's metadata was identical when originally collected, or establish historical appreciation. Two books have fresh query-matched context whose returned listing ISBN differs and is excluded. Fair, Fine, Near Fine and As New native labels are retained separately rather than translated into eBay condition categories.
+
+Known ISBN, binding, currency and literally matching ordinary seller labels govern pooled groups. Each supported group needs at least three distinct retained offers and strictly less than threefold spread. Matching labels do not prove identical grading standards or independent sellers across marketplaces. New-copy offers stay context. Existing tight-cluster/high-outlier and two-cheaper-matching-new-offer holds remain in place: 9 isolated high offers and 13 above-new-context used offers are held, not deleted. Wide or thin comparisons remain agent research; the owner is not asked to choose a price to settle them.
+
+The AbeBooks detail pages were read on November 16. Their current displayed item prices are dated separately from the retained November 6–9 eBay evidence and November 11 search export. Shipping is excluded; no amount is treated as proceeds. Browser checkpoints retain bibliographic fields and price context without seller identity, credentials or account data. All page inspection completed without an access block.
+
+## Owner checklist
+
+The 15 older pilot identity flags were reconciled with later preserved source notes: 10 publication profiles are available from records, 3 physical questions already exist, and 2 require newly narrowed copy checks. Profile availability does not assign a physical ISBN, binding or condition.
+
+The separate owner export has 64 naturally sorted rows: 60 cataloged books plus four unidentified entries. It retains the earlier 58 cataloged-book questions, adds only the two specific pilot gaps, and includes a blank answer column. General physical grading remains deferred until handling or before a copy-specific value is selected; it is not expanded into hundreds of new identity tasks. Canonical Action Items remain unchanged; these are private review outcomes and a consolidated checklist.
+
+The 32 remaining pricing cases stay in the market-research queue, separate from owner physical checks. Single-source scenarios are not advertised as cross-source corroboration. Existing saved values remain unchanged in every outcome.
+
+## Private records and validation
+
+The private records are under `output/market_flag_resolution_20261116/`: scope, source snapshot, preserved source notes, page plan and checkpointed page receipts, authored pilot decisions, and `final_results/`. The results include full adjudications, case decisions, revised conditional proposals and the owner physical-check CSV. No book-level records or prices are committed to GitHub.
+
+`valuation.market_flag_adjudication` checks complete page coverage, current scope, input fingerprints, unchanged saved-value baselines and source-supported pilot decisions. It refuses blocked/incomplete page reviews. It has no collector, estimate writer or Action Item mutation path. Independent validation recomputes every supported group's bounds, traces eBay amounts to retained rows and AbeBooks amounts to visible-page receipts, reconciles all 788 cases and 64 owner rows, and confirms identical canonical Mini hashes before and after the review. Full-suite validation: 869 tests pass, including ten new tests for identity, grade/format/currency separation, duplicate conflicts, conservative holds, saved-review protection and incomplete/blocked review handling.
+
+## Photo follow-up
+
+The owner confirmed the available 140-photo set is the only retained set. On-device text indexing, manual image review and title/author/identifier checks matched 14 of the 64 checklist entries. One edition-identifier question is resolved by a clear, valid primary publisher-line paperback ISBN; conflicting printed strings remain preserved exactly, including their separate checksum results. This does not visually verify the exterior cover or assign condition. Thirteen matched entries still lack conclusive binding evidence. No reliable matching photo was located for the other 50 entries.
+
+A separate private checklist now contains 63 remaining entries and photo findings/references where available. The prior 64-row checklist and market-review artifacts remain intact. Distinct photographed editions of the same work are not merged by title. Private source photographs, OCR output, bibliographic findings and the revised checklist stay outside GitHub; the original evidence for the resolved identifier is privately preserved with matching hashes. Saved values and canonical catalog/task records remain unchanged. General binding/condition confirmation during handling remains separate from the cleared edition-identifier recheck.
+
+## Action Items integration
+
+The November 16 review is now installed as a private, explicit workspace input.
+Action Items defaults to **Needs your input** with 63 remaining physical checks,
+using the narrowed questions and retained photo evidence. One resolved identifier
+check is available under **Resolved from records** as a completed reference.
+
+The separate **Proposed estimates** queue covers 1,165 books with conditional
+research ranges. **Research queue — assistant** covers 1,400 remaining catalog
+books, including the 32 unresolved cases in the flagged subset and books outside
+that subset. This full-library backlog is not an owner investigation checklist.
+Optional individual investigation and explicit estimate review remain available.
+No range is applied automatically.
+
+The projection validates book identities, preserves existing answers and decisions,
+and retains previous answers when changed questions reopen. Saved manually
+reviewed estimates are protected from new research tasks. Missing private input
+is reported visibly. The full suite passes 879 tests, including review projection,
+identity changes, invalid proposal rejection, answer preservation and explicit
+individual estimate saving. Live UI verification confirmed all four queue counts.
+
+The Mini installation preserved its newer user-management routes. Installation
+checks confirmed all pre-existing catalog, inventory, purchase and saved-value
+data files were unchanged. Only reusable code, tests and aggregate documentation
+are committed; private book identities, prices and review inputs remain private.
+
+## Remaining-work classification
+
+The original 1,400-record assistant queue was a complement of books with proposals,
+not a determination that each record needed an active investigation. The explicit
+classification now assigns those records as follows:
+
+| Classification | Records | Meaning |
+| --- | ---: | --- |
+| Further market evidence — assistant | 733 | 701 lack a usable saved estimate and a supported replacement; 32 retain unresolved detailed-review price questions |
+| Awaiting physical check — assistant | 57 | Research depends on an existing owner check, rather than another investigation |
+| Retain current estimate — reference | 610 | Existing usable range and no unresolved price-review flag; provisionally retained, not freshly independently valued |
+
+The owner default remains 63 physical checks. There are still 1,165 conditional
+proposal records and one resolved reference. Those proposal records and owner
+checks can overlap; queue counts are not a sum of distinct books. The 57 physical
+dependencies are book-level references, not 57 additional owner tasks.
+
+The retained classification uses the existing usable-estimate rules and the
+review's unresolved-flag scope. It does not claim that a missing proposal verifies
+an old price. Baseline range/identity changes require reassessment. Completing a
+current physical check with an answer returns the dependent record to assistant
+research; dismissal or completion without an answer does not assert edition facts.
+Saved task decisions and answers remain intact. No catalog, purchase or saved-value
+record is modified by classification. The private manifest contains the per-book
+classification and saved-range basis; only aggregate results and reusable logic
+are published. Full verification: 882 tests pass.
+
+## Follow-up on the remaining 733 research records
+
+All 733 records were reviewed against their retained detailed eBay evidence,
+source-page notes, purchase/inventory identities and 1,349 distinct AbeBooks
+listing references. Of those listing pages, 87 had retained same-day receipts;
+1,262 additional distinct pages were inspected. Incomplete page loads were
+rechecked, and final coverage contains no blocked or missing page metadata.
+
+| Outcome | Records |
+| --- | ---: |
+| Additional supported conditional proposals | 81 |
+| Too few comparable used offers | 357 |
+| Comparable prices remain too widely spread | 64 |
+| No eligible used offers in the retained evidence | 153 |
+| Source publication profile needs better-matched listing evidence | 78 |
+| Total reviewed | 733 |
+
+The 81 books yield 90 conditional scenarios: 88 use both marketplaces, one uses
+eBay alone and one uses AbeBooks alone. No seller condition is assigned to the
+owned copy. The existing minimum of three distinct comparable offers and strict
+less-than-threefold spread are unchanged. Seller-native labels stay in separate
+groups and are not translated into eBay grades. Forty-one unavailable listing
+references are context only; mismatched ISBNs, unsuitable special items, missing
+binding and unverified edition matches cannot support a proposal. Exclusion
+reasons can overlap, so they are not book totals.
+
+The three missing older pilot review files were reconciled from retained current
+records: two have matching purchase/scanned ISBNs, and the third has preserved
+facsimile publication notes. The previously photo-resolved primary ISBN is used
+only as a research target, without changing the catalog identifier or claiming
+the exterior binding is verified. Existing publication notes are retained for
+older books without ISBNs; these do not become generic requests to inspect the
+same pages again. No new owner question was justified by this pass.
+
+Action Items now has 1,246 proposal records and 652 assistant research records.
+The 652 each show their actual evidence gap and next step, rather than an
+unverified-search-result reminder. The owner default stays at 63 physical checks;
+57 assistant dependencies, 610 retained-estimate references and one photo-resolved
+reference are unchanged. All rows outside the 733-case scope and all owner
+questions are preserved exactly in the private review input. The 652 unresolved
+records require additional or better-matched market evidence; they have been
+reviewed, not assigned to the owner.
+
+Private reproducible inputs, page receipts, review results and validation live
+under `output/remaining_market_research_20261116/`. Independent validation traces
+every one of the 90 supported scenario bounds to distinct eligible source offers,
+checks edition/grade/binding/currency separation, verifies all input fingerprints,
+and reconciles the complete scope and workspace classifications. Only reusable
+logic, synthetic tests and these aggregate findings are published to GitHub.
+Full-suite verification: 892 tests pass. Saved values remain unchanged.
+
+## Owner-only Action Items revision
+
+The owner walkthrough established that references and assistant work are not
+owner action items. The Queue pulldown is removed, including Resolved from
+records, Retain current estimate, Proposed estimates, Research queue — assistant,
+and Awaiting physical check — assistant. Action Items shows physical-book checks
+only, retaining its status filter and existing Complete, Defer, Dismiss and
+Reopen controls. The 63 owner checks and their underlying records are unchanged.
+
+Each book now directly displays **Research history**, containing its conditional
+ranges, sources, recorded evidence, retained-estimate reasoning, resolved findings,
+research gaps and links to physical dependencies. Previous answers and saved notes
+remain accessible. Legacy research-task URLs open the associated book’s history
+instead of restoring an assistant queue in Action Items. Optional explicit
+estimate review remains in book history and requires preview and confirmation;
+this interface change itself does not save a value.
+
+Where every same-currency proposed comparison lies within a usable saved range,
+the history explains that retaining the current estimate requires no immediate
+action and condition can be checked before sale. Other proposals remain research
+findings for a future valuation review. A missing used-value estimate is recorded
+as an evidence gap; no automatic search, invented used-price discount or permanent
+owner assignment is introduced. Bounded new research may be requested separately.
+
+All research classifications remain in the private input for provenance; only
+their presentation changes. No findings, purchase history, saved task decisions
+or saved values are removed or rewritten. Verification includes all 893 Python
+tests, JavaScript compilation and category/recommendation behavior checks, followed
+by live owner-view and book-history inspection.
+
+## Plain-language book research summaries
+
+An optional, identity-bound authored summary now separates **What we know**,
+**What remains uncertain**, and **What happens next** in a book's Research history.
+It includes observation dates and expandable source references, distinguishes
+new-copy asking prices from used-copy evidence and completed sales, and states
+whether owner action or further searching is actually scheduled. The first
+private summary clarifies one existing no-estimate case using retained receipts;
+no additional marketplace search is performed or implied.
+
+The authored note is preserved in the private review input and its reproducible
+private assembler. Book-level text, prices and sources are excluded from GitHub.
+Its identity guard prevents application to another edition, and source links are
+validated before rendering as text. No owner task is created, no physical grade
+is inferred, and no saved value is written. Installation changes only that
+private review input; all 13 other private CSV/JSON data files remain unchanged.
+All 894 tests pass, including identity-bound summary projection, unsafe-link
+rejection and saved-value preservation. Live inspection verifies the full finding
+and its explicit no-action/no-scheduled-search conclusion.
+
+## Library-wide structured Research history
+
+Extend the plain-language structure to every retained book research classification.
+Each entry separates known evidence, remaining uncertainty and practical next
+steps. Conditional proposals distinguish fully contained comparisons from ranges
+that still need valuation review; retained estimates are explicitly provisional;
+resolved questions need no action; physical dependencies reference the existing
+owner check. Other evidence gaps describe an optional bounded search without
+claiming it is scheduled or assigning it to the owner. Saved manual estimates
+keep their explicit review date and basis.
+
+Summaries are derived at presentation time from the current book, retained task
+findings and saved answers. Authored findings take precedence. The projection
+does not modify private review inputs, task fingerprints, statuses, notes, source
+records, prices or dates, and cannot cause completed work to reopen. The rendered
+page includes the same summaries as the live state, retaining useful findings
+when saving is disconnected. No additional market research is run.
+
+Validation covers all research classifications, currency-safe range containment,
+existing physical dependencies, authored summaries and manual reviews, identity
+changes, answer preservation and unchanged data files. No book-level records or
+prices are included in the public change.
+
+Installation coverage: 2,566 structured research entries across all 2,565 active
+catalog records, with all 63 owner checks unchanged. Before/after comparison
+confirms identical task identities, fingerprints, statuses, answers, book values,
+dispositions, estimate history and revision. All 14 private CSV/JSON files remain
+byte-for-byte unchanged. All 904 tests pass; live inspection covers comparison
+ranges, provisional retention, physical dependencies and resolved findings.
+
+## Bounded review of a substantial edition discrepancy
+
+One book-specific follow-up rechecks the evidence behind a large saved/proposed
+range difference. The older title/author comparisons currently identify earlier
+editions, so the saved baseline is not verified for the owned edition. This is
+not proof that the earlier pages always carried the same metadata or that the
+book appreciated by the difference. Fresh ISBN-matched listings were also
+examined for shared retailer inventory, direct purchase versus rental pricing,
+and availability. A lower out-of-stock listing is retained only as context;
+repeated inventory is not described as independent corroboration.
+
+The completed-sale lookup reached a human-verification screen and was stopped;
+no bypass or claim of absent sales was made. The authored private history now
+explains why neither the old baseline nor the retained higher asking-price
+envelope is a settled resale value, what was verified, what remains missing,
+and why no new physical identification check is required. A bounded follow-up
+would need accessible completed-sale evidence or additional independent,
+available offers before an approved replacement range is justified. No further
+search is scheduled.
+
+An optional comparison note labels superseded or unapproved comparison ranges
+as retained provenance beneath the latest findings. The original scenario and
+all saved values remain intact. The book-specific text, prices, listing receipts
+and validation hashes stay private; only the generic display support, synthetic
+regression coverage and this aggregate explanation are committed.
+
+The guarded installation changes only one private book-history entry and the
+generic provenance label. Existing proposal bounds are retained, not overwritten
+or approved. All 13 other private CSV/JSON files and all 63 owner checks remain
+unchanged. Verification: 904 full-suite tests pass, followed by the focused
+authored-history regression check and live history inspection.
+
+## Other large-discrepancy edition and seller review
+
+Freeze 617 other active records using the established threshold of a 50% or
+USD 25 endpoint difference: 566 earlier large-change flags plus 51 additional
+records meeting the threshold with later conditional proposals. The individually
+reviewed example remains excluded and its authored history is preserved. All
+617 saved amounts reconcile to the earlier summaries using the original range
+or midpoint presentation. Individual baseline links are available for 592; the
+other 25 are explicitly marked as provenance gaps, not edition mismatches.
+
+The read-only pass inspects 2,980 distinct retained AbeBooks references for
+bibliographic identity, current availability, retailer and inventory metadata.
+All final page receipts have bibliographic metadata; incomplete initial loads
+were rechecked, with no access block in the completed AbeBooks pass.
+
+| Finding | Books |
+| --- | ---: |
+| Older baseline pages currently identify a different ISBN | 157 |
+| Repeated retailer family in older or newer references | 193 |
+| Shared inventory reference in older or newer references | 57 |
+| Same-ISBN publication-year variation needing qualification | 98 |
+| Earlier baseline links not recovered | 25 |
+
+These categories overlap. Of the retailer findings, 147 concern older baseline
+pages and 53 concern eligible newer comparison groups; shared inventory affects
+21 older-baseline and 37 newer-comparison cases. No explicit different-volume
+conflict is found in the checked titles. Different ISBNs are not presented as
+proof of historical appreciation; same-ISBN year differences can reflect a
+printing variation or metadata error. Seller/inventory repetition is not proof
+that separate physical copies do not exist. Older-page seller metadata is dated
+now and does not establish historical seller identity.
+
+Normalized earlier eBay exports deliberately omitted seller identities. This
+pass does not verify their seller independence, cross-marketplace duplication
+or completed-sale prices. No unsupported independent-seller count is inferred
+from marketplace URLs, and no attempt is made to bypass an access checkpoint.
+New, unavailable, wrong-edition and incompatible condition/binding/currency
+contexts are not treated as active used comparables. Repeated product ISBNs
+alone are not stock-overlap evidence; literal inventory references and retailer
+identities are evaluated separately within the relevant groups.
+
+The 617 private Research histories now explain the specific mismatch, overlap,
+year variation or source gap found, preserve earlier comparison bounds as
+unapproved provenance, and state what further independent evidence would be
+needed before applying a replacement range. Existing physical questions are
+referenced conditionally without adding duplicates or reopening answered checks.
+Presentation-only findings do not change task fingerprints, so prior completed
+research decisions and saved answers remain applicable. The two previous authored
+histories and all records outside this scope remain intact. No range, catalog
+identity, physical grade or saved value is changed.
+
+Private scope, original baseline rows/summaries, timestamped page receipts,
+reproducible review and independent validation are retained under
+`output/large_discrepancy_review_20261117/`. Public changes contain reusable logic,
+synthetic tests and aggregate findings only. Full-suite verification: 914 tests
+pass, including edition, volume/year, availability, retailer-family distinction,
+stock overlap, incomplete coverage and completed-decision preservation checks.
+
+The guarded live installation verifies exactly 617 updated research histories,
+unchanged saved book values and comparison bounds, identical task fingerprints,
+statuses and answers, and all 63 owner checks unchanged. The private review input
+is the only changed data file; all 13 other private CSV/JSON files remain
+byte-for-byte unchanged. A live example confirms the specific older-ISBN and
+shared-retailer/stock findings and the no-automatic-follow-up guidance.

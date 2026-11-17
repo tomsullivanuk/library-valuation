@@ -850,8 +850,11 @@ Run `.venv/bin/python -m valuation.workspace_service` and open
 [the local Library](http://127.0.0.1:8765). Add `--background` to keep the service running independently of the launcher.
 Restart it after restarting the computer. Library
 defaults to physically inventoried books. Reports provides historical/all-record
-views. Action Items combines physical book checks with optional research and saves
-Complete, Defer, Dismiss, Reopen and answers/notes. Select a disposition in book
+views. Action Items shows only physical-book checks that need your input, with
+Open, Deferred, Complete and Dismissed views. The Queue pulldown is removed.
+Research findings, conditional comparisons, retained-estimate references, resolved
+questions and assistant dependencies appear in each book's **Research history**.
+Answers and Complete, Defer, Dismiss and Reopen decisions remain saved. Select a disposition in book
 details and press **Save**. Generated HTML remains a read-only fallback.
 
 Saved decisions remain in the local data repositories across reloads and workspace
@@ -864,14 +867,15 @@ The service runs in the background, so the launcher window can be closed. If the
 service is already running, the launcher reuses it. Reopen it after restarting the
 computer; saved decisions remain in place.
 
-Action Items now includes **Estimate research**: concrete next steps and search
-links for physical books without supported estimates. Existing book checks remain
+Each book’s Research history includes concrete evidence gaps and research links
+where the reviewed evidence does not yet support a replacement range. Existing book checks remain
 the next step where an edition/binding question blocks research. Generic research
 scores are retained in the underlying assessment records but removed from book
 details. Save findings in the task's answer/note; completing it records progress
 without silently changing the catalog or estimate.
 
-From an **Estimate research** task, enter findings in **Answer or note**, expand
+For optional individual investigation in a book’s Research history,
+expand **Optional individual investigation**, enter findings in **Answer or note**, then expand
 **Review and save a revised estimate**, and enter the per-copy low/high range,
 currency, research date and source links. **Review estimate** previews the previous
 and revised ranges. **Save estimate and complete task** updates the Library and
@@ -882,3 +886,39 @@ Reviewed ranges are stored separately from observed listings in
 `data/reviewed_estimates.json`. Exact prices, purchase history and prior estimates
 are retained. Catalog-identity changes prevent an old reviewed range from being
 automatically applied to a different edition.
+
+The private research-review input is `data/workspace_reviews/current.json`. It
+projects recent outcomes into Action Items without writing catalog records,
+purchase history, saved estimates or task decisions. Include it in private data
+backups and migration. Missing review input is visibly reported; changed book
+identities do not inherit proposals or cleared checks. Previous answers remain
+visible when a changed question needs review. No private review input belongs in Git.
+
+Research classification distinguishes absent replacements from unfinished work.
+Usable existing ranges without unresolved price flags can be provisionally retained;
+this does not freshly validate their value. Physical dependencies point to existing
+owner checks. A current completed check with a recorded answer returns its dependent
+research to the assistant queue; no estimate is applied. Changed saved baselines
+invalidate retained classifications and require reassessment.
+
+The remaining-research follow-up reviews each queued record using retained detail
+evidence and explicit listing-page receipts. Its private results distinguish
+insufficient offer counts, excessive spread, absent eligible used offers and
+edition-profile matching work. Supported proposals remain conditional. Missing
+ISBNs already documented in page notes do not automatically create owner checks.
+See [the aggregate market review](docs/MARKET_FLAG_ADJUDICATION_20261116.md) for
+coverage and outcomes; private source inputs and prices are excluded from Git.
+
+Every book’s Research history uses **What we know**, **What remains uncertain**,
+and **What happens next**. The summaries are a read-only presentation of retained
+findings and saved state: they do not reopen decisions, collect fresh listings or
+apply estimates. Specific authored findings remain intact. Review dates retain
+their original meaning; generated wording does not imply current listing
+availability. Existing physical checks are referenced without duplication.
+
+Large-discrepancy reviews retain edition-mismatch, repeated-retailer and shared
+inventory findings in book history, without equating multiple URLs to independent
+sellers. Publication-year variation and missing baseline provenance are labelled
+separately. Presentation-only history findings preserve task fingerprints and
+completed answers; existing ranges remain unapproved provenance until explicitly
+reviewed and saved.
