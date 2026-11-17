@@ -1173,7 +1173,7 @@ _DOCUMENT = r"""<!doctype html>
       requestStatusBusy = true; requestStatusStamp = Date.now();
       try {
         const base = location.pathname.startsWith("/owner") ? "/owner" : "";
-        const responses = await Promise.allSettled([fetch(base + "/api/family-requests?archived=1", {cache:"no-store"}), fetch(base + "/api/users", {cache:"no-store"})]);
+        const responses = await Promise.allSettled([fetch(base + '/api/family-requests?archived=1', {cache:"no-store"}), fetch(base + '/api/users', {cache:"no-store"})]);
         const response = responses[0].status === "fulfilled" ? responses[0].value : null;
         if (!response?.ok) throw new Error("Request status unavailable");
         const rows = await response.json(); let names = {};

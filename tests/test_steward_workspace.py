@@ -981,3 +981,15 @@ def test_book_details_replace_legacy_priority_with_actionable_next_steps(tmp_pat
     assert 'book.usable_market_estimate ? "Action items" : "Next steps"' in detail
     assert '["Why", task.reason]' in html and '["Next step", task.next_step]' in html
     assert 'task.search_links' in html
+
+
+def test_live_request_paths_survive_public_owner_html_rewrite(tmp_path):
+    """The gateway rewrites root API literals; dynamic owner paths must stay intact."""
+    page = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+    public = page.replace('"/api/', '"/owner/api/')
+    loader = public.split('async function refreshLibraryRequests()', 1)[1].split('function requestCopyDetails', 1)[0]
+    paths = re.findall(r"fetch\(base \+ ['\"]([^'\"]+)['\"]", loader)
+    assert paths == ['/api/family-requests?archived=1', '/api/users']
+    assert ['/owner' + path for path in paths] == [
+        '/owner/api/family-requests?archived=1', '/owner/api/users'
+    ]
