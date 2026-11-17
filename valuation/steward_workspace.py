@@ -621,11 +621,11 @@ _DOCUMENT = r"""<!doctype html>
     .search-row { max-width: 50rem; }
     .filter-row {
       display: grid;
-      grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
+      grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
       gap: .55rem;
       align-items: end;
     }
-    .filter-row.report-filters { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
+    .filter-row.report-filters { grid-template-columns: repeat(4, minmax(10rem, 1fr)) auto; }
     .clear-filters {
       justify-self: start;
       width: auto;
@@ -804,7 +804,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     @media (max-width: 70rem) {
       .controls { grid-template-columns: repeat(2, minmax(12rem, 1fr)); }
-      .filter-row { grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto; }
+      .filter-row { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
     }
     @media (max-width: 42rem) {
       .brand, .results-header, .detail-heading { display: block; }
@@ -1086,11 +1086,15 @@ _DOCUMENT = r"""<!doctype html>
     const activeCatalogIds = new Set(completedInventory.catalog_item_ids);
     const libraryState = {
       scope: completedInventory.completed ? "present" : "",
-      search: "", acquisition: "", market: "", location: "",
+      search: "", acquisition: "", market: "", location: "", request: "",
       sort: "title", sortDirection: 1, visibleBooks: []
     };
     function bookMatches(book, state) {
-      if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id)) return false;
+      const requestEvents = libraryRequests.get(book.catalog_item_id)?.events || [];
+      const matchesRequest = event => state.request === "any" || (state.request === "requested" ? event.state === "pending" : state.request === "reserved" ? event.state === "approved" : ["transferred", "collected"].includes(event.state));
+      if (state.request && !requestEvents.some(matchesRequest)) return false;
+      const includeTransferred = ["transferred", "any"].includes(state.request) && requestEvents.some(event => ["transferred", "collected"].includes(event.state));
+      if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id) && !includeTransferred) return false;
       if (state.scope === "history" && activeCatalogIds.has(book.catalog_item_id)) return false;
       if (state.acquisition && book.acquisition_status !== state.acquisition) return false;
       if (state.market && book.resale_market_status !== state.market) return false;
@@ -1416,6 +1420,7 @@ _DOCUMENT = r"""<!doctype html>
       })[value] || statusLabel(value));
       const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right, undefined, {numeric:true}));
       const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
+      const requestFilter = selectControl("request-filter", "Request status", ["requested", "reserved", "transferred", "any"], value => ({requested:"Requested — awaiting decision", reserved:"Reserved — approved", transferred:"Transferred", any:"Any request status"})[value]);
       const clearButton = node("button", {type: "button", class: "clear-filters"}, "Clear");
       if (completedInventory.completed) {
         if (reportScope) {
@@ -1428,8 +1433,9 @@ _DOCUMENT = r"""<!doctype html>
           append(controls, node("p", {class: "lede"}, `${completedInventory.source_copies.toLocaleString()} physical books, ${distinctTitles().toLocaleString()} distinct recorded titles`));
         }
       }
-      append(filterRow, market, location, clearButton);
+      append(filterRow, market, location, requestFilter, clearButton);
       append(controls, searchRow, filterRow);
+      const requestNotice = node("p", {class:"muted", role:"status"}); append(controls, requestNotice);
       const marketSource = DATA.snapshot.sources.find(source => source.source_key === "market_evidence");
       if (marketSource && marketSource.status !== "current") {
         append(
@@ -1437,7 +1443,7 @@ _DOCUMENT = r"""<!doctype html>
           node("p", {class: "muted"}, `Resale-market information: ${statusLabel(marketSource.status)}. ${sourceStatusExplanation(marketSource.status)}`)
         );
       }
-      for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
+      for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location], ["request-filter", libraryState.request]]) controls.querySelector(`#${id}`).value = value;
       const searchNotice = node("p", {class:"muted", role:"status"});
       append(controls, searchNotice);
       let enhancedKey="", enhancedData=null, enhancedVersion=0, enhancedTimer, enhancedPending=false, relevance=true;
@@ -1482,7 +1488,9 @@ _DOCUMENT = r"""<!doctype html>
         libraryState.acquisition = "";
         libraryState.market = controls.querySelector("#market-filter").value;
         libraryState.location = controls.querySelector("#location-filter").value;
-        const key=JSON.stringify([libraryState.search,libraryState.market,libraryState.location]);
+        libraryState.request = controls.querySelector("#request-filter").value;
+        requestNotice.textContent = libraryState.request && !requestStatusLoaded ? "Request status is loading or unavailable. Retry shortly before relying on these results." : ["transferred", "any"].includes(libraryState.request) ? "Includes transferred books that are no longer physically present." : "";
+        const key=JSON.stringify([libraryState.search,libraryState.market,libraryState.location,libraryState.request]);
         if(!reportScope && key!==enhancedKey){
           enhancedKey=key;enhancedData=null;enhancedPending=Boolean(libraryState.search);relevance=true;clearTimeout(enhancedTimer);const version=++enhancedVersion;
           searchNotice.textContent=libraryState.search?"Searching keywords and related topics…":"";
@@ -1506,7 +1514,7 @@ _DOCUMENT = r"""<!doctype html>
         sortSummary.textContent=ranked&&relevance?"Sort: Relevance":`Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
         libraryState.visibleBooks = books;
         results.replaceChildren();
-        const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
+        const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location || libraryState.request);
         count.textContent = enhancedPending?"Searching…":`${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
         if (!books.length) {
           append(results, node("p", {class: "empty"}, enhancedPending?"Finding related books…":"No books match these filters."));
