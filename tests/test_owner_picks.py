@@ -48,3 +48,17 @@ def test_batch_conflict_is_atomic_and_changed_retry_rejected(setup):
     assert db.execute("SELECT count(*) FROM request_decisions WHERE slot='H:2'").fetchone()[0]==0
     changed=body();changed['message']='Changed'
     with pytest.raises(family_requests.Conflict):owner_picks.create(db,'owner@example.test',changed,facts,{'owner@example.test'})
+
+
+def test_multiple_copies_of_one_title_are_atomic_and_retry_safe(setup):
+    db,facts=setup
+    facts['r']['copies'].append(dict(id='H:2',label='2 · copy 1',location='2'))
+    b=body();b['items'].append(dict(catalog_item_id='B',slot='H:2'))
+    saved=owner_picks.create(db,'owner@example.test',b,facts,{'owner@example.test'})
+    assert saved['count']==2
+    assert owner_picks.create(db,'owner@example.test',b,facts,{'owner@example.test'})==saved
+    decisions=[r['items'][0]['decision'] for r in family_owner.inbox(db,facts)]
+    assert {d['slot'] for d in decisions}=={'H:1','H:2'}
+    assert all(d['state']=='approved' for d in decisions)
+    duplicate=body(key='duplicate');duplicate['items']*=2
+    with pytest.raises(ValueError):owner_picks.create(db,'owner@example.test',duplicate,facts,{'owner@example.test'})
