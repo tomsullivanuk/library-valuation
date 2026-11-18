@@ -419,6 +419,8 @@ def make_server(store, port=8765):
             if not self.local_request():
                 return self.send(403, b'{"error":"Local workspace requests only"}')
             path = unquote(urlsplit(self.path).path)
+            if path == "/owner-picks.js":
+                return self.send(200, Path(__file__).with_name("owner_picks.js").read_bytes(), "text/javascript")
             if path == "/users.js":
                 return self.send(200, Path(__file__).with_name("owner_users.js").read_bytes(), "text/javascript")
             if path == "/api/users":
@@ -459,6 +461,29 @@ def make_server(store, port=8765):
         def do_POST(self):
             if not self.local_request() or self.headers.get("X-Workspace-Token") != store.token:
                 return self.send(403, b'{"error":"Reload the local workspace before saving"}')
+            if self.path == "/api/owner-picks" and self.headers.get("Content-Type") == "application/json":
+                from valuation import owner_picks, family_owner, family_users
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 300000: raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length)); config=family_owner.settings()
+                    if not config: raise ValueError("Family access is not configured")
+                    users=family_users.state(config)['users']
+                    allowed={u['email'] for u in users if u['active']}
+                    allowed.add(config['owner_email'])
+                    with store.lock:
+                        facts=family_owner.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
+                        with family_owner.requests.connect(config['database']) as db:
+                            if body.get('action') == 'preview':
+                                ids=body.get('ids',[])
+                                if not isinstance(ids,list) or len(ids)>3000: raise ValueError("Invalid selection")
+                                family_owner.schema(db)
+                                used={r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state IN ('approved','collected','transferred')")}
+                                result=dict(owner=config['owner_email'],users=[dict(email=u['email'],name=u['name']) for u in users if u['email'] in allowed],books=[dict(f,copies=[dict(c,unavailable=c['id'] in used) for c in f['copies']]) for f in facts.values() if f['catalog_item_id'] in ids])
+                            else: result=owner_picks.create(db,config['owner_email'],body,facts,allowed)
+                    return self.send(200,json.dumps(result).encode())
+                except family_owner.requests.Conflict as e: return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e: return self.send(400,json.dumps(dict(error=str(e))).encode())
             if self.path == "/api/users" and self.headers.get("Content-Type") == "application/json":
                 from valuation import family_users, family_owner
                 try:

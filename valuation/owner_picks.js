@@ -1,0 +1,20 @@
+'use strict';
+(()=>{
+const base=location.pathname.startsWith('/owner')?'/owner':'';
+const el=(tag,value,parent)=>{const n=document.createElement(tag);n.textContent=value;if(parent)parent.append(n);return n};
+async function api(body){const state=await(await fetch(base+'/api/state',{cache:'no-store'})).json();const r=await fetch(base+'/api/owner-picks',{method:'POST',headers:{'Content-Type':'application/json','X-Workspace-Token':state.token},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||'Unable to save picking list');return data}
+window.addEventListener('owner-pick',async event=>{
+const ids=event.detail.ids;if(!ids.length)return;
+const dialog=document.createElement('dialog');dialog.style.cssText='width:min(55rem,90vw);max-height:85vh;overflow:auto;padding:1.5rem;color:#243c30';dialog.className='owner-pick-dialog';const style=el('style','.owner-pick-dialog [hidden]{display:none!important}.owner-pick-dialog label{display:block;margin:.75rem 0}.owner-pick-dialog select{max-width:100%;width:auto;margin:.25rem}.owner-pick-dialog p{margin:.75rem 0}.owner-pick-dialog button{margin:.4rem .5rem .4rem 0}',dialog);document.body.append(dialog);dialog.showModal();
+const close=el('button','Close',dialog);close.type='button';close.onclick=()=>{dialog.close();dialog.remove()};
+el('h2','Add books to picking list',dialog);const status=el('p','Loading available copies…',dialog);status.setAttribute('role','status');
+try{const data=await api({action:'preview',ids});status.textContent='Choose copies to pull. Review picks do not reserve books; copies may be reserved by someone else later.';
+const form=el('form','',dialog);const label=el('label','Purpose ',form),purpose=el('select','',label);for(const [value,name] of [['self','For myself'],['other','For someone else'],['review','Pull for review']]){const option=el('option',name,purpose);option.value=value}
+const personLabel=el('label',' User ',form),person=el('select','',personLabel);personLabel.hidden=true;for(const u of data.users.filter(u=>u.email!==data.owner)){const o=el('option',u.name||u.email,person);o.value=u.email}
+purpose.onchange=()=>{personLabel.hidden=purpose.value!=='other'};
+const entries=[];for(const id of ids){const book=data.books.find(b=>b.catalog_item_id===id);const row=el('p','',form);if(!book){el('span','Book is unavailable. Close and refresh the Library.',row);continue}el('strong',book.title+' ',row);const copy=el('select','',row);copy.setAttribute('aria-label','Copy for '+book.title);el('option','Choose copy',copy).value='';for(const c of book.copies){const o=el('option',c.label+(c.unavailable?' — reserved or transferred':''),copy);o.value=c.id;o.disabled=c.unavailable}if(book.copies.length===1&&!book.copies[0].unavailable)copy.value=book.copies[0].id;entries.push({id,copy})}
+const notes=el('textarea','',el('label','Optional message / picking notes',form));notes.maxLength=2000;notes.rows=3;notes.style.cssText='display:block;width:100%;box-sizing:border-box;margin:.75rem 0';
+const save=el('button','Save picking list',form);save.type='submit';const key=crypto.randomUUID();form.onsubmit=async e=>{e.preventDefault();if(entries.length!==ids.length||entries.some(x=>!x.copy.value)){status.textContent='Choose an available copy for every selected book.';return}if(purpose.value==='other'&&!person.value){status.textContent='Choose an active user.';return}save.disabled=true;try{await api({purpose:purpose.value,email:person.value,items:entries.map(x=>({catalog_item_id:x.id,slot:x.copy.value})),message:notes.value,key});window.dispatchEvent(new Event('owner-picks-saved'));form.remove();status.textContent='Saved. Open Requests → Picking list to print your storage list. Review picks appear under your own email. To cancel a review pick, decline it in Requests.';const refresh=el('button','Refresh Library',dialog);refresh.type='button';refresh.onclick=()=>location.reload()}catch(error){status.textContent=error.message;save.disabled=false}};purpose.focus();
+}catch(error){status.textContent=error.message}
+});
+})();

@@ -139,7 +139,7 @@ class App:
                         except HTTPError as exc:r=exc
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
-                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"')
+                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"').replace('src="/owner-picks.js"','src="/owner/owner-picks.js"')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):
                                 text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Library search combines keywords and local AI.</p></header>',1)

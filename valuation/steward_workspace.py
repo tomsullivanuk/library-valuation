@@ -848,6 +848,7 @@ _DOCUMENT = r"""<!doctype html>
   </noscript>
   <script defer src="/requests.js"></script>
   <script defer src="/users.js"></script>
+  <script defer src="/owner-picks.js"></script>
   <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
@@ -1087,8 +1088,9 @@ _DOCUMENT = r"""<!doctype html>
     const libraryState = {
       scope: completedInventory.completed ? "present" : "",
       search: "", acquisition: "", market: "", location: "", request: "",
-      sort: "title", sortDirection: 1, visibleBooks: []
+      sort: "title", sortDirection: 1, visibleBooks: [], selected: new Set()
     };
+    window.addEventListener("owner-picks-saved", () => libraryState.selected.clear());
     function bookMatches(book, state) {
       const requestEvents = libraryRequests.get(book.catalog_item_id)?.events || [];
       const matchesRequest = event => state.request === "any" || (state.request === "requested" ? event.state === "pending" : state.request === "reserved" ? event.state === "approved" : ["transferred", "collected"].includes(event.state));
@@ -1185,7 +1187,7 @@ _DOCUMENT = r"""<!doctype html>
           const id = item.catalog_item_id; if (!id) continue;
           if (!next.has(id)) next.set(id, {events:[], copies:item.copies});
           const entry = next.get(id);
-          if (["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
+          if (!(row.payload.owner_pick === "review" && item.decision.state === "pending") && ["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
         }
         const changed = !requestStatusLoaded || JSON.stringify([...next]) !== JSON.stringify([...libraryRequests]);
         libraryRequests = next; requestStatusLoaded = true;
@@ -1447,6 +1449,13 @@ _DOCUMENT = r"""<!doctype html>
       const searchNotice = node("p", {class:"muted", role:"status"});
       append(controls, searchNotice);
       let enhancedKey="", enhancedData=null, enhancedVersion=0, enhancedTimer, enhancedPending=false, relevance=true;
+      const picking = node("div", {class:"library-actions"});
+      const pickSummary = node("span", {id:"pick-selection-count"}, `${libraryState.selected.size} selected`);
+      const pickAll = node("button", {type:"button"}, "Select visible books"), pickClear = node("button", {type:"button"}, "Clear selection"), pickSave = node("button", {type:"button"}, "Add selected to picking list");
+      append(picking, pickAll, pickClear, pickSave, pickSummary); append(main, picking);
+      pickAll.onclick = () => { libraryState.visibleBooks.filter(b => activeCatalogIds.has(b.catalog_item_id)).forEach(b => libraryState.selected.add(b.catalog_item_id)); renderLibrary(reportScope); };
+      pickClear.onclick = () => { libraryState.selected.clear(); renderLibrary(reportScope); };
+      pickSave.onclick = () => window.dispatchEvent(new CustomEvent("owner-pick", {detail:{ids:[...libraryState.selected]}}));
       const actions = node("div", {class: "library-actions"});
       const sortNames = {
         title: "Title",
@@ -1544,6 +1553,12 @@ _DOCUMENT = r"""<!doctype html>
     function bookCard(book) {
       const article = node("article", {class: "library-card"});
       const identity = node("div");
+      if (activeCatalogIds.has(book.catalog_item_id)) {
+        const label = node("label", {style:"display:flex;flex-direction:row;gap:.5rem;align-items:center"});
+        const check = node("input", {type:"checkbox", style:"width:1rem;height:1rem;min-height:1rem;max-width:1rem;flex:0 0 1rem;padding:0;margin:0", "aria-label":`Select ${book.title} for picking`}); check.checked = libraryState.selected.has(book.catalog_item_id);
+        check.onchange = () => { if (check.checked) libraryState.selected.add(book.catalog_item_id); else libraryState.selected.delete(book.catalog_item_id); const marker = document.querySelector("#pick-selection-count"); if (marker) marker.textContent = `${libraryState.selected.size} selected`; };
+        append(label,check,document.createTextNode("Select for picking")); append(identity,label);
+      }
       const publication = [book.publisher, book.publication_year].filter(Boolean).join(" • ");
       const title = node("h2");
       append(
@@ -1616,6 +1631,7 @@ _DOCUMENT = r"""<!doctype html>
         append(main, node("p", {class: "panel"}, book.description));
       }
       append(main, definitionList([["Location", book.location_summary], ["Copies", String(book.copy_count)], ["Acquired", book.purchase_summary], ["Resale market", book.resale_market_summary]]));
+      if (activeCatalogIds.has(bookId)) { const pick = node("button", {type:"button"}, "Add to picking list"); pick.onclick = () => window.dispatchEvent(new CustomEvent("owner-pick", {detail:{ids:[bookId]}})); append(main,pick); }
       append(main, node("h2", {}, "Disposition"), requestCopyDetails(book), node("p", {class:"muted"}, "Saved disposition (your separate plan for this book)"), dispositionEditor(book));
       append(main, node("h2", {}, "Physical copies"));
       const currentHoldings = book.holding_ids.map(id => index.holdings.get(id)).filter(Boolean).filter(h => !completedInventory.completed || completedInventory.holding_ids.includes(h.holding_id));
