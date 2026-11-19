@@ -1,4 +1,4 @@
-"""Loopback family service behind Cloudflare Access; no steward routes."""
+"""Authenticated family browsing and owner gateway behind Cloudflare Access."""
 from contextlib import closing
 from datetime import datetime, timezone
 import argparse
@@ -15,14 +15,50 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 import jwt
 from valuation import family_requests as store
 from valuation.family_catalog import render
 
-def owner_badge(email):
+def owner_return_path(value):
+    """Only return to the owner workspace, never an arbitrary redirect target."""
+    if not isinstance(value, str) or len(value) > 1000 or any(ord(c) < 32 for c in value):
+        return '/owner/'
+    try:
+        target = urlsplit(value)
+    except ValueError:
+        return '/owner/'
+    if target.scheme or target.netloc or target.path not in ('/owner', '/owner/') or target.query:
+        return '/owner/'
+    return '/owner/' + ('#' + target.fragment if target.fragment else '')
+
+
+def account_controls(email, is_owner, *, family_view=False, return_to='/owner/'):
     import html
-    return '<span style="font-size:.9rem">Signed in as '+html.escape(email,quote=True)+' · Owner</span>'
+    esc = lambda value:html.escape(value, quote=True)
+    links = ''
+    if is_owner:
+        links = ('<a href="'+esc(return_to)+'">Return to Owner workspace</a>' if family_view else
+                 '<a href="/browse" data-family-view>Family browsing</a>')
+    return ('<div class="account-controls" style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font:400 .9rem system-ui">'
+            '<span>Signed in as '+esc(email)+(' · Owner' if is_owner else '')+'</span>'
+            +links+'<a href="/sign-out" data-sign-out>Sign out / Switch account</a></div>').replace('<a ', '<a style="display:inline-flex;align-items:center;min-height:44px;color:#245d49" ')
+
+
+def owner_badge(email):
+    return account_controls(email, True)
+
+
+def sign_out_page(email, is_owner, return_to):
+    import html
+    back = owner_return_path(return_to) if is_owner else '/'
+    return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>Sign out — Thomas D Sullivan Library</title><style>body{max-width:650px;margin:2rem auto;padding:1rem;font:17px/1.6 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}.actions{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}.button{display:inline-block;background:#245d49;color:white;border-radius:6px;padding:.7rem 1rem;text-decoration:none}</style>'
+            '<h1>Sign out / Switch account</h1><p>Signed in as <strong>'+html.escape(email,quote=True)+'</strong>'+(' · Owner' if is_owner else '')+'</p>'
+            '<p>Your saved book lists, requests and storage checklist progress will be kept. Make sure your latest changes say <strong>Saved</strong> before signing out. Unsaved storage drafts stay on this device.</p>'
+            '<p>To use a different account, sign out below, reopen the library, and sign in with that email address. Owner tools require your designated owner email.</p>'
+            '<p>This ends your Cloudflare Access session and may sign you out of other protected applications in the same account.</p>'
+            '<div class="actions"><a class="button" href="/cdn-cgi/access/logout">Sign out and switch account</a><a href="'+html.escape(back,quote=True)+'">Keep browsing</a></div></html>')
 
 class Identity:
     def __init__(self,config):
@@ -113,6 +149,9 @@ class App:
                     from valuation.family_users import allowed
                     if not allowed(app.config,email,touch=True):return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
+                    return_to=owner_return_path(parse_qs(urlsplit(self.path).query).get('owner_return',[''])[0])
+                    if not write and path=='/sign-out':return self.reply(200,sign_out_page(email,email==app.config['owner_email'],return_to),'text/html')
+                    if not write and path=='/account.js':return self.reply(200,Path(__file__).with_name('account_controls.js').read_text(),'text/javascript')
                     if write:
                         if self.headers.get('Origin')!=app.config['origin'] or self.headers.get('Content-Type')!='application/json' or (not path.startswith('/owner/') and self.headers.get('X-Family-Request')!='1'):return self.reply(403,{'error':'Invalid request origin'})
                         length=int(self.headers.get('Content-Length','0'))
@@ -140,6 +179,7 @@ class App:
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
                             text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"').replace('src="/owner-picks.js"','src="/owner/owner-picks.js"')
+                            text=text.replace('</body>','<script src="/account.js" defer></script></body>')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):
                                 text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Library search combines keywords and local AI.</p></header>',1)
@@ -173,10 +213,14 @@ class App:
                             if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
                             return self.reply(200,store.submissions(db))
                         if path=='/app.js':return self.reply(200,Path(__file__).with_name('family_app.js').read_text(),'text/javascript')
-                        if path=='/':
+                        if path in {'/','/browse','/browse/'}:
                             updated=datetime.fromtimestamp(Path(app.config['snapshot']).stat().st_mtime,timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
                             page=render(list(catalog.values()),updated)
-                            page=page[:page.index('<script>')]+ '<script src="/app.js" defer></script></html>'
+                            page=page[:page.index('<script>')]+ '<script src="/app.js" defer></script><script src="/account.js" defer></script></html>'
+                            controls=account_controls(email,email==app.config['owner_email'],family_view=True,return_to=return_to)
+                            page=page.replace('<p id="signed-in" role="status">Checking sign-in…</p>','<div>'+controls+'<span id="signed-in" role="status" hidden></span></div>')
+                            if email==app.config['owner_email']:
+                                page=page.replace('<div id="browse-intro">','<p style="padding:.7rem;background:#edf3ef;border-left:4px solid #245d49">Family browsing · You are still signed in as Owner. My List and requests here belong to you.</p><div id="browse-intro">')
                             page=page.replace('This is a read-only catalog.','You can save a personal list and submit requests to Tom.')
                             page=page.replace('<main>','<nav class="family-nav" aria-label="Library views"><button id="browse">Browse</button> <button id="mine">My List</button> <button id="inbox" hidden>Owner inbox</button></nav><p id="saved" role="status"></p><section id="panel" hidden></section><main>')
                             # Stable references supplied as escaped HTML attributes, never private catalog IDs.

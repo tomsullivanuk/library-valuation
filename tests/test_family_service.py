@@ -144,3 +144,53 @@ def test_topic_endpoint_is_authenticated_and_bibliographic_only(server):
  assert result['books']['ref']==['more']
  assert 'owner@example.org' not in raw.decode()
  assert 'request_decisions' not in raw.decode()
+
+
+def test_owner_family_view_preserves_identity_and_separate_lists(server):
+ code,raw=server('/browse?owner_return=%2Fowner%2F%23storage-visit',who='owner@example.org')
+ assert code==200
+ page=raw.decode()
+ assert 'Return to Owner workspace' in page and 'href="/owner/#storage-visit"' in page
+ assert 'My List and requests here belong to you.' in page
+ assert 'src="/account.js"' in page
+ assert server('/api/list',who='owner@example.org',data=dict(version=0,books=['ref']))[0]==200
+ assert json.loads(server('/api/me',who='owner@example.org')[1])['draft']['books']==['ref']
+ assert json.loads(server('/api/me')[1])['draft']['books']==[]
+ guest=server('/browse?owner_return=%2Fowner%2F%23storage-visit')[1].decode()
+ assert 'Return to Owner workspace' not in guest
+ assert 'Family browsing · You are still signed in as Owner' not in guest
+ assert 'Sign out / Switch account' in guest
+ assert server('/owner/api/state')[0]==403
+
+
+def test_sign_out_page_keeps_saved_lists_and_requires_authentication(server):
+ server('/api/list',data=dict(version=0,books=['ref']))
+ code,raw=server('/sign-out')
+ assert code==200 and b'/cdn-cgi/access/logout' in raw
+ assert b'guest@example.org' in raw and b'Unsaved storage drafts stay on this device' in raw
+ assert b'href="/">Keep browsing' in raw
+ assert json.loads(server('/api/me')[1])['draft']['books']==['ref']
+ assert server('/sign-out',who='forged')[0]==403
+ assert server('/account.js',who='forged')[0]==403
+ owner=server('/sign-out?owner_return=%2Fowner%2F%23storage-visit',who='owner@example.org')[1]
+ assert b'href="/owner/#storage-visit">Keep browsing' in owner
+
+
+def test_owner_gateway_adds_view_switch_and_account_script(server,monkeypatch):
+ from valuation import family_service
+ class Upstream:
+  code=200
+  headers={'Content-Type':'text/html'}
+  def read(self):return b'<html><body><div class="brand"><strong>Library Valuation</strong></div></body></html>'
+ monkeypatch.setattr(family_service,'urlopen',lambda *a,**k:Upstream())
+ code,raw=server('/owner/',who='owner@example.org')
+ assert code==200
+ assert b'data-family-view' in raw and b'data-sign-out' in raw
+ assert b'/account.js' in raw and b'nonce=' in raw
+ assert server('/owner/')[0]==403
+
+
+@pytest.mark.parametrize('value',['https://evil.example/owner/','//evil.example/owner/','/owner/../admin','/owner/?redirect=evil','/owner/\n','http://[invalid'])
+def test_view_switch_return_path_stays_in_owner_workspace(value):
+ from valuation.family_service import owner_return_path
+ assert owner_return_path(value)=='/owner/'
