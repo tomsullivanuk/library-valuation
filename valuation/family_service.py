@@ -158,6 +158,9 @@ class App:
                             if path=='/api/list':return self.reply(200,store.save(db,email,body['version'],body['books'],body.get('message',''),catalog))
                             if path=='/api/submit':return self.reply(200,store.submit(db,email,body['version'],body['key'],catalog,snapshot))
                             return self.reply(404,{'error':'Not found'})
+                        if path=='/api/topics':
+                            from valuation.browse_topics import build
+                            return self.reply(200,build(catalog,app.config.get('owner_output_dir')))
                         if path=='/api/me':
                             from valuation import family_owner as owner
                             owner.schema(db);own=store.submissions(db,email)

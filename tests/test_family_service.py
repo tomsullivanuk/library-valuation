@@ -132,3 +132,15 @@ def test_legacy_origin_redirect_is_fixed_and_rejects_old_writes(server):
   c=http.client.HTTPConnection('127.0.0.1',srv.server_port);c.request('GET','/owner/#users',headers={'Host':'old.example.org'});res=c.getresponse();assert res.status==302 and res.getheader('Location')=='https://family.example/owner/#users';res.read();c.close()
   c=http.client.HTTPConnection('127.0.0.1',srv.server_port);c.request('POST','/api/list',body='{}',headers={'Host':'old.example.org'});res=c.getresponse();assert res.status==409;res.read();c.close()
  finally:srv.shutdown();srv.server_close()
+
+
+def test_topic_endpoint_is_authenticated_and_bibliographic_only(server):
+ assert server('/api/topics',who='forged')[0]==403
+ code,raw=server('/api/topics')
+ assert code==200
+ result=json.loads(raw)
+ assert result['total']==1
+ assert set(result['books'])=={'ref'}
+ assert result['books']['ref']==['more']
+ assert 'owner@example.org' not in raw.decode()
+ assert 'request_decisions' not in raw.decode()
