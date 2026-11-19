@@ -212,6 +212,7 @@ def load_book_checks(data_dir, model):
     data_dir = Path(data_dir)
     checks = {}
     receipt = data_dir / "inventory_followup_reviews.json"
+    saved = {"reviews": []}
     if receipt.exists():
         saved = json.loads(receipt.read_text())
         if saved.get("schema_version") != 1:
@@ -232,6 +233,14 @@ def load_book_checks(data_dir, model):
             checks[oid] = dict(inventory_observation_id=oid, title=observation.title,
                 question=question.strip(), collection=observation.source_collection_label,
                 bibliographic_evidence=evidence.strip())
+    # Reviewed answers may narrow a remaining question without rewriting its source evidence.
+    for row in saved["reviews"]:
+        oid = row["inventory_observation_id"]
+        remaining = row.get("remaining_question")
+        if row["status"] == "physical_check_required" and oid in checks and remaining:
+            if not isinstance(remaining, str) or len(remaining) > 4000:
+                raise ValueError("Invalid reviewed follow-up question")
+            checks[oid]["question"] = remaining
     import re
     return sorted(checks.values(), key=lambda row:(
         tuple((0, int(part)) if part.isdigit() else (1, part.casefold())
