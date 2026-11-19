@@ -26,20 +26,7 @@ const whoLabel=text('label','Requested by',tools),who=text('select','',whoLabel)
 const searchLabel=text('label','Search books or messages',tools),search=text('input','',searchLabel);search.type='search';search.value=query;search.placeholder='Title, author or message';
 button(includeArchived?'Hide archived':'Show archived',()=>{includeArchived=!includeArchived;return render()},tools);
 button('Refresh',render,tools);
-button('Storage visit — picks and checks',()=>{location.hash='#storage-visit'},tools);
-button('Picking list',()=>{
-const old=main.querySelector('.request-picking');if(old)old.remove();
-const report=text('section','',main);report.className='request-picking';report.setAttribute('aria-label','Picking list');
-const controls=text('div','',report);controls.className='picking-controls';button('Print / Save PDF',()=>window.print(),controls);button('Close picking list',()=>report.remove(),controls);
-text('h2','Storage picking list',report);text('p',person?'Requested by: '+person:'Requested by: Everyone',report);text('p','Prepared '+new Date().toLocaleString()+'. Approved reservations awaiting a pull and open review picks; status and search filters do not limit this report. Record pickups in Storage visit; these boxes are for paper notes.',report);
-const entries=rows.flatMap(row=>row.items.filter(item=>(itemStatus(item)==='approved'||(row.payload.owner_pick==='review'&&item.decision.state==='pending'))&&(!person||row.email===person)).map(item=>({row,item,copy:item.copies.find(c=>c.id===(item.decision.slot||row.payload.owner_pick_slots?.[item.reference]))})));
-entries.sort((a,b)=>(a.copy?.location||'Location not recorded').localeCompare(b.copy?.location||'Location not recorded',undefined,{numeric:true,sensitivity:'base'})||a.item.title.localeCompare(b.item.title));
-text('p',entries.length+' books to pull across '+new Set(entries.map(e=>e.copy?.location||'Location not recorded')).size+' locations.',report);
-if(!entries.length)text('p','No books awaiting a pull for this requester. Pulled books are already recorded in Requests.',report);
-let location='';for(const {row,item,copy} of entries){const next=copy?.location||'Location not recorded';if(next!==location){location=next;text('h3','Location '+location,report)}const line=text('div','',report);line.className='picking-book';const label=text('label','',line),check=text('span','☐',label);text('strong',' '+item.title,label);text('p',item.author||'Author not recorded',line);text('p',(row.payload.owner_pick==='review'&&item.decision.state==='pending'?'Review — not reserved. Suggested copy: ':'Assigned copy: ')+(copy?.label||'Assignment missing — check before pulling'),line);if(row.payload.owner_pick==='review'&&item.decision.state==='pending'&&copy?.assignment)text('p','This review copy is now assigned or transferred. Check Requests before pulling.',line);if(!person)text('p','For: '+row.email,line);}
-text('p','Pull only the assigned copies. This report does not mark books transferred or change inventory. Check the latest Requests page before handover.',report);
-report.scrollIntoView({block:'start'});
-},tools);
+button('Picking list / Storage visit',()=>{location.hash='#storage-visit'},tools);
 
 const selected=new Map();let prepared=false,saving=false,bulkAction='approved';const bulk=text('section','',main);bulk.className='request-bulk';bulk.setAttribute('aria-label','Bulk decisions');const bulkTools=text('div','',bulk);bulkTools.className='request-tools';const bulkStatus=text('p','',bulk);bulkStatus.setAttribute('role','status');const messageLabel=text('label','Message to selected requesters (optional)',bulk),bulkMessage=text('textarea','',messageLabel);bulkMessage.maxLength=2000;bulkMessage.rows=3;const results=text('div','',bulk);let visible=[];
 const key=(row,item)=>row.id+':'+item.reference;
