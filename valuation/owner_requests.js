@@ -25,6 +25,7 @@ const whoLabel=text('label','Requested by',tools),who=text('select','',whoLabel)
 const searchLabel=text('label','Search books or messages',tools),search=text('input','',searchLabel);search.type='search';search.value=query;search.placeholder='Title, author or message';
 button(includeArchived?'Hide archived':'Show archived',()=>{includeArchived=!includeArchived;return render()},tools);
 button('Refresh',render,tools);
+button('Storage visit — picks and checks',()=>{location.hash='#storage-visit'},tools);
 button('Picking list',()=>{
 const old=main.querySelector('.request-picking');if(old)old.remove();
 const report=text('section','',main);report.className='request-picking';report.setAttribute('aria-label','Picking list');

@@ -1346,6 +1346,7 @@ _DOCUMENT = r"""<!doctype html>
       const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
       if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
       clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
+      append(main, routeLink("Storage visit — picks and checks by box", "storage-visit", "button-link"));
       if (estimateSaveMessage) { append(main,node("p",{role:"status","aria-live":"polite"},estimateSaveMessage)); estimateSaveMessage=""; }
       if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
       const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
@@ -1946,8 +1947,58 @@ _DOCUMENT = r"""<!doctype html>
       append(card, actions);
       return card;
     }
+    async function renderStorageVisit() {
+      clear(); heading("Storage visit", "One stop per box: pull reserved books and record outstanding checks together.");
+      const controls=node("div",{class:"visit-controls card-actions"});
+      const dateLabel=node("label",{},"Visit date "),visitDate=node("input",{type:"date"});
+      const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);visitDate.value=tomorrow.toLocaleDateString("en-CA",{timeZone:"America/Chicago"});append(dateLabel,visitDate);append(controls,dateLabel);
+      const researchLabel=node("label",{}), research=node("input",{type:"checkbox"});
+      append(researchLabel,research,document.createTextNode(" Include estimate and other research tasks"));
+      const print=node("button",{type:"button"},"Print / Save PDF"); print.disabled=true; print.onclick=()=>window.print();
+      append(controls,researchLabel,print,routeLink("Back to Reports","reports"));append(main,controls);
+      const report=node("section",{class:"storage-visit-report"});append(main,report);
+      append(main,node("style",{},`.visit-entry{break-inside:avoid;border-bottom:1px solid #ccc;padding:.65rem 0}.visit-entry p{margin:.3rem 0}.visit-notes{min-height:2rem;border-bottom:1px dotted #999}.storage-visit-report h2{break-after:avoid}.visit-check{font-size:1.2rem;margin-right:.5rem}@media print{body *{visibility:hidden!important}.storage-visit-report,.storage-visit-report *{visibility:visible!important}header,nav,footer,.visit-controls{display:none!important}#main-content>:not(.storage-visit-report){display:none!important}.storage-visit-report{position:absolute;top:0;left:0;width:100%;font-size:10pt}.storage-visit-report h2{font-size:15pt}}`));
+      try {
+        const base=location.pathname.startsWith('/owner')?'/owner':'';
+        const responses=await Promise.all([fetch(base+'/api/state',{cache:'no-store'}),fetch(base+'/api/family-requests',{cache:'no-store'})]);
+        if(responses.some(r=>!r.ok))throw Error("Current requests or Action Items could not be loaded. Retry before printing.");
+        const [state,rows]=await Promise.all(responses.map(r=>r.json()));
+        if(currentRoute()[0]!=="storage-visit")return;
+        function draw(){
+          report.replaceChildren();const groups=new Map();let pulls=0,checks=0;
+          const add=(location,entry)=>{const box=displayLocation(location).trim()||"Location not recorded";const key=box.toLocaleLowerCase();if(!groups.has(key))groups.set(key,{box,entries:[]});groups.get(key).entries.push(entry)};
+          for(const row of rows)for(const item of row.items){
+            const review=row.payload.owner_pick==='review'&&item.decision.state==='pending';
+            if(item.decision.state!=='approved'&&!review)continue;
+            const copy=item.copies.find(c=>c.id===(item.decision.slot||row.payload.owner_pick_slots?.[item.reference]));
+            pulls++;add(copy?.location,{kind:review?'Review pick — not reserved':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — verify before pulling')+(review&&copy?.assignment?' · WARNING: suggested copy is now assigned or transferred':''),route:'book/'+item.catalog_item_id});
+          }
+          for(const task of state.actions){
+            const status=task.status==='deferred'&&task.deferred_until&&task.deferred_until<=visitDate.value?'open':(task.status||'open');
+            if(status!=='open'||(!research.checked&&task.category!=='Book checks'))continue;
+            const book=index.books.get(task.catalog_item_id);
+            const locations=task.category==='Book checks'&&task.location?[task.location]:(book?.location_values?.length?book.location_values:[task.location]);
+            checks++;for(const box of new Set(locations))add(box,{kind:task.category==='Book checks'?'Check':'Research',title:task.title,author:book?.author,detail:task.action,note:task.note,route:task.route,multiple:locations.length>1});
+          }
+          append(report,node('h1',{},'Storage visit — box by box'),node('p',{},'Visit: '+visitDate.value+' · Prepared '+new Date().toLocaleString()+'. '+pulls+' picks and '+checks+' open Action Items. '+(research.checked?'Includes research tasks.':'Book checks only; optional research omitted.')));
+          append(report,node('p',{},'Work through each box once. Record answers below, then update Action Items after your visit. Pull only assigned copies; review picks are not reserved. Nothing is marked complete or transferred by this report.'));
+          const ordered=[...groups.values()].sort((a,b)=>a.box==='Location not recorded'?1:b.box==='Location not recorded'?-1:a.box.localeCompare(b.box,undefined,{numeric:true,sensitivity:'base'}));
+          append(report,node('p',{},ordered.length+' locations: '+ordered.map(g=>g.box).join(' · ')));
+          for(const group of ordered){
+            append(report,node('h2',{},group.box==='Location not recorded'?group.box:'Box '+group.box));
+            group.entries.sort((a,b)=>a.title.localeCompare(b.title)||a.kind.localeCompare(b.kind));
+            for(const entry of group.entries){const line=node('article',{class:'visit-entry'});append(line,node('strong',{},'☐ '+entry.kind+' — '+entry.title));if(entry.author)append(line,node('p',{},entry.author));append(line,node('p',{},entry.detail));if(entry.multiple)append(line,node('p',{},'Multiple recorded locations — check the relevant copy here; this task also appears at its other locations.'));if(entry.note)append(line,node('p',{},'Previous note: '+entry.note));append(line,node('p',{class:'visit-notes'},'Answer / notes:'));append(report,line)}
+          }
+          if(!ordered.length)append(report,node('p',{},'No current picks or open checks.'));
+          print.disabled=false;
+        }
+        research.onchange=draw;visitDate.onchange=draw;draw();
+      }catch(error){append(report,node('p',{role:'alert'},error.message));}
+    }
+
     function renderReports() {
       clear();
+      append(main, routeLink("Storage visit — picks and checks by box", "storage-visit", "button-link"));
       append(main, node("h2", {}, "Catalog reports"), routeLink("Physically inventoried books", "catalog-report/present", "button-link"), routeLink("Historical records", "catalog-report/history", "button-link secondary"), routeLink("All records including history", "catalog-report/all", "button-link secondary"));
       heading("Reports", "Choose a prepared report by what you want to review or share.");
       append(main, node("p", {class: "notice"}, "Every report shown here was registered and checked for this workspace. Other project files are not shown automatically."));
@@ -2069,6 +2120,7 @@ _DOCUMENT = r"""<!doctype html>
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();
+      else if (route === "storage-visit") renderStorageVisit();
       else if (route === "about") renderAbout(id);
       else if (route === "book") renderBook(id);
       else if (route === "holding") renderHolding(id);
