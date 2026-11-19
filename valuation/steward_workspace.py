@@ -1948,52 +1948,120 @@ _DOCUMENT = r"""<!doctype html>
       return card;
     }
     async function renderStorageVisit() {
-      clear(); heading("Storage visit", "One stop per box: pull reserved books and record outstanding checks together.");
-      const controls=node("div",{class:"visit-controls card-actions"});
-      const dateLabel=node("label",{},"Visit date "),visitDate=node("input",{type:"date"});
-      const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);visitDate.value=tomorrow.toLocaleDateString("en-CA",{timeZone:"America/Chicago"});append(dateLabel,visitDate);append(controls,dateLabel);
-      const researchLabel=node("label",{}), research=node("input",{type:"checkbox"});
-      append(researchLabel,research,document.createTextNode(" Include estimate and other research tasks"));
-      const print=node("button",{type:"button"},"Print / Save PDF"); print.disabled=true; print.onclick=()=>window.print();
-      append(controls,researchLabel,print,routeLink("Back to Reports","reports"));append(main,controls);
-      const report=node("section",{class:"storage-visit-report"});append(main,report);
-      append(main,node("style",{},`.visit-entry{break-inside:avoid;border-bottom:1px solid #ccc;padding:.65rem 0}.visit-entry p{margin:.3rem 0}.visit-notes{min-height:2rem;border-bottom:1px dotted #999}.storage-visit-report h2{break-after:avoid}.visit-check{font-size:1.2rem;margin-right:.5rem}@media print{body *{visibility:hidden!important}.storage-visit-report,.storage-visit-report *{visibility:visible!important}header,nav,footer,.visit-controls{display:none!important}#main-content>:not(.storage-visit-report){display:none!important}.storage-visit-report{position:absolute;top:0;left:0;width:100%;font-size:10pt}.storage-visit-report h2{font-size:15pt}}`));
+      clear(); heading("Storage visit", "Pull books and answer checks, one box at a time.");
+      const base=location.pathname.startsWith('/owner')?'/owner':'';
+      const controls=node('div',{class:'visit-controls'}), dateLabel=node('label',{},'Visit date'),visitDate=node('input',{type:'date'});
+      const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);visitDate.value=tomorrow.toLocaleDateString('en-CA',{timeZone:'America/Chicago'});
+      append(dateLabel,visitDate);
+      const researchLabel=node('label',{class:'visit-toggle'}),research=node('input',{type:'checkbox'});append(researchLabel,research,document.createTextNode('Include research tasks'));
+      const print=node('button',{type:'button'},'Print / Save PDF');print.disabled=true;print.onclick=()=>window.print();
+      const refresh=node('button',{type:'button'},'Reload latest');refresh.onclick=renderStorageVisit;
+      const today=node('button',{type:'button'},'Today');today.onclick=()=>{visitDate.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Chicago'});draw()};
+      append(controls,dateLabel,today,researchLabel,refresh,print);append(main,controls);
+      const notice=node('p',{class:'visit-notice',role:'status','aria-live':'polite'},'Loading current picks and checks…');append(main,notice);
+      const report=node('section',{class:'storage-visit-report'});append(main,report);
+      append(main,node('style',{},`
+        .visit-controls{display:flex;align-items:end;gap:.75rem;flex-wrap:wrap;padding:1rem;background:#edf3ef;border-radius:12px;margin:1rem 0}.visit-controls label{margin:0}.visit-controls input[type=date]{width:auto;min-height:44px}.visit-controls .visit-toggle{display:flex;align-items:center;gap:.5rem;min-height:44px}.visit-toggle input{width:20px;height:20px;margin:0}.visit-controls button{min-height:44px}.visit-notice{color:#52695b}.visit-overview{background:#245e4c;color:white;border-radius:12px;padding:1.2rem 1.5rem;margin:1rem 0}.visit-overview h2,.visit-overview p{color:inherit;margin:.3rem 0}.visit-layout{display:grid;grid-template-columns:180px minmax(0,1fr);gap:1.5rem;align-items:start}.visit-box-nav{position:sticky;top:5rem;max-height:75vh;overflow:auto;display:flex;flex-direction:column;gap:.4rem}.visit-box-nav button{text-align:left;font-size:.9rem;min-height:44px;padding:.5rem .7rem}.visit-box{border:1px solid #cfdbd3;border-radius:12px;margin:0 0 1rem;background:white;overflow:hidden;scroll-margin-top:5rem}.visit-box>summary{padding:1rem 1.2rem;background:#edf3ef;cursor:pointer;font-weight:700;font-size:1.15rem;min-height:44px;box-sizing:border-box;display:list-item}.visit-box>summary small{font-weight:400;font-size:.9rem;margin-left:.75rem}.visit-entry{padding:1.2rem;border-top:1px solid #e2e8e3;break-inside:avoid}.visit-entry h3{font-size:1.15rem;margin:.4rem 0}.visit-entry p{margin:.4rem 0}.visit-kind{display:inline-block;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#245e4c;background:#e7f0ea;border-radius:4px;padding:.2rem .45rem}.visit-kind.check{color:#795219;background:#fff2d9}.visit-meta{font-size:.9rem;color:#617268}.visit-detail{margin:.7rem 0!important;line-height:1.5}.visit-editor label{font-size:.9rem}.visit-editor textarea{box-sizing:border-box;width:100%;min-height:85px;font:inherit;line-height:1.4;padding:.7rem;resize:vertical;margin:.3rem 0 .6rem}.visit-entry-tools{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}.visit-entry-tools button{min-height:44px}.visit-done{display:flex!important;align-items:center;gap:.7rem;margin:0!important;min-height:44px;font-weight:600}.visit-done input{width:24px!important;height:24px!important;min-height:24px!important;flex:none;padding:0;margin:0;accent-color:#245e4c}.visit-save-status{font-size:.85rem;color:#52695b;min-height:1.4em}.visit-save-status.error{color:#a02d21}.visit-entry.finished{background:#f6faf7}.visit-entry.finished h3:after{content:' · Done';font-size:.8rem;color:#245e4c}.visit-print-note{display:none}.visit-next{margin:1rem;min-height:44px}
+        @media(max-width:800px){.visit-layout{grid-template-columns:1fr;gap:.7rem}.visit-box-nav{position:static;flex-direction:row;overflow:auto;max-height:none;padding:.3rem 0 .7rem}.visit-box-nav button{white-space:nowrap;flex:none}.visit-overview{padding:1rem}.visit-controls{gap:.5rem;padding:.75rem}.visit-entry{padding:1rem}.visit-entry-tools{align-items:stretch}.visit-controls button{font-size:.9rem}}
+        @media print{body *{visibility:hidden!important}.storage-visit-report,.storage-visit-report *{visibility:visible!important}header,nav,footer,.visit-controls,.visit-box-nav,.visit-editor,.visit-entry-tools,.visit-save-status,.visit-next{display:none!important}#main-content>:not(.storage-visit-report){display:none!important}.storage-visit-report{position:absolute;top:0;left:0;width:100%;font-size:10pt}.visit-layout{display:block}.visit-box{display:block;border:0;border-radius:0}.visit-box>summary{display:block;break-after:avoid;background:none;padding:.6rem 0}.visit-box>:not(summary){display:block!important}.visit-entry{padding:.5rem 0}.visit-overview{background:none;color:#222;padding:0}.visit-print-note{display:block;white-space:pre-wrap;min-height:2rem;border-bottom:1px dotted #888}.visit-kind{padding:0;background:none}.visit-entry h3{font-size:12pt}.visit-entry h3:before{content:'☐ '}.visit-entry.finished h3:before{content:'☑ '}}
+      `));
+      let state,rows,draw=()=>{},saveQueue=Promise.resolve(),busy=0;
       try {
-        const base=location.pathname.startsWith('/owner')?'/owner':'';
         const responses=await Promise.all([fetch(base+'/api/state',{cache:'no-store'}),fetch(base+'/api/family-requests',{cache:'no-store'})]);
-        if(responses.some(r=>!r.ok))throw Error("Current requests or Action Items could not be loaded. Retry before printing.");
-        const [state,rows]=await Promise.all(responses.map(r=>r.json()));
-        if(currentRoute()[0]!=="storage-visit")return;
-        function draw(){
-          report.replaceChildren();const groups=new Map();let pulls=0,checks=0;
-          const add=(location,entry)=>{const box=displayLocation(location).trim()||"Location not recorded";const key=box.toLocaleLowerCase();if(!groups.has(key))groups.set(key,{box,entries:[]});groups.get(key).entries.push(entry)};
+        if(responses.some(r=>!r.ok))throw Error('Current picks or Action Items could not be loaded. Reconnect and reload.');
+        [state,rows]=await Promise.all(responses.map(r=>r.json()));
+        if(currentRoute()[0]!=='storage-visit')return;
+        const storageKey='storage-visit:'+state.workspace_id;
+        const readLocal=()=>{try{return JSON.parse(localStorage.getItem(storageKey)||'{}')}catch(e){return {}}};
+        const writeLocal=value=>{try{localStorage.setItem(storageKey,JSON.stringify(value));return true}catch(e){return false}};
+        let local=readLocal();
+        const dates=Object.keys(state.storage_visits||{}).sort(),last=dates.at(-1);
+        if(local.date)visitDate.value=local.date;else if(last&&last>=new Date().toLocaleDateString('en-CA',{timeZone:'America/Chicago'}))visitDate.value=last;
+        const savedEntry=(day,key)=>{const value=state.storage_visits?.[day]?.[key];if(value?.source==='action'&&state.actions.find(t=>t.id===value.id)?.fingerprint!==value.fingerprint)return undefined;return value};
+        const taskNow=entry=>entry.source==='action'?state.actions.find(t=>t.id===entry.id):null;
+        const signature=(entry,day)=>JSON.stringify([savedEntry(day,entry.key)?.updated_at||'',taskNow(entry)?.status||'',taskNow(entry)?.note||'',taskNow(entry)?.fingerprint||'']);
+        let selectedBox='';
+        draw=()=>{
+          if(!visitDate.value)return;
+          local=readLocal();local.date=visitDate.value;writeLocal(local);
+          report.replaceChildren();const groups=new Map();const day=visitDate.value;
+          const add=(location,entry)=>{const box=displayLocation(location).trim()||'Location not recorded',key=box.toLocaleLowerCase();if(!groups.has(key))groups.set(key,{box,key,entries:[]});groups.get(key).entries.push(entry)};
           for(const row of rows)for(const item of row.items){
             const review=row.payload.owner_pick==='review'&&item.decision.state==='pending';
             if(item.decision.state!=='approved'&&!review)continue;
             const copy=item.copies.find(c=>c.id===(item.decision.slot||row.payload.owner_pick_slots?.[item.reference]));
-            pulls++;add(copy?.location,{kind:review?'Review pick — not reserved':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — verify before pulling')+(review&&copy?.assignment?' · WARNING: suggested copy is now assigned or transferred':''),route:'book/'+item.catalog_item_id});
+            const slot=copy?.id||'';
+            add(copy?.location,{source:'pick',submission:row.id,reference:item.reference,slot,key:'pick:'+row.id+':'+item.reference+':'+slot,kind:review?'Review pick':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — check Requests'),warning:review?'Review copy is not reserved.'+(copy?.assignment?' This copy is now assigned or transferred.':''):'',invalid:!slot});
           }
           for(const task of state.actions){
-            const status=task.status==='deferred'&&task.deferred_until&&task.deferred_until<=visitDate.value?'open':(task.status||'open');
-            if(status!=='open'||(!research.checked&&task.category!=='Book checks'))continue;
-            const book=index.books.get(task.catalog_item_id);
-            const locations=task.category==='Book checks'&&task.location?[task.location]:(book?.location_values?.length?book.location_values:[task.location]);
-            checks++;for(const box of new Set(locations))add(box,{kind:task.category==='Book checks'?'Check':'Research',title:task.title,author:book?.author,detail:task.action,note:task.note,route:task.route,multiple:locations.length>1});
+            const key='action:'+task.id,previous=savedEntry(day,key);
+            const completedHere=previous?.fingerprint===task.fingerprint&&previous.done&&task.status==='complete';
+            const status=task.status==='deferred'&&task.deferred_until&&task.deferred_until<=day?'open':(task.status||'open');
+            if((status!=='open'&&!completedHere)||(!research.checked&&task.category!=='Book checks'))continue;
+            const book=index.books.get(task.catalog_item_id),locations=task.category==='Book checks'&&task.location?[task.location]:(book?.location_values?.length?book.location_values:[task.location]);
+            for(const box of new Set(locations))add(box,{source:'action',id:task.id,fingerprint:task.fingerprint,key,kind:task.category==='Book checks'?'Check':'Research',title:task.title,author:book?.author,detail:task.action,note:task.note,warning:locations.length>1?'Multiple recorded locations — check the relevant copy. The same task appears at its other locations.':''});
           }
-          append(report,node('h1',{},'Storage visit — box by box'),node('p',{},'Visit: '+visitDate.value+' · Prepared '+new Date().toLocaleString()+'. '+pulls+' picks and '+checks+' open Action Items. '+(research.checked?'Includes research tasks.':'Book checks only; optional research omitted.')));
-          append(report,node('p',{},'Work through each box once. Record answers below, then update Action Items after your visit. Pull only assigned copies; review picks are not reserved. Nothing is marked complete or transferred by this report.'));
           const ordered=[...groups.values()].sort((a,b)=>a.box==='Location not recorded'?1:b.box==='Location not recorded'?-1:a.box.localeCompare(b.box,undefined,{numeric:true,sensitivity:'base'}));
-          append(report,node('p',{},ordered.length+' locations: '+ordered.map(g=>g.box).join(' · ')));
-          for(const group of ordered){
-            append(report,node('h2',{},group.box==='Location not recorded'?group.box:'Box '+group.box));
+          const allEntries=new Map(ordered.flatMap(g=>g.entries.map(e=>[e.key,e])));
+          const overview=node('div',{class:'visit-overview'}),progress=node('p',{'aria-live':'polite'});append(overview,node('h2',{},'Your box-by-box checklist'),progress,node('p',{},'Visit '+day+' · Checkmarks and answers save to your workspace. “Pulled” does not mean transferred.'));append(report,overview);
+          const layout=node('div',{class:'visit-layout'}),nav=node('div',{class:'visit-box-nav',role:'navigation','aria-label':'Boxes to visit'}),content=node('div');append(layout,nav,content);append(report,layout);
+          const updateProgress=()=>{const done=[...allEntries.values()].filter(e=>e.source==='action'?taskNow(e)?.status==='complete':savedEntry(day,e.key)?.done).length;progress.textContent=done+' of '+allEntries.size+' items done · '+ordered.length+' recorded locations';};updateProgress();
+          const peers=new Map();
+          const updatePeers=key=>{for(const peer of peers.get(key)||[])peer.sync()};
+          const sections=[];
+          ordered.forEach((group,groupIndex)=>{
+            const box=node('details',{class:'visit-box'});if((selectedBox||ordered[0]?.key)===group.key)box.open=true;
+            const summary=node('summary',{},group.box==='Location not recorded'?group.box:'Box '+group.box),boxProgress=node('small');append(summary,boxProgress);append(box,summary);sections.push(box);
+            const boxButton=node('button',{type:'button'},group.box);boxButton.onclick=()=>{box.open=true;selectedBox=group.key;box.scrollIntoView({block:'start',behavior:'smooth'})};append(nav,boxButton);
+            const updateBox=()=>{const count=group.entries.filter(e=>e.source==='action'?taskNow(e)?.status==='complete':savedEntry(day,e.key)?.done).length;boxProgress.textContent=count+'/'+group.entries.length+' done';boxButton.textContent=group.box+' · '+count+'/'+group.entries.length;};updateBox();box.addEventListener('toggle',()=>{if(box.open)selectedBox=group.key});
             group.entries.sort((a,b)=>a.title.localeCompare(b.title)||a.kind.localeCompare(b.kind));
-            for(const entry of group.entries){const line=node('article',{class:'visit-entry'});append(line,node('strong',{},'☐ '+entry.kind+' — '+entry.title));if(entry.author)append(line,node('p',{},entry.author));append(line,node('p',{},entry.detail));if(entry.multiple)append(line,node('p',{},'Multiple recorded locations — check the relevant copy here; this task also appears at its other locations.'));if(entry.note)append(line,node('p',{},'Previous note: '+entry.note));append(line,node('p',{class:'visit-notes'},'Answer / notes:'));append(report,line)}
-          }
-          if(!ordered.length)append(report,node('p',{},'No current picks or open checks.'));
+            for(const entry of group.entries){
+              const line=node('article',{class:'visit-entry'}),badge=node('span',{class:'visit-kind'+(entry.source==='action'?' check':'')},entry.kind);
+              append(line,badge,node('h3',{},entry.title));if(entry.author)append(line,node('p',{class:'visit-meta'},entry.author));append(line,node('p',{class:'visit-detail'},entry.detail));if(entry.warning)append(line,node('p',{class:'notice'},entry.warning));
+              const editor=node('div',{class:'visit-editor'}),label=node('label',{},entry.source==='action'?'Answer / notes':'Pickup notes'),note=node('textarea',{rows:'2',maxlength:'4000','aria-label':(entry.source==='action'?'Answer for ':'Pickup notes for ')+entry.title});
+              const localId=day+'|'+entry.key;let previous=savedEntry(day,entry.key),draft=readLocal().drafts?.[localId];
+              note.value=draft?.note??(entry.source==='action'?entry.note:previous?.note)??previous?.note??'';
+              const doneLabel=node('label',{class:'visit-done'}),done=node('input',{type:'checkbox','aria-label':(entry.source==='action'?'Check complete: ':'Pulled: ')+entry.title});done.checked=draft?.done??(entry.source==='action'?taskNow(entry)?.status==='complete':previous?.done)??false;done.disabled=!!entry.invalid;
+              append(doneLabel,done,document.createTextNode(entry.source==='action'?'Check complete':'Pulled from storage'));
+              const tools=node('div',{class:'visit-entry-tools'}),save=node('button',{type:'button'},'Save notes'),restore=node('button',{type:'button'},'Use saved version');
+              const message=node('p',{class:'visit-save-status',role:'status','aria-live':'polite'}),printNote=node('p',{class:'visit-print-note'});
+              append(label,note);append(editor,label);append(tools,doneLabel,save,restore);append(line,editor,tools,message,printNote);append(box,line);
+              let timer=null,saving=false,draftKept=true,baseSignature=draft?.base??signature(entry,day);
+              const setMessage=(text,error=false)=>{message.textContent=text;message.classList.toggle('error',error)};
+              const sync=()=>{line.classList.toggle('finished',entry.source==='action'?taskNow(entry)?.status==='complete':!!savedEntry(day,entry.key)?.done);printNote.textContent='Notes: '+note.value;updateBox();updateProgress()};sync();
+              if(!peers.has(entry.key))peers.set(entry.key,[]);peers.get(entry.key).push({sync:()=>{const pending=readLocal().drafts?.[localId];if(!pending&&!saving){note.value=(entry.source==='action'?taskNow(entry)?.note:savedEntry(day,entry.key)?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!savedEntry(day,entry.key)?.done;baseSignature=signature(entry,day);}sync()}});
+              setMessage(draft?'Unsaved draft on this device.':previous?'Saved '+new Date(previous.updated_at).toLocaleTimeString():entry.source==='action'?'Answers save here and in Action Items.':'Check off when this assigned copy has been pulled.');restore.hidden=!draft;
+              const keepDraft=()=>{const local=readLocal();local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};const kept=writeLocal(local);draftKept=kept;restore.hidden=false;setMessage(kept?'Not yet saved. Draft kept on this device.':'Not yet saved. Keep this page open until saved.',!kept);printNote.textContent='Notes: '+note.value;};
+              const persist=()=>{
+                clearTimeout(timer);keepDraft();const values={note:note.value,done:done.checked};
+                saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+                  if(!line.isConnected)return;
+                  saving=true;busy++;save.disabled=true;done.disabled=true;restore.disabled=true;setMessage('Saving…');
+                  try{
+                    if(signature(entry,day)!==baseSignature)throw Error('This item changed elsewhere. Your draft is kept. Copy your answer, then choose Use saved version to review the latest.');
+                    const response=await fetch(base+'/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Workspace-Token':state.token},body:JSON.stringify({kind:'storage_visit',source:entry.source,id:entry.id,fingerprint:entry.fingerprint,submission:entry.submission,reference:entry.reference,slot:entry.slot,visit_date:day,revision:state.revision,...values})});
+                    const result=await response.json();if(!response.ok)throw Error(result.error||'Save failed.');
+                    state=result;workspaceState={...result,connected:true};baseSignature=signature(entry,day);
+                    const local=readLocal();if(note.value===values.note&&done.checked===values.done){if(local.drafts)delete local.drafts[localId];restore.hidden=true;setMessage('Saved · '+new Date().toLocaleTimeString());}else{local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};setMessage('New changes waiting to save.');}writeLocal(local);updatePeers(entry.key);
+                  }catch(error){setMessage('Not saved — '+error.message+' Reconnect and Reload latest to retry. '+(draftKept?'Your draft remains on this device.':'Keep this page open; the draft could not be stored on this device.'),true);done.checked=values.done;}
+                  finally{saving=false;busy--;save.disabled=!!entry.invalid;done.disabled=!!entry.invalid;restore.disabled=false;}
+                });
+              };
+              note.oninput=()=>{keepDraft();clearTimeout(timer);timer=setTimeout(persist,900)};
+              done.onchange=persist;save.onclick=persist;save.disabled=!!entry.invalid;
+              restore.onclick=()=>{clearTimeout(timer);const local=readLocal();if(local.drafts)delete local.drafts[localId];writeLocal(local);previous=savedEntry(day,entry.key);note.value=(entry.source==='action'?taskNow(entry)?.note:previous?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!previous?.done;baseSignature=signature(entry,day);restore.hidden=true;setMessage('Showing the last loaded saved version.');sync()};
+            }
+            const next=node('button',{type:'button',class:'visit-next'},groupIndex===ordered.length-1?'Back to box list':'Next box →');next.onclick=()=>{if(busy){notice.textContent='Wait for your changes to finish saving.';return}const target=sections[groupIndex+1];box.open=false;if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'})}else controls.scrollIntoView({block:'start',behavior:'smooth'})};append(box,next);append(content,box);
+          });
+          if(!ordered.length)append(content,node('p',{},'No current picks or open checks for this visit.'));
+          notice.textContent='Saved work is shared across devices. Drafts stay on this device until saved. Use Reload latest when switching devices.';
           print.disabled=false;
-        }
+        };
         research.onchange=draw;visitDate.onchange=draw;draw();
-      }catch(error){append(report,node('p',{role:'alert'},error.message));}
+        const openForPrint=()=>report.querySelectorAll('details').forEach(d=>{d.dataset.wasOpen=String(d.open);d.open=true});
+        const closeAfterPrint=()=>report.querySelectorAll('details').forEach(d=>{d.open=d.dataset.wasOpen==='true'});
+        window.addEventListener('beforeprint',openForPrint);window.addEventListener('afterprint',closeAfterPrint);
+      }catch(error){notice.textContent=error.message;notice.setAttribute('role','alert');}
     }
 
     function renderReports() {

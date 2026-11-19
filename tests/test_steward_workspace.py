@@ -110,7 +110,9 @@ def test_html_is_deterministic_self_contained_and_script_safe(tmp_path):
     assert b"https://" not in first
     assert b"http://127.0.0.1:8765" in first
     assert b'fetch("/api/state"' in first
-    assert b"localStorage" not in first
+    # Device-local storage is limited to unsaved visit drafts; saved decisions stay on the server.
+    outside_visit = first.split(b"    async function renderStorageVisit()", 1)[0] + first.split(b"    function renderReports()", 1)[1]
+    assert b"localStorage" not in outside_visit
     assert b"sessionStorage" not in first
 
 
@@ -134,7 +136,8 @@ def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigati
     assert '"Acquired"' in html
     assert "offline view" in html
     assert "Open the local workspace to save" in html
-    assert "localStorage" not in html
+    outside_visit = html.split("    async function renderStorageVisit()", 1)[0] + html.split("    function renderReports()", 1)[1]
+    assert "localStorage" not in outside_visit
     assert "sessionStorage" not in html
     assert 'node("button", {type:"submit"}, "Save")' in html
     assert "Export filtered XLSX" not in html

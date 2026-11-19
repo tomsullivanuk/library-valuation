@@ -1,7 +1,7 @@
 """Loopback-only workspace with durable, explicit steward decisions.
 
 Generated HTML remains an offline read-only fallback. The service keeps decisions
-in project repositories, never in browser storage or the generated HTML.
+in project repositories. Browser storage holds unsaved visit drafts only.
 """
 from __future__ import annotations
 
@@ -287,6 +287,7 @@ class WorkspaceStore:
             return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
                 dispositions={r["catalog_item_id"]: ("gift_donate" if r["disposition"] in {"gift", "donate"} else r["disposition"]) for r in reviews},
                 disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles),
+                storage_visits=state.get("storage_visits", {}),
                 estimate_currencies=list(estimate_reviews.CURRENCIES),
                 estimate_history={cid:[{key:row.get(key, "") for key in (
                     "review_id","low","high","currency","researched_on","note","source_urls","saved_at","supersedes","title")}
@@ -310,6 +311,28 @@ class WorkspaceStore:
                 yield
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def visit_pick(self, request):
+        """Validate the assigned copy without changing its reservation or inventory."""
+        from valuation import family_owner as family
+        config = family.settings()
+        if not config:
+            raise ValueError("Requests are unavailable. Reload before saving this pickup.")
+        facts = family.live_facts(load_model(self.data_dir, self.output_dir, family_overlay=False), self.data_dir)
+        from contextlib import closing
+        with closing(family.requests.connect(config['database'])) as db:
+            rows = family.inbox(db, facts)
+        for row in rows:
+            if row['id'] != request.get('submission'):
+                continue
+            for item in row['items']:
+                if item['reference'] != request.get('reference'):
+                    continue
+                review = row['payload'].get('owner_pick') == 'review' and item['decision']['state'] == 'pending'
+                slot = item['decision'].get('slot') or row['payload'].get('owner_pick_slots', {}).get(item['reference'])
+                if (item['decision']['state'] == 'approved' or review) and slot and slot == request.get('slot'):
+                    return dict(submission=row['id'], reference=item['reference'], slot=slot, title=item['title'])
+        raise ValueError("This reservation changed or is no longer active. Reload before checking it off.")
 
     def update(self, request):
         with self.write_lock():
@@ -341,6 +364,9 @@ class WorkspaceStore:
                     fingerprint=task["fingerprint"], updated_at=stamp)
                 state["actions"][task["id"]] = value
                 event = dict(kind=kind, id=task["id"], **value)
+            elif kind == "storage_visit":
+                from valuation.storage_visit import save_entry
+                event = save_entry(state, request, self.all_tasks(state), stamp, self.visit_pick)
             elif kind == "estimate":
                 task = self.all_tasks(state).get(request.get("id"))
                 if not task or task["category"] != "Estimate research" or task["fingerprint"] != request.get("fingerprint"):
