@@ -194,3 +194,21 @@ def test_owner_gateway_adds_view_switch_and_account_script(server,monkeypatch):
 def test_view_switch_return_path_stays_in_owner_workspace(value):
  from valuation.family_service import owner_return_path
  assert owner_return_path(value)=='/owner/'
+
+
+def test_recipient_sees_pulled_without_private_pickup_notes(server,tmp_path):
+ from valuation import family_owner as owner,family_requests as requests
+ server('/api/list',data=dict(version=0,books=['ref']))
+ sid=json.loads(server('/api/submit',data=dict(version=1,key='pulled-test'))[1])['id']
+ facts={'ref':dict(copies=[dict(id='copy-1')])}
+ with requests.connect(server.app.db) as db:
+  owner.update(db,'owner@example.org',dict(submission=sid,reference='ref',state='approved',slot='copy-1',version=0),facts)
+ server.app.config['owner_data_dir']=str(tmp_path)
+ server.app.catalog=server.app.raw_catalog  # This fixture has no owner inventory model.
+ entry=dict(source='pick',submission=sid,reference='ref',slot='copy-1',done=True,updated_at='2099-01-01T00:00:00+00:00',note='PRIVATE PICKUP NOTE')
+ (tmp_path/'workspace_actions.json').write_text(json.dumps(dict(storage_visits={'2026-11-20':{'pick':entry}})))
+ code,raw=server('/api/me')
+ assert code==200
+ assert json.loads(raw)['submissions'][0]['payload']['books'][0]['request_status']=='pulled'
+ assert b'PRIVATE PICKUP NOTE' not in raw
+ assert b'copy-1' not in raw

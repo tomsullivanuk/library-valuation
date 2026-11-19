@@ -204,9 +204,11 @@ class App:
                         if path=='/api/me':
                             from valuation import family_owner as owner
                             owner.schema(db);own=store.submissions(db,email)
+                            from valuation.storage_visit import pickup_records,request_status
+                            pickups=pickup_records(app.config.get('owner_data_dir'))
                             for row in own:
                                 for book in row['payload']['books']:
-                                    book['request_status']=owner.decision(db,row['id'],book['reference'])['state']
+                                    book['request_status']=request_status(db,owner.decision(db,row['id'],book['reference']),pickups)
                                     book['owner_messages']=owner.recipient_messages(db,row['id'],book['reference'])
                             return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=own))
                         if path=='/api/inbox':

@@ -464,7 +464,8 @@ def make_server(store, port=8765):
                     if not config: return self.send(200,b'[]')
                     facts=family.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
                     with closing(family.requests.connect(config['database'])) as db:
-                        return self.send(200,json.dumps(family.inbox(db,facts,include_archived="archived=1" in self.path)).encode())
+                        from valuation.storage_visit import pickup_records
+                        return self.send(200,json.dumps(family.inbox(db,facts,include_archived="archived=1" in self.path,pickups=pickup_records(store.data_dir))).encode())
                 except Exception:
                     return self.send(503,b'{"error":"Request inbox unavailable; please retry"}')
             if path == "/api/state":

@@ -1093,7 +1093,7 @@ _DOCUMENT = r"""<!doctype html>
     window.addEventListener("owner-picks-saved", () => libraryState.selected.clear());
     function bookMatches(book, state) {
       const requestEvents = libraryRequests.get(book.catalog_item_id)?.events || [];
-      const matchesRequest = event => state.request === "any" || (state.request === "requested" ? event.state === "pending" : state.request === "reserved" ? event.state === "approved" : ["transferred", "collected"].includes(event.state));
+      const matchesRequest = event => state.request === "any" || (state.request === "requested" ? event.state === "pending" : state.request === "reserved" ? ["approved", "pulled"].includes(event.state) : state.request === "pulled" ? event.state === "pulled" : ["transferred", "collected"].includes(event.state));
       if (state.request && !requestEvents.some(matchesRequest)) return false;
       const includeTransferred = ["transferred", "any"].includes(state.request) && requestEvents.some(event => ["transferred", "collected"].includes(event.state));
       if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id) && !includeTransferred) return false;
@@ -1163,7 +1163,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     let libraryRequests = new Map(), requestStatusLoaded = false, requestStatusBusy = false, requestStatusStamp = 0;
     function requestLabel(entry) {
-      const state = entry.state === "approved" ? "Reserved for" : ["transferred", "collected"].includes(entry.state) ? "Transferred to" : "Requested by";
+      const state = entry.state === "pulled" ? "Pulled for" : entry.state === "approved" ? "Reserved for" : ["transferred", "collected"].includes(entry.state) ? "Transferred to" : "Requested by";
       return `${state} ${entry.person}`;
     }
     function requestSummary(book) {
@@ -1187,7 +1187,7 @@ _DOCUMENT = r"""<!doctype html>
           const id = item.catalog_item_id; if (!id) continue;
           if (!next.has(id)) next.set(id, {events:[], copies:item.copies});
           const entry = next.get(id);
-          if (!(row.payload.owner_pick === "review" && item.decision.state === "pending") && ["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
+          if (!(row.payload.owner_pick === "review" && item.decision.state === "pending") && ["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.status || item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
         }
         const changed = !requestStatusLoaded || JSON.stringify([...next]) !== JSON.stringify([...libraryRequests]);
         libraryRequests = next; requestStatusLoaded = true;
@@ -1423,7 +1423,7 @@ _DOCUMENT = r"""<!doctype html>
       })[value] || statusLabel(value));
       const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right, undefined, {numeric:true}));
       const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
-      const requestFilter = selectControl("request-filter", "Request status", ["requested", "reserved", "transferred", "any"], value => ({requested:"Requested — awaiting decision", reserved:"Reserved — approved", transferred:"Transferred", any:"Any request status"})[value]);
+      const requestFilter = selectControl("request-filter", "Request status", ["requested", "reserved", "pulled", "transferred", "any"], value => ({requested:"Requested — awaiting decision", reserved:"Reserved — approved or pulled", pulled:"Pulled — awaiting handover", transferred:"Transferred", any:"Any request status"})[value]);
       const clearButton = node("button", {type: "button", class: "clear-filters"}, "Clear");
       if (completedInventory.completed) {
         if (reportScope) {
@@ -1991,7 +1991,7 @@ _DOCUMENT = r"""<!doctype html>
             if(item.decision.state!=='approved'&&!review)continue;
             const copy=item.copies.find(c=>c.id===(item.decision.slot||row.payload.owner_pick_slots?.[item.reference]));
             const slot=copy?.id||'';
-            add(copy?.location,{source:'pick',submission:row.id,reference:item.reference,slot,key:'pick:'+row.id+':'+item.reference+':'+slot,kind:review?'Review pick':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — check Requests'),warning:review?'Review copy is not reserved.'+(copy?.assignment?' This copy is now assigned or transferred.':''):'',invalid:!slot});
+            add(copy?.location,{source:'pick',submission:row.id,reference:item.reference,slot,pulled:item.decision.status==='pulled',key:'pick:'+row.id+':'+item.reference+':'+slot,kind:review?'Review pick':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — check Requests'),warning:review?'Review copy is not reserved.'+(copy?.assignment?' This copy is now assigned or transferred.':''):'',invalid:!slot});
           }
           for(const task of state.actions){
             const key='action:'+task.id,previous=savedEntry(day,key);
@@ -2005,7 +2005,7 @@ _DOCUMENT = r"""<!doctype html>
           const allEntries=new Map(ordered.flatMap(g=>g.entries.map(e=>[e.key,e])));
           const overview=node('div',{class:'visit-overview'}),progress=node('p',{'aria-live':'polite'});append(overview,node('h2',{},'Your box-by-box checklist'),progress,node('p',{},'Visit '+day+' · Checkmarks and answers save to your workspace. “Pulled” does not mean transferred.'));append(report,overview);
           const layout=node('div',{class:'visit-layout'}),nav=node('div',{class:'visit-box-nav',role:'navigation','aria-label':'Boxes to visit'}),content=node('div');append(layout,nav,content);append(report,layout);
-          const updateProgress=()=>{const done=[...allEntries.values()].filter(e=>e.source==='action'?taskNow(e)?.status==='complete':savedEntry(day,e.key)?.done).length;progress.textContent=done+' of '+allEntries.size+' items done · '+ordered.length+' recorded locations';};updateProgress();
+          const updateProgress=()=>{const done=[...allEntries.values()].filter(e=>e.source==='action'?taskNow(e)?.status==='complete':e.pulled).length;progress.textContent=done+' of '+allEntries.size+' items done · '+ordered.length+' recorded locations';};updateProgress();
           const peers=new Map();
           const updatePeers=key=>{for(const peer of peers.get(key)||[])peer.sync()};
           const sections=[];
@@ -2013,7 +2013,7 @@ _DOCUMENT = r"""<!doctype html>
             const box=node('details',{class:'visit-box'});if((selectedBox||ordered[0]?.key)===group.key)box.open=true;
             const summary=node('summary',{},group.box==='Location not recorded'?group.box:'Box '+group.box),boxProgress=node('small');append(summary,boxProgress);append(box,summary);sections.push(box);
             const boxButton=node('button',{type:'button'},group.box);boxButton.onclick=()=>{box.open=true;selectedBox=group.key;box.scrollIntoView({block:'start',behavior:'smooth'})};append(nav,boxButton);
-            const updateBox=()=>{const count=group.entries.filter(e=>e.source==='action'?taskNow(e)?.status==='complete':savedEntry(day,e.key)?.done).length;boxProgress.textContent=count+'/'+group.entries.length+' done';boxButton.textContent=group.box+' · '+count+'/'+group.entries.length;};updateBox();box.addEventListener('toggle',()=>{if(box.open)selectedBox=group.key});
+            const updateBox=()=>{const count=group.entries.filter(e=>e.source==='action'?taskNow(e)?.status==='complete':e.pulled).length;boxProgress.textContent=count+'/'+group.entries.length+' done';boxButton.textContent=group.box+' · '+count+'/'+group.entries.length;};updateBox();box.addEventListener('toggle',()=>{if(box.open)selectedBox=group.key});
             group.entries.sort((a,b)=>a.title.localeCompare(b.title)||a.kind.localeCompare(b.kind));
             for(const entry of group.entries){
               const line=node('article',{class:'visit-entry'}),badge=node('span',{class:'visit-kind'+(entry.source==='action'?' check':'')},entry.kind);
@@ -2021,15 +2021,15 @@ _DOCUMENT = r"""<!doctype html>
               const editor=node('div',{class:'visit-editor'}),label=node('label',{},entry.source==='action'?'Answer / notes':'Pickup notes'),note=node('textarea',{rows:'2',maxlength:'4000','aria-label':(entry.source==='action'?'Answer for ':'Pickup notes for ')+entry.title});
               const localId=day+'|'+entry.key;let previous=savedEntry(day,entry.key),draft=readLocal().drafts?.[localId];
               note.value=draft?.note??(entry.source==='action'?entry.note:previous?.note)??previous?.note??'';
-              const doneLabel=node('label',{class:'visit-done'}),done=node('input',{type:'checkbox','aria-label':(entry.source==='action'?'Check complete: ':'Pulled: ')+entry.title});done.checked=draft?.done??(entry.source==='action'?taskNow(entry)?.status==='complete':previous?.done)??false;done.disabled=!!entry.invalid;
+              const doneLabel=node('label',{class:'visit-done'}),done=node('input',{type:'checkbox','aria-label':(entry.source==='action'?'Check complete: ':'Pulled: ')+entry.title});done.checked=draft?.done??(entry.source==='action'?taskNow(entry)?.status==='complete':entry.pulled)??false;done.disabled=!!entry.invalid;
               append(doneLabel,done,document.createTextNode(entry.source==='action'?'Check complete':'Pulled from storage'));
               const tools=node('div',{class:'visit-entry-tools'}),save=node('button',{type:'button'},'Save notes'),restore=node('button',{type:'button'},'Use saved version');
               const message=node('p',{class:'visit-save-status',role:'status','aria-live':'polite'}),printNote=node('p',{class:'visit-print-note'});
               append(label,note);append(editor,label);append(tools,doneLabel,save,restore);append(line,editor,tools,message,printNote);append(box,line);
               let timer=null,saving=false,draftKept=true,baseSignature=draft?.base??signature(entry,day);
               const setMessage=(text,error=false)=>{message.textContent=text;message.classList.toggle('error',error)};
-              const sync=()=>{line.classList.toggle('finished',entry.source==='action'?taskNow(entry)?.status==='complete':!!savedEntry(day,entry.key)?.done);printNote.textContent='Notes: '+note.value;updateBox();updateProgress()};sync();
-              if(!peers.has(entry.key))peers.set(entry.key,[]);peers.get(entry.key).push({sync:()=>{const pending=readLocal().drafts?.[localId];if(!pending&&!saving){note.value=(entry.source==='action'?taskNow(entry)?.note:savedEntry(day,entry.key)?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!savedEntry(day,entry.key)?.done;baseSignature=signature(entry,day);}sync()}});
+              const sync=()=>{line.classList.toggle('finished',entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled);printNote.textContent='Notes: '+note.value;updateBox();updateProgress()};sync();
+              if(!peers.has(entry.key))peers.set(entry.key,[]);peers.get(entry.key).push({sync:()=>{const pending=readLocal().drafts?.[localId];if(!pending&&!saving){note.value=(entry.source==='action'?taskNow(entry)?.note:savedEntry(day,entry.key)?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled;baseSignature=signature(entry,day);}sync()}});
               setMessage(draft?'Unsaved draft on this device.':previous?'Saved '+new Date(previous.updated_at).toLocaleTimeString():entry.source==='action'?'Answers save here and in Action Items.':'Check off when this assigned copy has been pulled.');restore.hidden=!draft;
               const keepDraft=()=>{const local=readLocal();local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};const kept=writeLocal(local);draftKept=kept;restore.hidden=false;setMessage(kept?'Not yet saved. Draft kept on this device.':'Not yet saved. Keep this page open until saved.',!kept);printNote.textContent='Notes: '+note.value;};
               const persist=()=>{
@@ -2041,7 +2041,7 @@ _DOCUMENT = r"""<!doctype html>
                     if(signature(entry,day)!==baseSignature)throw Error('This item changed elsewhere. Your draft is kept. Copy your answer, then choose Use saved version to review the latest.');
                     const response=await fetch(base+'/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Workspace-Token':state.token},body:JSON.stringify({kind:'storage_visit',source:entry.source,id:entry.id,fingerprint:entry.fingerprint,submission:entry.submission,reference:entry.reference,slot:entry.slot,visit_date:day,revision:state.revision,...values})});
                     const result=await response.json();if(!response.ok)throw Error(result.error||'Save failed.');
-                    state=result;workspaceState={...result,connected:true};baseSignature=signature(entry,day);
+                    state=result;workspaceState={...result,connected:true};if(entry.source==='pick'){entry.pulled=values.done;allEntries.get(entry.key).pulled=values.done;}baseSignature=signature(entry,day);
                     const local=readLocal();if(note.value===values.note&&done.checked===values.done){if(local.drafts)delete local.drafts[localId];restore.hidden=true;setMessage('Saved · '+new Date().toLocaleTimeString());}else{local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};setMessage('New changes waiting to save.');}writeLocal(local);updatePeers(entry.key);
                   }catch(error){setMessage('Not saved — '+error.message+' Reconnect and Reload latest to retry. '+(draftKept?'Your draft remains on this device.':'Keep this page open; the draft could not be stored on this device.'),true);done.checked=values.done;}
                   finally{saving=false;busy--;save.disabled=!!entry.invalid;done.disabled=!!entry.invalid;restore.disabled=false;}
@@ -2049,7 +2049,7 @@ _DOCUMENT = r"""<!doctype html>
               };
               note.oninput=()=>{keepDraft();clearTimeout(timer);timer=setTimeout(persist,900)};
               done.onchange=persist;save.onclick=persist;save.disabled=!!entry.invalid;
-              restore.onclick=()=>{clearTimeout(timer);const local=readLocal();if(local.drafts)delete local.drafts[localId];writeLocal(local);previous=savedEntry(day,entry.key);note.value=(entry.source==='action'?taskNow(entry)?.note:previous?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!previous?.done;baseSignature=signature(entry,day);restore.hidden=true;setMessage('Showing the last loaded saved version.');sync()};
+              restore.onclick=()=>{clearTimeout(timer);const local=readLocal();if(local.drafts)delete local.drafts[localId];writeLocal(local);previous=savedEntry(day,entry.key);note.value=(entry.source==='action'?taskNow(entry)?.note:previous?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled;baseSignature=signature(entry,day);restore.hidden=true;setMessage('Showing the last loaded saved version.');sync()};
             }
             const next=node('button',{type:'button',class:'visit-next'},groupIndex===ordered.length-1?'Back to box list':'Next box →');next.onclick=()=>{if(busy){notice.textContent='Wait for your changes to finish saving.';return}const target=sections[groupIndex+1];box.open=false;if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'})}else controls.scrollIntoView({block:'start',behavior:'smooth'})};append(box,next);append(content,box);
           });
