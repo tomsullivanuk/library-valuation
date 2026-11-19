@@ -27,7 +27,59 @@ SUBTOPICS = [
  ('spirituality','Spirituality & Saints','religion',r'spiritual|saints|prayer|devotion|contemplation'),
  ('american','American history','history-politics',r'american history|united states|lincoln|civil war'),
  ('poetry','Poetry','literature',r'\bpoetry\b|\bpoems\b'),
+ ('modern','Modern philosophy','philosophy',r'philosophy, modern|modern philosophy|\bdescartes\b|\bspinoza\b|\bleibniz\b|\bkant\b|\bhegel\b|\bhume\b|\blocke\b|\bwittgenstein\b'),
+ ('logic','Logic & Argument','logic-mathematics',r'\blogic\b|logical|reasoning|argumentation|syllogis|fallac'),
+ ('math-foundations','Foundations of mathematics','logic-mathematics',r'foundations? of mathematics|set theory|\bgödel\b|\bgodel\b|\bgoedel\b|incompleteness|mathematical logic'),
+ ('mathematics','Mathematics','logic-mathematics',r'mathematic|\balgebra\b|\bgeometry\b|\bcalculus\b|number theory'),
+ ('probability','Probability & Statistics','logic-mathematics',r'probability|statistics|statistical|bayesian'),
+ ('theology','Christian theology','religion',r'christian theology|christian doctrine|christology|trinity|incarnation|theological|\btheology\b'),
+ ('world-religions','Religious traditions','religion',r'world religions|comparative religion|judaism|\bjewish\b|\bislam\b|\bmuslim\b|buddhis|hinduis|religions of'),
+ ('bible-editions','Bible editions','bible',r'study bible|holy bible|new american bible|new jerusalem bible|revised standard version'),
+ ('old-testament','Old Testament & Hebrew Bible','bible',r'old testament|hebrew bible|\btorah\b|\bpsalms\b|book of genesis|\bpentateuch\b'),
+ ('new-testament','New Testament & Gospels','bible',r'new testament|\bgospels?\b|gospel of|pauline|epistles?|revelation of john'),
+ ('biblical-interpretation','Biblical interpretation & History','bible',r'biblical history|biblical interpretation|bible.{0,30}(commentar|interpret|history)|scriptur.{0,30}interpret|exegesis|hermeneutic'),
+ ('ancient-history','Ancient history','history-politics',r'ancient history|history, ancient|ancient greece|ancient rome|roman empire|roman republic|greek history|history of rome|peloponnesian|classical world'),
+ ('european-history','European history','history-politics',r'european history|history of europe|british history|english history|french history|history of england|history of britain|history of france|history of germany|england.{0,15}history|france.{0,15}history'),
+ ('medieval-history','Medieval history','history-politics',r'medieval history|history, medieval|middle ages|crusades|medieval europe'),
+ ('world-history','World history','history-politics',r'world history|global history|world civilization|world civilisations|history of the world'),
+ ('political-thought','Politics & Political thought','history-politics',r'politic|democracy|government|liberalism|conservatism|totalitarian|constitutional'),
+ ('war-history','War & Military history','history-politics',r'military history|world war|civil war|revolutionary war|napoleonic wars|warfare|battle of'),
+ ('historical-lives','Historical lives','biography',r'lincoln|washington.{0,15}(life|biograph)|president.{0,20}biograph|biograph.{0,20}president'),
+ ('thinkers-lives','Lives of thinkers & Writers','biography',r'(philosopher|scientist|writer|author).{0,30}biograph|biograph.{0,30}(philosopher|scientist|writer|author)'),
+ ('religious-lives','Religious lives','biography',r'saints.{0,20}(life|biograph)|lives of (the )?saints|spiritual autobiograph|religious biograph'),
+ ('memoir','Memoir & Autobiography','biography',r'memoir|autobiograph|personal narrative'),
+ ('fiction','Fiction','literature',r'\bfiction\b|\bnovels?\b|short stories'),
+ ('drama','Drama','literature',r'\bdrama\b|\bplays\b|tragedies|comedies|shakespeare'),
+ ('literary-criticism','Literary criticism','literature',r'literary criticism|literary history|criticism and interpretation|literary theory'),
+ ('classics','Greek & Roman classics','literature',r'\bhomer\b|\biliad\b|\bodyssey\b|\bvirgil\b|\baeneid\b|classical literature|greek literature|latin literature'),
+ ('physics-astronomy','Physics & Astronomy','science-nature',r'\bphysics\b|astronom|cosmolog|quantum|relativity|\buniverse\b'),
+ ('biology-nature','Biology & Natural history','science-nature',r'\bbiology\b|natural history|evolution|ecology|\bbirds\b|botany|zoology'),
+ ('science-history','History & Philosophy of science','science-nature',r'history of science|philosophy of science|science.{0,15}history|scientific revolution'),
+ ('earth-environment','Earth & Environment','science-nature',r'geolog|earth science|environment|climate|oceanograph'),
+ ('art-history','Art history','art',r'art history|history of art|artists|art criticism'),
+ ('drawing-painting','Drawing & Painting','art',r'\bdrawing\b|\bpainting\b|watercolor|watercolour|color mixing|colour mixing'),
+ ('photography','Photography','art',r'photograph'),
+ ('music','Music','art',r'\bmusic\b|musical|composers|symphon'),
+ ('psychology','Psychology','society',r'psycholog|psychiatr|psychotherap'),
+ ('education','Education & Learning','society',r'education|teaching|pedagogy|learning|schools'),
+ ('social-questions','Society & Social questions','society',r'sociolog|social sciences|social conditions|social change|social justice'),
+ ('health','Health & Wellbeing','society',r'\bhealth\b|\bmedicine\b|nutrition|wellbeing|well-being'),
+ ('practical','Home, Garden & Travel','society',r'\bcooking\b|cookbook|gardening|\btravel\b|home improvement'),
 ]
+
+
+SUBTOPIC_LC = {
+    'logic': r'^BC', 'mathematics': r'^QA',
+    'theology': r'^BT', 'world-religions': r'^(BM|BP|BQ)',
+    'american': r'^[EF]', 'ancient-history': r'^DE',
+    'european-history': r'^(DA|DB|DC|DD|DF|DG|DH|DJ|DK|DL|DP|DQ|DR)',
+    'political-thought': r'^J', 'war-history': r'^[UV]',
+    'classics': r'^PA', 'fiction': r'^PZ',
+    'physics-astronomy': r'^(QB|QC)', 'biology-nature': r'^(QH|QK|QL|QM|QP|QR)',
+    'earth-environment': r'^QE', 'art-history': r'^N', 'music': r'^M',
+    'psychology': r'^BF', 'education': r'^L', 'social-questions': r'^H',
+    'health': r'^R', 'practical': r'^(SB|TX|G[0-9])',
+}
 
 def classify(book, metadata=None, override=None):
     if override is not None:
@@ -42,7 +94,7 @@ def classify(book, metadata=None, override=None):
     # Named thinkers are useful only as bibliographic topic signals, not broad
     # assumptions about every book by an author.
     for id,_,parent,pattern in SUBTOPICS:
-        if re.search(pattern,evidence):result.update((parent,id))
+        if re.search(pattern,evidence) or any(re.search(SUBTOPIC_LC.get(id,r'(?!)'),c) for c in classes):result.update((parent,id))
     return sorted(result)
 
 

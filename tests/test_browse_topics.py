@@ -23,3 +23,19 @@ def test_stale_isbn_metadata_is_not_applied(tmp_path):
 
 def test_review_override_supports_subtopics_and_rejects_unknown_labels():
     assert classify({'title':'Physics'},override=['ancient','made-up'])==['ancient','philosophy']
+
+
+def test_history_subtopics_from_catalog_subjects_and_lc():
+    assert 'american' in classify({'title':'A life'},{'lcc':'E457.2'})
+    assert 'european-history' in classify({'title':'A kingdom'},{'lcc':'DA30'})
+    assert 'ancient-history' in classify({'title':'The Roman Empire'})
+    assert 'political-thought' in classify({'title':'A treatise'},{'lcc':'JC71'})
+    assert 'war-history' in classify({'title':'World War II'})
+    assert 'medieval-history' in classify({'title':'The Middle Ages'})
+
+
+def test_each_broad_topic_has_narrower_subjects():
+    result=build({'a':{'title':'Uninformative'}})
+    assert all(t['subtopics'] for t in result['topics'] if t['id']!='more')
+    assert 'fiction' in classify({'title':'A novel'})
+    assert 'drawing-painting' in classify({'title':'Drawing and painting'})

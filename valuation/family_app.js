@@ -42,7 +42,38 @@ async function submitRequest(message,send){if(busy)return;if(!me.draft.books.len
 (async()=>{try{me=await api('/api/me');if(me.owner){location.replace('/owner/');return}document.querySelector('#signed-in').textContent='Signed in as '+me.email;status.textContent='Your list is saved automatically as you add or remove books.';document.querySelector('#inbox').hidden=true;for(const c of cards)c.querySelector('.choose').onclick=()=>{const ref=c.dataset.ref;change(me.draft.books.includes(ref)?me.draft.books.filter(x=>x!==ref):[...me.draft.books,ref],me.draft.message)};document.querySelector('#browse').onclick=showBrowse;document.querySelector('#mine').onclick=showMine;search.oninput=searchChanged;search.maxLength=500;update()}catch(e){status.textContent='Unable to load your list. Refresh to sign in again.';document.querySelector('#signed-in').textContent='Sign-in could not be verified.';for(const b of document.querySelectorAll('button'))b.disabled=true}})();
 
 async function loadTopics(){
-const section=document.createElement('section');section.id='browse-topics';document.querySelector('#search-tools').before(section);const heading=el('h2','Browse by topic',section);const note=el('p','Explore the collection. Books may appear in more than one topic; counts reflect books currently available to request.',section);note.className='muted';const content=el('div','',section);content.style.cssText='display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0';const sub=el('div','',section);sub.style.cssText='display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0';const feedback=el('p','',section);feedback.setAttribute('role','status');
-try{topicData=await api('/api/topics');function draw(){content.replaceChildren();sub.replaceChildren();const choose=(id)=>{selectedTopic=id;draw();if(me)update()};const all=button('All topics',()=>choose(''),content);all.setAttribute('aria-pressed',String(!selectedTopic));for(const topic of topicData.topics.filter(t=>t.count)){const b=button(topic.title+' ('+topic.count+')',()=>choose(topic.id),content);b.title=topic.description;b.setAttribute('aria-pressed',String(selectedTopic===topic.id||topic.subtopics.some(s=>s.id===selectedTopic)));if(selectedTopic===topic.id||topic.subtopics.some(s=>s.id===selectedTopic)){feedback.textContent=topic.description;for(const child of topic.subtopics.filter(s=>s.count)){const c=button(child.title+' ('+child.count+')',()=>choose(child.id),sub);c.setAttribute('aria-pressed',String(selectedTopic===child.id))}}}if(!selectedTopic)feedback.textContent='Choose a topic, then narrow it with search.'}draw();if(me)update()}catch(e){content.textContent='Topic browsing is temporarily unavailable. You can still search the library.'}
+  const section=document.createElement('section');section.id='browse-topics';document.querySelector('#search-tools').before(section);
+  el('style',`#browse-topics .topic-grid{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0 1rem}#browse-topics .topic-grid button{font-weight:600}#browse-topics .subtopic-panel{margin:1rem 0;padding:1rem 1.2rem;background:#edf3ee;border-left:4px solid #245d49;border-radius:0 8px 8px 0}#browse-topics .subtopic-panel h3{font:600 1rem system-ui;margin:0 0 .4rem}#browse-topics .subtopic-grid{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}#browse-topics .subtopic-grid button{font-size:.92rem;border-radius:999px;padding:.3rem .75rem}#browse-topics .topic-path{font-size:.9rem;color:#4e6256;margin:.6rem 0}#browse-topics .topic-level{font-weight:600;margin-top:.7rem}`,section);
+  el('h2','Browse by topic',section);
+  el('p','Books may appear in more than one topic. Counts show catalog records currently available to request.',section).className='muted';
+  el('p','1. Choose a topic',section).className='topic-level';
+  const content=el('div','',section);content.className='topic-grid';content.setAttribute('role','group');content.setAttribute('aria-label','Broad topics');
+  const detail=el('section','',section);detail.className='subtopic-panel';detail.setAttribute('aria-label','Narrower subjects');detail.hidden=true;
+  const path=el('p','',section);path.className='topic-path';path.setAttribute('role','status');
+  try{
+    topicData=await api('/api/topics');
+    function draw(){
+      content.replaceChildren();detail.replaceChildren();detail.hidden=true;
+      const choose=id=>{selectedTopic=id;draw();if(me)update()};
+      const all=button('All topics',()=>choose(''),content);all.setAttribute('aria-pressed',String(!selectedTopic));
+      let active=null;
+      for(const topic of topicData.topics.filter(t=>t.count)){
+        const isActive=selectedTopic===topic.id||topic.subtopics.some(s=>s.id===selectedTopic);
+        const b=button(topic.title+' ('+topic.count+')',()=>choose(topic.id),content);b.title=topic.description;b.setAttribute('aria-pressed',String(isActive));if(isActive)active=topic;
+      }
+      if(active){
+        const child=active.subtopics.find(s=>s.id===selectedTopic);
+        path.textContent='Browsing: All topics › '+active.title+(child?' › '+child.title:'');
+        const children=active.subtopics.filter(s=>s.count);
+        if(children.length){
+          detail.hidden=false;el('h3','2. Narrow '+active.title,detail);el('p',active.description,detail).className='muted';
+          const sub=el('div','',detail);sub.className='subtopic-grid';sub.setAttribute('role','group');sub.setAttribute('aria-label','Subtopics within '+active.title);
+          const any=button('All '+active.title+' ('+active.count+')',()=>choose(active.id),sub);any.setAttribute('aria-pressed',String(selectedTopic===active.id));
+          for(const subject of children){const b=button(subject.title+' ('+subject.count+')',()=>choose(subject.id),sub);b.setAttribute('aria-pressed',String(selectedTopic===subject.id))}
+        }
+      }else path.textContent='Browsing: All topics';
+    }
+    draw();if(me)update();
+  }catch(e){content.textContent='Topic browsing is temporarily unavailable. You can still search the library.'}
 }
 loadTopics();
