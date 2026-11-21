@@ -520,6 +520,16 @@ def make_server(store, port=8765):
                     return self.send(200,json.dumps(result).encode())
                 except family_owner.requests.Conflict as e: return self.send(409,json.dumps(dict(error=str(e))).encode())
                 except (ValueError,KeyError,TypeError) as e: return self.send(400,json.dumps(dict(error=str(e))).encode())
+            if self.path == "/api/applications" and self.headers.get("Content-Type") == "application/json":
+                from valuation import registration, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 8192:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    return self.send(200,json.dumps(registration.decide(config,config['owner_email'],body)).encode())
+                except registration.ledger.Conflict as exc:return self.send(409,json.dumps(dict(error=str(exc))).encode())
+                except (ValueError,KeyError,TypeError) as exc:return self.send(400,json.dumps(dict(error=str(exc))).encode())
             if self.path == "/api/users" and self.headers.get("Content-Type") == "application/json":
                 from valuation import family_users, family_owner
                 try:

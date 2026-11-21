@@ -102,7 +102,8 @@ def state(config):
         history=[dict(r) for r in db.execute('SELECT actor,email,created,payload FROM user_events ORDER BY id DESC LIMIT 100')]
         for event in history:event['details']=json.loads(event.pop('payload'))
     cfg=config.get('user_access',{})
-    return dict(users=users,history=history,origin=config['origin'],configured=bool(cfg.get('token_file') and Path(cfg['token_file']).is_file()),connection_expires_on=cfg.get('expires_on'),owner=config['owner_email'])
+    from valuation.registration import state as applications
+    return dict(applications=applications(config),registration_open=bool(config.get('registration',{}).get('enabled')),users=users,history=history,origin=config['origin'],configured=bool(cfg.get('token_file') and Path(cfg['token_file']).is_file()),connection_expires_on=cfg.get('expires_on'),owner=config['owner_email'])
 
 
 def update(config,actor,body,provider=None):

@@ -81,6 +81,8 @@ class App:
         store.connect(self.db).close();os.chmod(self.db,0o600)
         from valuation.family_notifications import initialize
         initialize(self.db)
+        from valuation import registration
+        registration.initialize(config)
     def raw_catalog(self):
         raw=Path(self.config['snapshot']).read_bytes();records=json.loads(raw)
         from valuation.family_catalog import FIELDS
@@ -143,6 +145,10 @@ class App:
                         if write:return self.reply(409,{'error':'Open the new library address before saving'})
                         self.send_response(302);self.send_header('Location',app.config['origin']+self.path);self.send_header('Cache-Control','no-store');self.send_header('Content-Length','0');self.end_headers();return
                     if hostname!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
+                    public_path=urlsplit(self.path).path
+                    if public_path=='/register' or public_path.startswith('/register/'):
+                        from valuation.registration import public_request
+                        return public_request(app.config,self,public_path,write)
                     try:email=app.identity(self.headers.get('Cf-Access-Jwt-Assertion',''))
                     except jwt.PyJWKClientConnectionError:
                         return self.reply(503,'<!doctype html><html lang="en"><title>Sign-in temporarily unavailable</title><h1>Sign-in temporarily unavailable</h1><p>We could not verify your sign-in right now. Please try again shortly.</p><a href="/">Try again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(503,{'error':'Sign-in verification temporarily unavailable. Please retry.'})

@@ -15,8 +15,8 @@ def server(tmp_path):
   if token not in ['owner@example.org','guest@example.org']:raise ValueError()
   return token
  app=App(config,identity);srv=ThreadingHTTPServer(('127.0.0.1',0),app.handler());threading.Thread(target=srv.serve_forever,daemon=True).start()
- def call(path,who='guest@example.org',data=None,origin='https://family.example'):
-  req=Request('http://127.0.0.1:'+str(srv.server_port)+path,data=json.dumps(data).encode() if data is not None else None,headers={'Host':'family.example','Origin':origin,'Content-Type':'application/json','X-Family-Request':'1','Cf-Access-Jwt-Assertion':who})
+ def call(path,who='guest@example.org',data=None,origin='https://family.example',registration=False):
+  req=Request('http://127.0.0.1:'+str(srv.server_port)+path,data=json.dumps(data).encode() if data is not None else None,headers={'Host':'family.example','Origin':origin,'Content-Type':'application/json','X-Family-Request':'1','Cf-Access-Jwt-Assertion':who,**({'X-Registration':'1'} if registration else {})})
   try:r=urlopen(req)
   except HTTPError as e:r=e
   return r.code,r.read()
@@ -230,3 +230,31 @@ def test_notification_status_private_and_visits_ignore_polling(server):
  with closing(connect(server.app.db)) as db:
   rows=db.execute('SELECT email FROM notification_visits').fetchall()
   assert [r[0] for r in rows]==['guest@example.org']
+
+
+def test_public_registration_is_isolated_and_requires_origin(server,monkeypatch):
+ from valuation import registration as reg
+ from valuation.family_requests import connect
+ from contextlib import closing
+ config=server.app.config
+ secret=Path(config['database']).parent/'registration-secret';secret.write_text('synthetic-secret')
+ config['registration']=dict(enabled=True,secret_file=str(secret))
+ monkeypatch.setattr(reg,'lookup_zip',lambda postal:dict(places=[dict(city='Example',region='NY')]))
+ assert server('/register',who='forged')[0]==200
+ assert server('/register/app.js',who='forged')[0]==200
+ assert server('/register/zip?postal=00501',who='forged')[0]==200
+ assert server('/register/../owner/',who='forged')[0] in {403,404}
+ assert server('/owner/api/users',who='forged')[0]==403
+ assert server('/api/me',who='forged')[0]==403
+ # Existing fixture sends the family header, not the required registration header.
+ form=dict(name='Reader',email='reader@example.org',street='100 Example',country='US',postal='00501',city='Example',region='NY')
+ assert server('/register/submit',who='forged',data=form)[0]==403
+ with closing(connect(config['database'])) as db:
+  assert db.execute('SELECT count(*) FROM registration_applications').fetchone()[0]==0
+ assert server('/register/submit',who='forged',data=form,registration=True,origin='https://evil.example')[0]==403
+ assert server('/register/submit',who='forged',data=form,registration=True)[0]==200
+ with closing(connect(config['database'])) as db:
+  row=db.execute('SELECT status FROM registration_applications').fetchone()
+  assert row[0]=='unverified'
+ config['registration']['enabled']=False
+ assert server('/register',who='forged')[0]==404

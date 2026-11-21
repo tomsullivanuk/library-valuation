@@ -21,6 +21,8 @@ def schema(db, now):
       state TEXT NOT NULL DEFAULT 'queued',attempts INTEGER NOT NULL DEFAULT 0,first_attempt TEXT,
       next_attempt TEXT,provider_id TEXT,error TEXT);
     ''')
+    if 'recipient' not in {r[1] for r in db.execute('PRAGMA table_info(notification_outbox)')}:
+        db.execute('ALTER TABLE notification_outbox ADD COLUMN recipient TEXT')
     with db:
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('started', now.isoformat()))
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('digest_day', now.astimezone(ZONE).date().isoformat()))
@@ -41,8 +43,10 @@ def visit(path, email, owner, now=None):
           (now.astimezone(ZONE).date().isoformat(), email, now.isoformat(), now.isoformat()))
 
 
-def enqueue(db, key, subject, text):
-    db.execute('INSERT OR IGNORE INTO notification_outbox(id,subject,text) VALUES(?,?,?)', (key, subject, text))
+def enqueue(db, key, subject, text, recipient=None):
+    from valuation.family_users import email
+    recipient = email(recipient or RECIPIENT)
+    db.execute('INSERT OR IGNORE INTO notification_outbox(id,subject,text,recipient) VALUES(?,?,?,?)', (key, subject, text, recipient))
 
 
 
@@ -150,7 +154,7 @@ def send_icloud(mail, password, payload, key, first, mark_sending):
     from email.utils import format_datetime
     message = EmailMessage()
     message['From'] = payload['sender']
-    message['To'] = RECIPIENT
+    message['To'] = ', '.join(payload['to'])
     message['Subject'] = payload['subject']
     message['Date'] = format_datetime(first)
     message['Message-ID'] = '<'+key+'@wearyfather.org>'
@@ -165,7 +169,7 @@ def send_icloud(mail, password, payload, key, first, mark_sending):
         smtp.login(mail['smtp_username'], password)
         mark_sending()
         try:
-            refused = smtp.send_message(message, from_addr='library@wearyfather.org', to_addrs=[RECIPIENT])
+            refused = smtp.send_message(message, from_addr='library@wearyfather.org', to_addrs=payload['to'])
             if refused:
                 raise smtplib.SMTPRecipientsRefused(refused)
         except (smtplib.SMTPResponseException, smtplib.SMTPRecipientsRefused):
@@ -224,7 +228,7 @@ def tick(config, now=None, sender=None):
                         db.execute("UPDATE notification_outbox SET state='needs_review',error='Retry window expired; check provider before resending' WHERE id=?", (row['id'],))
                     continue
                 payload = json.loads(row['payload']) if row['payload'] else dict(
-                    sender=mail['from'], to=[RECIPIENT], subject=row['subject'], text=row['text'], provider=provider)
+                    sender=mail['from'], to=[row['recipient'] or RECIPIENT], subject=row['subject'], text=row['text'], provider=provider)
                 if payload.get('provider', 'resend') != provider:
                     with db:
                         db.execute("UPDATE notification_outbox SET state='needs_review',error='Delivery provider changed; confirm prior delivery before resending' WHERE id=?", (row['id'],))
