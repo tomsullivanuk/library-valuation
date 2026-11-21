@@ -835,6 +835,7 @@ _DOCUMENT = r"""<!doctype html>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
     <a href="#actions" data-nav="actions">Action Items</a>
     <a href="#requests" data-nav="requests">Requests</a>
+    <a href="#selling" data-nav="selling">Sale preparation</a>
     <a href="#users" data-nav="users">Users</a>
     <a href="#reports" data-nav="reports">Reports</a>
     <a href="#settings" data-nav="settings">Settings</a>
@@ -1191,12 +1192,12 @@ _DOCUMENT = r"""<!doctype html>
         }
         const changed = !requestStatusLoaded || JSON.stringify([...next]) !== JSON.stringify([...libraryRequests]);
         libraryRequests = next; requestStatusLoaded = true;
-        if (changed && ["library", "book", "home", "explore", "catalog-report"].includes(currentRoute()[0])) renderRoute();
-      } catch (error) { requestStatusLoaded = false; }
+        if (changed && ["library", "book", "home", "explore", "catalog-report", "selling"].includes(currentRoute()[0])) renderRoute();
+      } catch (error) { const wasLoaded = requestStatusLoaded; requestStatusLoaded = false; if (wasLoaded && currentRoute()[0] === "selling") renderSelling(); }
       finally { requestStatusBusy = false; }
     }
-    setInterval(() => { if (!document.hidden && ["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); }, 15000);
-    window.addEventListener("focus", () => { if (["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); });
+    setInterval(() => { if (!document.hidden && ["library", "book", "catalog-report", "selling"].includes(currentRoute()[0])) refreshLibraryRequests(); }, 15000);
+    window.addEventListener("focus", () => { if (["library", "book", "catalog-report", "selling"].includes(currentRoute()[0])) refreshLibraryRequests(); });
     function requestCopyDetails(book) {
       const data = libraryRequests.get(book.catalog_item_id), section = node("section", {class:"panel"});
       append(section, node("h3", {}, "Requests and assigned copies"));
@@ -1399,9 +1400,56 @@ _DOCUMENT = r"""<!doctype html>
       if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-notifications"}, "Email notifications — setup and delivery status")));
     }
 
+    function libraryPlan() {
+      const section = node("section", {class:"panel", "aria-label":"Your library plan"});
+      append(section, node("h2", {}, "Share first, sell what remains"),
+        node("p", {}, "Through December 31, 2026: share books with friends and family. From January 2027: review what remains and sell what is worthwhile."),
+        node("p", {class:"muted"}, "Use Requests to reserve a specific copy. When it permanently leaves, mark it transferred as a Gift or Sale. Pulling a book or saving a disposition does not record a handover. Recorded transfers reduce the available inventory; purchase and research history stay intact."),
+        routeLink("Manage requests and handovers", "requests", "button-link"),
+        routeLink("Prepare the remaining books for sale", "selling", "button-link secondary"));
+      return section;
+    }
+    function saleCandidate(book, requestData) {
+      const disposition = dispositionValue(Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition);
+      if (!activeCatalogIds.has(book.catalog_item_id) || ["keep", "gift_donate", "recycle"].includes(disposition)) return null;
+      const available = requestData ? requestData.copies.filter(c => !c.assignment).length : Number(book.copy_count);
+      if (!(available > 0)) return null;
+      return {book, available, pending: Boolean(requestData?.events.some(e => e.state === "pending")), disposition};
+    }
+    function renderSelling() {
+      clear(); heading("Sale preparation", "For January 2027 onward — a planning list, not a commitment to sell.");
+      append(main, libraryPlan(), node("p", {}, "Use the existing estimates to decide what is worth selling individually, in bundles, or to a bookseller. Further valuation research is optional and can wait until a particular sale warrants it. Nothing is automatically listed or repriced at year-end."));
+      if (!requestStatusLoaded) {
+        append(main, node("p", {role:"status"}, "Live requests and reservations are unavailable or loading. No sale list is shown until they can be checked."));
+        const retry = node("button", {type:"button"}, "Retry live status");
+        retry.onclick = () => { requestStatusStamp = 0; refreshLibraryRequests(); }; append(main, retry); return;
+      }
+      const candidates = DATA.books.map(book => saleCandidate(book, libraryRequests.get(book.catalog_item_id))).filter(Boolean);
+      const ready = candidates.filter(row => !row.pending), waiting = candidates.filter(row => row.pending);
+      append(main, node("p", {class:"notice"}, "Reserved and transferred copies are excluded. Books marked Keep, Gift / Donate, or Recycle are also excluded. Unassigned and Undecided books are included for review. A pending request stays separate until you decide it."));
+      const exports = node("button", {type:"button"}, "Export sale preparation CSV");
+      exports.onclick = () => {
+        const rows = [["Catalog ID","Title","Author","ISBN","Unassigned copies","Location","Saved estimate","Saved disposition"], ...ready.map(r => [r.book.catalog_item_id,r.book.title,r.book.author,r.book.isbn13 || r.book.isbn10,r.available,r.book.location_summary,r.book.estimated_value_display,dispositionText(r.disposition || "undecided")])];
+        const csv = rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+        const url = URL.createObjectURL(new Blob(["\ufeff" + csv], {type:"text/csv;charset=utf-8"}));
+        const a = node("a", {href:url,download:"sale-preparation.csv"}); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      };
+      exports.disabled = !ready.length; append(main, exports);
+      for (const [title, rows] of [["Unassigned copies to consider", ready], ["Awaiting a request decision", waiting]]) {
+        append(main, node("h2", {}, `${title} — ${rows.length.toLocaleString()} catalog records · ${rows.reduce((n,r) => n+r.available,0).toLocaleString()} copies`));
+        if (!rows.length) append(main, node("p", {}, "No books in this group."));
+        for (const row of rows.sort((a,b) => a.book.title.localeCompare(b.book.title))) {
+          const card = node("article", {class:"panel"});
+          append(card, routeLink(row.book.title, `book/${encodeURIComponent(row.book.catalog_item_id)}`), node("p", {}, `${row.available} unassigned ${row.available === 1 ? "copy" : "copies"} · Location ${row.book.location_summary || "not recorded"} · Saved estimate: ${row.book.estimated_value_display || "not available"}`));
+          if (row.pending) append(card, node("p", {}, "Decide the pending request before treating this book as available for sale."));
+          append(main, card);
+        }
+      }
+    }
     function renderLibrary(reportScope = "") {
       libraryState.scope = reportScope || (completedInventory.completed ? "present" : "");
       clear();
+      if (!reportScope) append(main, libraryPlan());
       const controls = node("form", {class: "library-controls", role: "search"});
       const searchRow = node("div", {class: "search-row"});
       const searchLabel = node("label", {for: "library-search"}, "Search");
@@ -2194,7 +2242,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     function renderRoute() {
       const [route, id] = currentRoute();
-      if (["library", "book", "home", "explore", "catalog-report"].includes(route)) refreshLibraryRequests();
+      if (["library", "book", "home", "explore", "catalog-report", "selling"].includes(route)) refreshLibraryRequests();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
           || (["recommendations", "recommendation"].includes(route) && link.dataset.nav === "actions")
@@ -2207,6 +2255,7 @@ _DOCUMENT = r"""<!doctype html>
       else if (route === "recommendations" || route === "actions") renderActions(id);
       else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
       else if (route === "users") { main.replaceChildren(); window.dispatchEvent(new Event("owner-users")); }
+      else if (route === "selling") renderSelling();
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();

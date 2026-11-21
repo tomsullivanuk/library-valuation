@@ -891,3 +891,19 @@ Use [the owner workspace](https://library.wearyfather.org/owner/) and its **User
 Guest changes coordinate the dedicated Cloudflare email policy with the local user registry. A failed grant remains pending; disabling access takes effect locally immediately even when Cloudflare is unavailable. Retry synchronization from Users. Invitations offer a link, copyable instructions and an email draft; nothing is sent automatically. The private provider token stays on the Mini, outside Git and browser responses. Its expiry is displayed in Users.
 
 Completed request submissions can be archived and restored in **Requests**. Archiving hides them from the normal owner inbox while preserving recipient history, transfer accounting and source records. Explicit test-data cleanup is a separate preview-and-backup operation; it does not erase library or purchase history. See [administration and recovery](docs/OWNER_USERS_AND_ADDRESS.md).
+
+### Sharing through year-end, then sale preparation
+
+The owner Library shows the plan to share with friends and family through
+December 31, 2026, then review remaining books for sale from January 2027.
+Requests remains the copy-level reservation and handover ledger: mark a permanent
+handover as Gift or Sale only when the copy leaves. Pulling and disposition changes
+do not record a transfer. Transfers reduce current inventory without removing
+purchase, inventory, or research history; Libib still needs its separate update.
+
+Sale preparation is an owner-only planning view and CSV export using saved
+estimates. It includes unassigned copies from current inventory, excludes Keep,
+Gift / Donate and Recycle plans, and separates books with pending requests.
+Reserved/transferred copies are excluded; a partially assigned title can retain
+its other unassigned copies. Live request status must load before the list is
+shown. January does not trigger automatic sales, repricing, or further research.
