@@ -200,11 +200,11 @@ def lookup_zip(postal):
         return dict(places=[],notice='City and state could not be filled in. Please enter them below.')
 
 
-STYLE='body{max-width:680px;margin:2rem auto;padding:1rem;font:18px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}label{display:block;margin:.8rem 0}input,select,button,textarea{box-sizing:border-box;font:inherit;padding:.65rem;max-width:100%;width:100%}button{background:#245d49;color:white;border:0;border-radius:6px;margin-top:1rem;min-height:44px}.muted{color:#5d6a62}.trap{position:absolute;left:-9999px}[hidden]{display:none!important}'
+STYLE='body{max-width:680px;margin:2rem auto;padding:1rem;font:18px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}label{display:block;margin:.8rem 0}input,select,button,textarea{box-sizing:border-box;font:inherit;padding:.65rem;max-width:100%;width:100%}button{background:#245d49;color:white;border:0;border-radius:6px;margin-top:1rem;min-height:44px}.muted{color:#5d6a62}.trap{position:absolute;left:-9999px}[hidden]{display:none!important}.registration-brand{margin:0 0 1.5rem;text-align:center}.registration-brand img{display:block;width:min(100%,380px);height:auto;margin:0 auto;border-radius:8px}@media(max-width:480px){body{margin:.75rem auto}.registration-brand{margin-bottom:1rem}.registration-brand img{max-width:280px}}'
 
 
 def page(content, script=False):
-    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Library registration</title><style>'+STYLE+'</style><main>'+content+'</main>'+('<script src="/register/app.js" defer></script>' if script else '')+'</html>'
+    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Library registration</title><style>'+STYLE+'</style><main><header class="registration-brand"><img src="/register/emblem.png" width="1536" height="1024" alt="Thomas D. Sullivan Library &amp; Archive emblem, showing Thomas reading among bookshelves" fetchpriority="high" decoding="async"></header>'+content+'</main>'+('<script src="/register/app.js" defer></script>' if script else '')+'</html>'
 
 
 def form_page():
@@ -231,6 +231,7 @@ def public_request(config, handler, path, write):
         return handler.reply(404,{'error':'Registration is not open'})
     if not write:
         if path in {'/register','/register/'}:return handler.reply(200,form_page(),'text/html')
+        if path=='/register/emblem.png':return handler.reply(200,(Path(__file__).parent/'assets/library-emblem.png').read_bytes(),'image/png')
         if path=='/register/app.js':return handler.reply(200,Path(__file__).with_name('registration_app.js').read_text(),'text/javascript')
         if path=='/register/verify':
             token=parse_qs(urlsplit(handler.path).query).get('token',[''])[0]

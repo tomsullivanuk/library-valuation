@@ -31,3 +31,7 @@ The helper uses the existing private Access connection, creates only the path-sp
 Verify public form access, protected library/owner access, and synthetic confirmation/approval/decline before using it with real applicants. Live end-to-end email receipt and real provider grants should be verified with an owner-designated test address rather than invented public recipients.
 
 References: [Cloudflare application-path precedence](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/app-paths/), [ZIP lookup coverage/accuracy](https://docs.zippopotam.us/docs/getting-started/), [USPS ZIP and mailing-city distinctions](https://faq.usps.com/s/article/ZIP-Code-The-Basics).
+
+## Registration emblem
+
+The owner-supplied Thomas D. Sullivan Library & Archive emblem is stored unchanged at `valuation/assets/library-emblem.png` and served only through the fixed public `/register/emblem.png` route. Registration and confirmation pages display it with descriptive alternative text, intrinsic dimensions, and responsive CSS (380 px desktop; up to 280 px on phones). No visitor request goes to ChatGPT for branding. Source supplied by the owner: https://chatgpt.com/s/m_6b02114f80c88191b399ec4344181c59.
