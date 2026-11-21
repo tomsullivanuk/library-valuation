@@ -12,6 +12,21 @@ from valuation.completed_inventory import resolve_completed_inventory
 from valuation.libib_catalog import StrictCatalogRepository
 
 
+def preserved_config(state,data,owner,allowed):
+    path=state/'config.json'
+    if path.exists():
+        existing=json.loads(path.read_text())
+        if existing['owner_email']!=owner:raise ValueError('Owner changes require a separate migration')
+        # Guest access is now owned by Users; refresh must not restore the pilot
+        # hostname, drop the private provider connection, or alter approved users.
+        return existing
+    return dict(database=str(state/'requests.sqlite'),snapshot=str(state/'catalog.json'),
+        origin='https://library.wearyfather.org',issuer='https://frosty-rain-0886.cloudflareaccess.com',
+        audience='d3cdd8afa98ff0e99e089fc0706e12569383c28e860367a46b0153d1294f247b',
+        owner_data_dir=str(data),owner_output_dir=str(data.parent/'output'),
+        owner_email=owner,allowed_emails=sorted(set(allowed+[owner])))
+
+
 def install(home,owner,allowed):
     home=Path(home);root=home/'library-access-pilot';data=home/'library-valuation/data'
     before={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in data.iterdir() if p.is_file()}
@@ -19,7 +34,8 @@ def install(home,owner,allowed):
     descriptions={b.catalog_item_id:b.description for b in load_model(data,home/'library-valuation/output',family_overlay=False).books}
     records=project(StrictCatalogRepository(data/'catalog_items.csv').load(),resolve_completed_inventory(data),descriptions)
     state=root/'state';state.mkdir(mode=0o700,exist_ok=True);os.chmod(state,0o700)
-    for name,payload in [('catalog.json',records),('config.json',dict(database=str(state/'requests.sqlite'),snapshot=str(state/'catalog.json'),origin='https://library-pilot.wearyfather.org',issuer='https://frosty-rain-0886.cloudflareaccess.com',audience='d3cdd8afa98ff0e99e089fc0706e12569383c28e860367a46b0153d1294f247b',owner_data_dir=str(data),owner_output_dir=str(home/'library-valuation/output'),owner_email=owner,allowed_emails=sorted(set(allowed+[owner]))))]:
+    config=preserved_config(state,data,owner,allowed)
+    for name,payload in [('catalog.json',records),('config.json',config)]:
         path=state/name;tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(payload));tmp.chmod(0o600);tmp.replace(path)
     if before!={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in data.iterdir() if p.is_file()}:raise ValueError('Canonical data changed')
     plist=home/'Library/LaunchAgents/local.library-access-pilot.plist';backup=root/'static-server-before-requests.plist'
@@ -32,7 +48,7 @@ def install(home,owner,allowed):
         if result.returncode==0:break
         if time.monotonic()>=deadline:raise RuntimeError('Pilot startup failed; inspect the private service logs')
         time.sleep(0.2)
-    print(json.dumps(dict(records=len(records),canonical_unchanged=True,allowed_addresses=len(set(allowed+[owner])))))
+    print(json.dumps(dict(records=len(records),canonical_unchanged=True,allowed_addresses=len(config['allowed_emails']))))
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--owner-email',required=True);p.add_argument('--allowed-email',action='append',default=[]);a=p.parse_args();install(Path.home(),a.owner_email.lower(),[e.lower() for e in a.allowed_email])

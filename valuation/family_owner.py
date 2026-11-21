@@ -59,24 +59,30 @@ def live_facts(model,data_dir):
     return result
 
 
-def inbox(db,facts):
-    schema(db);rows=requests.submissions(db);people={}
+def inbox(db,facts,include_archived=False,pickups=None):
+    from valuation.storage_visit import request_status
+    pickups = pickups or {}
+    schema(db);rows=requests.submissions(db,include_archived=include_archived);people={}
     for row in rows:
         for b in row['payload']['books']:
             d=decision(db,row['id'],b['reference'])
             if d['state'] not in ('declined','collected','transferred'):people.setdefault(b['reference'],set()).add(row['email'])
     assigned={r['slot']:dict(r) for r in db.execute("SELECT * FROM request_decisions WHERE state IN ('approved','collected','transferred')")}
+    for assignment in assigned.values():
+        assignment['status']=request_status(db,assignment,pickups)
     for row in rows:
         details=[]
         for b in row['payload']['books']:
             ref=b['reference'];f=facts.get(ref,dict(title=b['title'],author=b['author'],value='Unavailable',location='',copies=[]))
             d=decision(db,row['id'],ref)
+            d['status']=request_status(db,d,pickups)
             copies=[dict(c,assignment=assigned.get(c['id'])) for c in f['copies']]
             details.append(dict(reference=ref,**{k:v for k,v in f.items() if k!='copies'},copies=copies,decision=d,
                 other_requesters=sorted(people.get(ref,set())-{row['email']}),
                 history=[dict(created=e['created'],actor=e['actor'],state=json.loads(e['payload'])['after']['state'],transfer=json.loads(e['payload'])['after'].get('transfer'),correction_reason=json.loads(e['payload']).get('correction_reason'),message=json.loads(e['payload']).get('message',''))
                     for e in db.execute('SELECT created,actor,payload FROM request_events WHERE submission=? AND reference=? ORDER BY id',(row['id'],ref))]))
         row['items']=details
+        row['archived']=bool(db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_archives'").fetchone() and db.execute('SELECT 1 FROM request_archives WHERE submission=?',(row['id'],)).fetchone())
     return rows
 
 

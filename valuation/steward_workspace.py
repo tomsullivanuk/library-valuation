@@ -621,11 +621,11 @@ _DOCUMENT = r"""<!doctype html>
     .search-row { max-width: 50rem; }
     .filter-row {
       display: grid;
-      grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
+      grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
       gap: .55rem;
       align-items: end;
     }
-    .filter-row.report-filters { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
+    .filter-row.report-filters { grid-template-columns: repeat(4, minmax(10rem, 1fr)) auto; }
     .clear-filters {
       justify-self: start;
       width: auto;
@@ -804,7 +804,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     @media (max-width: 70rem) {
       .controls { grid-template-columns: repeat(2, minmax(12rem, 1fr)); }
-      .filter-row { grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto; }
+      .filter-row { grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto; }
     }
     @media (max-width: 42rem) {
       .brand, .results-header, .detail-heading { display: block; }
@@ -835,6 +835,7 @@ _DOCUMENT = r"""<!doctype html>
     <span aria-disabled="true" title="Import remains in the established command workflow">Import</span>
     <a href="#actions" data-nav="actions">Action Items</a>
     <a href="#requests" data-nav="requests">Requests</a>
+    <a href="#users" data-nav="users">Users</a>
     <a href="#reports" data-nav="reports">Reports</a>
     <a href="#settings" data-nav="settings">Settings</a>
   </nav>
@@ -846,6 +847,8 @@ _DOCUMENT = r"""<!doctype html>
     <p class="notice">JavaScript is required to explore this self-contained local workspace.</p>
   </noscript>
   <script defer src="/requests.js"></script>
+  <script defer src="/users.js"></script>
+  <script defer src="/owner-picks.js"></script>
   <script id="action-data" type="application/json">__WORKSPACE_ACTIONS__</script>
   <script id="workspace-data" type="application/json">__WORKSPACE_DATA__</script>
   <script id="recommendation-data" type="application/json">__WORKSPACE_RECOMMENDATIONS__</script>
@@ -1084,11 +1087,16 @@ _DOCUMENT = r"""<!doctype html>
     const activeCatalogIds = new Set(completedInventory.catalog_item_ids);
     const libraryState = {
       scope: completedInventory.completed ? "present" : "",
-      search: "", acquisition: "", market: "", location: "",
-      sort: "title", sortDirection: 1, visibleBooks: []
+      search: "", acquisition: "", market: "", location: "", request: "",
+      sort: "title", sortDirection: 1, visibleBooks: [], selected: new Set()
     };
+    window.addEventListener("owner-picks-saved", () => libraryState.selected.clear());
     function bookMatches(book, state) {
-      if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id)) return false;
+      const requestEvents = libraryRequests.get(book.catalog_item_id)?.events || [];
+      const matchesRequest = event => state.request === "any" || (state.request === "requested" ? event.state === "pending" : state.request === "reserved" ? ["approved", "pulled"].includes(event.state) : state.request === "pulled" ? event.state === "pulled" : ["transferred", "collected"].includes(event.state));
+      if (state.request && !requestEvents.some(matchesRequest)) return false;
+      const includeTransferred = ["transferred", "any"].includes(state.request) && requestEvents.some(event => ["transferred", "collected"].includes(event.state));
+      if (state.scope === "present" && !activeCatalogIds.has(book.catalog_item_id) && !includeTransferred) return false;
       if (state.scope === "history" && activeCatalogIds.has(book.catalog_item_id)) return false;
       if (state.acquisition && book.acquisition_status !== state.acquisition) return false;
       if (state.market && book.resale_market_status !== state.market) return false;
@@ -1153,11 +1161,65 @@ _DOCUMENT = r"""<!doctype html>
       for (const h of DATA.holdings) if (completedInventory.holding_ids.includes(h.holding_id)) ids.add(h.latest_inventory_observation_id);
       return new Set(DATA.observations.filter(o => ids.has(o.inventory_observation_id) && o.title.trim()).map(o => o.title.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g," ").trim())).size;
     }
+    let libraryRequests = new Map(), requestStatusLoaded = false, requestStatusBusy = false, requestStatusStamp = 0;
+    function requestLabel(entry) {
+      const state = entry.state === "pulled" ? "Pulled for" : entry.state === "approved" ? "Reserved for" : ["transferred", "collected"].includes(entry.state) ? "Transferred to" : "Requested by";
+      return `${state} ${entry.person}`;
+    }
+    function requestSummary(book) {
+      return [...new Set((libraryRequests.get(book.catalog_item_id)?.events || []).map(requestLabel))].join("; ");
+    }
+    async function refreshLibraryRequests() {
+      if (main.contains(document.activeElement) && document.activeElement.matches("input,textarea,select")) return;
+      if (!/^https?:$/.test(location.protocol) || requestStatusBusy || Date.now() - requestStatusStamp < 2000) return;
+      requestStatusBusy = true; requestStatusStamp = Date.now();
+      try {
+        const base = location.pathname.startsWith("/owner") ? "/owner" : "";
+        const responses = await Promise.allSettled([fetch(base + '/api/family-requests?archived=1', {cache:"no-store"}), fetch(base + '/api/users', {cache:"no-store"})]);
+        const response = responses[0].status === "fulfilled" ? responses[0].value : null;
+        if (!response?.ok) throw new Error("Request status unavailable");
+        const rows = await response.json(); let names = {};
+        if (responses[1].status === "fulfilled" && responses[1].value.ok) {
+          const users = await responses[1].value.json(); names = Object.fromEntries(users.users.map(u => [u.email, u.name || u.email]));
+        }
+        const next = new Map();
+        for (const row of rows) for (const item of row.items) {
+          const id = item.catalog_item_id; if (!id) continue;
+          if (!next.has(id)) next.set(id, {events:[], copies:item.copies});
+          const entry = next.get(id);
+          if (!(row.payload.owner_pick === "review" && item.decision.state === "pending") && ["pending", "approved", "transferred", "collected"].includes(item.decision.state)) entry.events.push({state:item.decision.status || item.decision.state, slot:item.decision.slot, person:names[row.email] || row.email, submission:row.id, reference:item.reference});
+        }
+        const changed = !requestStatusLoaded || JSON.stringify([...next]) !== JSON.stringify([...libraryRequests]);
+        libraryRequests = next; requestStatusLoaded = true;
+        if (changed && ["library", "book", "home", "explore", "catalog-report"].includes(currentRoute()[0])) renderRoute();
+      } catch (error) { requestStatusLoaded = false; }
+      finally { requestStatusBusy = false; }
+    }
+    setInterval(() => { if (!document.hidden && ["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); }, 15000);
+    window.addEventListener("focus", () => { if (["library", "book", "catalog-report"].includes(currentRoute()[0])) refreshLibraryRequests(); });
+    function requestCopyDetails(book) {
+      const data = libraryRequests.get(book.catalog_item_id), section = node("section", {class:"panel"});
+      append(section, node("h3", {}, "Requests and assigned copies"));
+      if (!requestStatusLoaded) append(section, node("p", {}, "Live request status is unavailable. Check Requests before assigning a copy."));
+      else if (!data) append(section, node("p", {}, "No requests recorded for this book."));
+      else {
+        for (const event of data.events.filter(e => e.state === "pending")) append(section, node("p", {}, requestLabel(event) + " — awaiting your decision."));
+        for (const copy of data.copies) {
+          const assigned = data.events.find(e => e.slot === copy.id && e.state !== "pending");
+          const status = assigned ? requestLabel(assigned) : copy.assignment ? "Assigned — check Requests" : "Available";
+          append(section, node("p", {}, `${copy.label}: ${status}`));
+        }
+        const available = data.copies.filter(c => !c.assignment).length;
+        append(section, node("p", {}, `${available} ${available === 1 ? "copy available" : "copies available"}.`));
+      }
+      append(section, routeLink("View requests", "requests")); return section;
+    }
     function dispositionValue(value) { return ["gift", "donate"].includes(value) ? "gift_donate" : value; }
     function dispositionText(value) { return dispositionValue(value) === "gift_donate" ? "Gift / Donate" : human(value); }
     function dispositionLabel(book) {
       const value = Object.hasOwn(workspaceState.dispositions, book.catalog_item_id) ? workspaceState.dispositions[book.catalog_item_id] : book.disposition;
-      return value && value !== "information_not_included" ? dispositionText(value) : "";
+      const saved = value && value !== "information_not_included" ? dispositionText(value) : "";
+      return [requestSummary(book), saved ? `Saved disposition: ${saved}` : ""].filter(Boolean).join(" · ");
     }
     function applyEstimateUpdates() {
       for (const [id, values] of Object.entries(workspaceState.estimate_updates || {})) {
@@ -1284,6 +1346,7 @@ _DOCUMENT = r"""<!doctype html>
       const selectedTask = workspaceState.actions.find(task => task.id === selectedId);
       if (selectedTask) { actionCategory = selectedTask.category; actionFilter = actionStatus(selectedTask); }
       clear(); heading("Action Items", "Book checks and optional research, ready when you are.");
+      append(main, routeLink("Storage visit — picks and checks by box", "storage-visit", "button-link"));
       if (estimateSaveMessage) { append(main,node("p",{role:"status","aria-live":"polite"},estimateSaveMessage)); estimateSaveMessage=""; }
       if (!workspaceState.connected) append(main, node("p", {class:"notice"}, "This is an offline view. Open the local workspace to save Complete, Defer, or Dismiss decisions."));
       const filter = selectControl("action-filter", "Show", ["open", "deferred", "complete", "dismissed"], human);
@@ -1331,6 +1394,9 @@ _DOCUMENT = r"""<!doctype html>
     function renderSettings() {
       clear(); heading("Settings", "Your workspace and saved decisions");
       append(main, node("p", {}, workspaceState.connected ? "Saving is connected. Dispositions and action statuses are stored with the project and survive workspace regeneration." : "Saving is disconnected. Start the local workspace service to edit decisions."), node("p", {}, "Library browsing defaults to physically inventoried books. Historical and all-record views are available under Reports."), routeLink("About this data", "about"));
+      append(main, node("section", {id: "user-connection-settings"}));
+      window.dispatchEvent(new Event("owner-user-settings"));
+      if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-notifications"}, "Email notifications — setup and delivery status")));
     }
 
     function renderLibrary(reportScope = "") {
@@ -1358,6 +1424,7 @@ _DOCUMENT = r"""<!doctype html>
       })[value] || statusLabel(value));
       const knownLocations = [...new Set(DATA.books.flatMap(book => book.location_values))].sort((left, right) => left.localeCompare(right, undefined, {numeric:true}));
       const location = selectControl("location-filter", "Location", [...knownLocations, "__not_recorded__"], value => value === "__not_recorded__" ? "Not Located" : value);
+      const requestFilter = selectControl("request-filter", "Request status", ["requested", "reserved", "pulled", "transferred", "any"], value => ({requested:"Requested — awaiting decision", reserved:"Reserved — approved or pulled", pulled:"Pulled — awaiting handover", transferred:"Transferred", any:"Any request status"})[value]);
       const clearButton = node("button", {type: "button", class: "clear-filters"}, "Clear");
       if (completedInventory.completed) {
         if (reportScope) {
@@ -1370,8 +1437,9 @@ _DOCUMENT = r"""<!doctype html>
           append(controls, node("p", {class: "lede"}, `${completedInventory.source_copies.toLocaleString()} physical books, ${distinctTitles().toLocaleString()} distinct recorded titles`));
         }
       }
-      append(filterRow, market, location, clearButton);
+      append(filterRow, market, location, requestFilter, clearButton);
       append(controls, searchRow, filterRow);
+      const requestNotice = node("p", {class:"muted", role:"status"}); append(controls, requestNotice);
       const marketSource = DATA.snapshot.sources.find(source => source.source_key === "market_evidence");
       if (marketSource && marketSource.status !== "current") {
         append(
@@ -1379,10 +1447,17 @@ _DOCUMENT = r"""<!doctype html>
           node("p", {class: "muted"}, `Resale-market information: ${statusLabel(marketSource.status)}. ${sourceStatusExplanation(marketSource.status)}`)
         );
       }
-      for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location]]) controls.querySelector(`#${id}`).value = value;
+      for (const [id, value] of [["market-filter", libraryState.market], ["location-filter", libraryState.location], ["request-filter", libraryState.request]]) controls.querySelector(`#${id}`).value = value;
       const searchNotice = node("p", {class:"muted", role:"status"});
       append(controls, searchNotice);
       let enhancedKey="", enhancedData=null, enhancedVersion=0, enhancedTimer, enhancedPending=false, relevance=true;
+      const picking = node("div", {class:"library-actions"});
+      const pickSummary = node("span", {id:"pick-selection-count"}, `${libraryState.selected.size} selected`);
+      const pickAll = node("button", {type:"button"}, "Select visible books"), pickClear = node("button", {type:"button"}, "Clear selection"), pickSave = node("button", {type:"button"}, "Add selected to picking list");
+      append(picking, pickAll, pickClear, pickSave, pickSummary); append(main, picking);
+      pickAll.onclick = () => { libraryState.visibleBooks.filter(b => activeCatalogIds.has(b.catalog_item_id)).forEach(b => libraryState.selected.add(b.catalog_item_id)); renderLibrary(reportScope); };
+      pickClear.onclick = () => { libraryState.selected.clear(); renderLibrary(reportScope); };
+      pickSave.onclick = () => window.dispatchEvent(new CustomEvent("owner-pick", {detail:{ids:[...libraryState.selected]}}));
       const actions = node("div", {class: "library-actions"});
       const sortNames = {
         title: "Title",
@@ -1424,7 +1499,9 @@ _DOCUMENT = r"""<!doctype html>
         libraryState.acquisition = "";
         libraryState.market = controls.querySelector("#market-filter").value;
         libraryState.location = controls.querySelector("#location-filter").value;
-        const key=JSON.stringify([libraryState.search,libraryState.market,libraryState.location]);
+        libraryState.request = controls.querySelector("#request-filter").value;
+        requestNotice.textContent = libraryState.request && !requestStatusLoaded ? "Request status is loading or unavailable. Retry shortly before relying on these results." : ["transferred", "any"].includes(libraryState.request) ? "Includes transferred books that are no longer physically present." : "";
+        const key=JSON.stringify([libraryState.search,libraryState.market,libraryState.location,libraryState.request]);
         if(!reportScope && key!==enhancedKey){
           enhancedKey=key;enhancedData=null;enhancedPending=Boolean(libraryState.search);relevance=true;clearTimeout(enhancedTimer);const version=++enhancedVersion;
           searchNotice.textContent=libraryState.search?"Searching keywords and related topics…":"";
@@ -1448,7 +1525,7 @@ _DOCUMENT = r"""<!doctype html>
         sortSummary.textContent=ranked&&relevance?"Sort: Relevance":`Sort: ${sortNames[libraryState.sort]} ${libraryState.sortDirection === 1 ? "↑" : "↓"}`;
         libraryState.visibleBooks = books;
         results.replaceChildren();
-        const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location);
+        const filtered = Boolean(libraryState.search || libraryState.acquisition || libraryState.market || libraryState.location || libraryState.request);
         count.textContent = enhancedPending?"Searching…":`${books.length.toLocaleString()} ${books.length === 1 ? "catalog record" : "catalog records"}${filtered ? " match" : ""}`;
         if (!books.length) {
           append(results, node("p", {class: "empty"}, enhancedPending?"Finding related books…":"No books match these filters."));
@@ -1478,6 +1555,12 @@ _DOCUMENT = r"""<!doctype html>
     function bookCard(book) {
       const article = node("article", {class: "library-card"});
       const identity = node("div");
+      if (activeCatalogIds.has(book.catalog_item_id)) {
+        const label = node("label", {style:"display:flex;flex-direction:row;gap:.5rem;align-items:center"});
+        const check = node("input", {type:"checkbox", style:"width:1rem;height:1rem;min-height:1rem;max-width:1rem;flex:0 0 1rem;padding:0;margin:0", "aria-label":`Select ${book.title} for picking`}); check.checked = libraryState.selected.has(book.catalog_item_id);
+        check.onchange = () => { if (check.checked) libraryState.selected.add(book.catalog_item_id); else libraryState.selected.delete(book.catalog_item_id); const marker = document.querySelector("#pick-selection-count"); if (marker) marker.textContent = `${libraryState.selected.size} selected`; };
+        append(label,check,document.createTextNode("Select for picking")); append(identity,label);
+      }
       const publication = [book.publisher, book.publication_year].filter(Boolean).join(" • ");
       const title = node("h2");
       append(
@@ -1550,7 +1633,8 @@ _DOCUMENT = r"""<!doctype html>
         append(main, node("p", {class: "panel"}, book.description));
       }
       append(main, definitionList([["Location", book.location_summary], ["Copies", String(book.copy_count)], ["Acquired", book.purchase_summary], ["Resale market", book.resale_market_summary]]));
-      append(main, node("h2", {}, "Disposition"), dispositionEditor(book));
+      if (activeCatalogIds.has(bookId)) { const pick = node("button", {type:"button"}, "Add to picking list"); pick.onclick = () => window.dispatchEvent(new CustomEvent("owner-pick", {detail:{ids:[bookId]}})); append(main,pick); }
+      append(main, node("h2", {}, "Disposition"), requestCopyDetails(book), node("p", {class:"muted"}, "Saved disposition (your separate plan for this book)"), dispositionEditor(book));
       append(main, node("h2", {}, "Physical copies"));
       const currentHoldings = book.holding_ids.map(id => index.holdings.get(id)).filter(Boolean).filter(h => !completedInventory.completed || completedInventory.holding_ids.includes(h.holding_id));
       if (!currentHoldings.length) append(main, node("p", {}, "No current physical copy is linked."));
@@ -1864,8 +1948,147 @@ _DOCUMENT = r"""<!doctype html>
       append(card, actions);
       return card;
     }
+    async function renderStorageVisit() {
+      clear(); heading("Storage visit", "Pull books and answer checks, one box at a time.");
+      const base=location.pathname.startsWith('/owner')?'/owner':'';
+      const controls=node('div',{class:'visit-controls'}), dateLabel=node('label',{},'Visit date'),visitDate=node('input',{type:'date'});
+      const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);visitDate.value=tomorrow.toLocaleDateString('en-CA',{timeZone:'America/Chicago'});
+      append(dateLabel,visitDate);
+      const viewLabel=node('label',{},'Show'),view=node('select',{'aria-label':'Show picking work'});
+      for(const [value,label] of [['remaining','Remaining'],['done','Done'],['all','All']])append(view,node('option',{value},label));append(viewLabel,view);
+      const personLabel=node('label',{},'Requested by'),person=node('select',{'aria-label':'Picking requester'});append(person,node('option',{value:''},'Everyone'));append(personLabel,person);
+      const researchLabel=node('label',{class:'visit-toggle'}),research=node('input',{type:'checkbox'});append(researchLabel,research,document.createTextNode('Include research tasks'));
+      const print=node('button',{type:'button'},'Print / Save PDF');print.disabled=true;print.onclick=()=>window.print();
+      const refresh=node('button',{type:'button'},'Reload latest');refresh.onclick=renderStorageVisit;
+      const today=node('button',{type:'button'},'Today');today.onclick=()=>{visitDate.value=new Date().toLocaleDateString('en-CA',{timeZone:'America/Chicago'});view.value='remaining';draw()};
+      append(controls,dateLabel,today,viewLabel,personLabel,researchLabel,refresh,print);append(main,controls);
+      const notice=node('p',{class:'visit-notice',role:'status','aria-live':'polite'},'Loading current picks and checks…');append(main,notice);
+      const report=node('section',{class:'storage-visit-report'});append(main,report);
+      append(main,node('style',{},`
+        .visit-controls{display:flex;align-items:end;gap:.75rem;flex-wrap:wrap;padding:1rem;background:#edf3ef;border-radius:12px;margin:1rem 0}.visit-controls label{margin:0}.visit-controls input[type=date],.visit-controls select{width:auto;max-width:100%;min-height:44px;font:inherit}.visit-controls select{padding:.45rem .6rem;min-width:9rem}.visit-controls .visit-toggle{display:flex;align-items:center;gap:.5rem;min-height:44px}.visit-toggle input{width:20px;height:20px;margin:0}.visit-controls button{min-height:44px}.visit-notice{color:#52695b}.visit-overview{background:#245e4c;color:white;border-radius:12px;padding:1.2rem 1.5rem;margin:1rem 0}.visit-overview h2,.visit-overview p{color:inherit;margin:.3rem 0}.visit-layout{display:grid;grid-template-columns:180px minmax(0,1fr);gap:1.5rem;align-items:start}.visit-box-nav{position:sticky;top:5rem;max-height:75vh;overflow:auto;display:flex;flex-direction:column;gap:.4rem}.visit-box-nav button{text-align:left;font-size:.9rem;min-height:44px;padding:.5rem .7rem}.visit-box{border:1px solid #cfdbd3;border-radius:12px;margin:0 0 1rem;background:white;overflow:hidden;scroll-margin-top:5rem}.visit-box>summary{padding:1rem 1.2rem;background:#edf3ef;cursor:pointer;font-weight:700;font-size:1.15rem;min-height:44px;box-sizing:border-box;display:list-item}.visit-box>summary small{font-weight:400;font-size:.9rem;margin-left:.75rem}.visit-entry{padding:1.2rem;border-top:1px solid #e2e8e3;break-inside:avoid}.visit-entry h3{font-size:1.15rem;margin:.4rem 0}.visit-entry p{margin:.4rem 0}.visit-kind{display:inline-block;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#245e4c;background:#e7f0ea;border-radius:4px;padding:.2rem .45rem}.visit-kind.check{color:#795219;background:#fff2d9}.visit-meta{font-size:.9rem;color:#617268}.visit-detail{margin:.7rem 0!important;line-height:1.5}.visit-editor label{font-size:.9rem}.visit-editor textarea{box-sizing:border-box;width:100%;min-height:85px;font:inherit;line-height:1.4;padding:.7rem;resize:vertical;margin:.3rem 0 .6rem}.visit-entry-tools{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap}.visit-entry-tools button{min-height:44px}.visit-done{display:flex!important;align-items:center;gap:.7rem;margin:0!important;min-height:44px;font-weight:600}.visit-done input{width:24px!important;height:24px!important;min-height:24px!important;flex:none;padding:0;margin:0;accent-color:#245e4c}.visit-save-status{font-size:.85rem;color:#52695b;min-height:1.4em}.visit-save-status.error{color:#a02d21}.visit-entry.finished{background:#f6faf7}.visit-entry.finished h3:after{content:' · Done';font-size:.8rem;color:#245e4c}.visit-print-note{display:none}.visit-next{margin:1rem;min-height:44px}
+        @media(max-width:800px){.visit-layout{grid-template-columns:1fr;gap:.7rem}.visit-box-nav{position:static;flex-direction:row;overflow:auto;max-height:none;padding:.3rem 0 .7rem}.visit-box-nav button{white-space:nowrap;flex:none}.visit-overview{padding:1rem}.visit-controls{gap:.5rem;padding:.75rem}.visit-entry{padding:1rem}.visit-entry-tools{align-items:stretch}.visit-controls button{font-size:.9rem}}
+        @media print{body *{visibility:hidden!important}.storage-visit-report,.storage-visit-report *{visibility:visible!important}header,nav,footer,.visit-controls,.visit-box-nav,.visit-editor,.visit-entry-tools,.visit-save-status,.visit-next{display:none!important}#main-content>:not(.storage-visit-report){display:none!important}.storage-visit-report{position:absolute;top:0;left:0;width:100%;font-size:10pt}.visit-layout{display:block}.visit-box{display:block;border:0;border-radius:0}.visit-box>summary{display:block;break-after:avoid;background:none;padding:.6rem 0}.visit-box>:not(summary){display:block!important}.visit-entry{padding:.5rem 0}.visit-overview{background:none;color:#222;padding:0}.visit-print-note{display:block;white-space:pre-wrap;min-height:2rem;border-bottom:1px dotted #888}.visit-kind{padding:0;background:none}.visit-entry h3{font-size:12pt}.visit-entry h3:before{content:'☐ '}.visit-entry.finished h3:before{content:'☑ '}.storage-visit-report [hidden]{display:none!important}}
+      `));
+      let state,rows,draw=()=>{},saveQueue=Promise.resolve(),busy=0;
+      try {
+        const responses=await Promise.all([fetch(base+'/api/state',{cache:'no-store'}),fetch(base+'/api/family-requests',{cache:'no-store'})]);
+        if(responses.some(r=>!r.ok))throw Error('Current picks or Action Items could not be loaded. Reconnect and reload.');
+        [state,rows]=await Promise.all(responses.map(r=>r.json()));
+        if(currentRoute()[0]!=='storage-visit')return;
+        for(const email of [...new Set(rows.map(r=>r.email))].sort())append(person,node('option',{value:email},email));
+        const storageKey='storage-visit:'+state.workspace_id;
+        const readLocal=()=>{try{return JSON.parse(localStorage.getItem(storageKey)||'{}')}catch(e){return {}}};
+        const writeLocal=value=>{try{localStorage.setItem(storageKey,JSON.stringify(value));return true}catch(e){return false}};
+        let local=readLocal();
+        const dates=Object.keys(state.storage_visits||{}).sort(),last=dates.at(-1);
+        if(local.date)visitDate.value=local.date;else if(last&&last>=new Date().toLocaleDateString('en-CA',{timeZone:'America/Chicago'}))visitDate.value=last;
+        const savedEntry=(day,key)=>{const value=state.storage_visits?.[day]?.[key];if(value?.source==='action'&&state.actions.find(t=>t.id===value.id)?.fingerprint!==value.fingerprint)return undefined;return value};
+        const taskNow=entry=>entry.source==='action'?state.actions.find(t=>t.id===entry.id):null;
+        const signature=(entry,day)=>JSON.stringify([savedEntry(day,entry.key)?.updated_at||'',taskNow(entry)?.status||'',taskNow(entry)?.note||'',taskNow(entry)?.fingerprint||'']);
+        let selectedBox='';
+        draw=()=>{
+          if(!visitDate.value)return;
+          local=readLocal();local.date=visitDate.value;writeLocal(local);
+          report.replaceChildren();const groups=new Map();const day=visitDate.value;
+          const add=(location,entry)=>{const box=displayLocation(location).trim()||'Location not recorded',key=box.toLocaleLowerCase();if(!groups.has(key))groups.set(key,{box,key,entries:[]});groups.get(key).entries.push(entry)};
+          for(const row of rows)for(const item of row.items){
+            const review=row.payload.owner_pick==='review'&&item.decision.state==='pending';
+            if(item.decision.state!=='approved'&&!review)continue;
+            const copy=item.copies.find(c=>c.id===(item.decision.slot||row.payload.owner_pick_slots?.[item.reference]));
+            const slot=copy?.id||'';
+            add(copy?.location,{source:'pick',person:row.email,submission:row.id,reference:item.reference,slot,pulled:item.decision.status==='pulled',key:'pick:'+row.id+':'+item.reference+':'+slot,kind:review?'Review pick':'Pull',title:item.title,author:item.author,detail:'For: '+row.email+' · '+(copy?.label||'Copy assignment missing — check Requests'),warning:review?'Review copy is not reserved.'+(copy?.assignment?' This copy is now assigned or transferred.':''):'',invalid:!slot});
+          }
+          for(const task of state.actions){
+            const key='action:'+task.id,previous=savedEntry(day,key);
+            const status=task.status==='deferred'&&task.deferred_until&&task.deferred_until<=day?'open':(task.status||'open');
+            if(!['open','complete'].includes(status)||(!research.checked&&task.category!=='Book checks'))continue;
+            const book=index.books.get(task.catalog_item_id),locations=task.category==='Book checks'&&task.location?[task.location]:(book?.location_values?.length?book.location_values:[task.location]);
+            for(const box of new Set(locations))add(box,{source:'action',id:task.id,fingerprint:task.fingerprint,key,kind:task.category==='Book checks'?'Check':'Research',title:task.title,author:book?.author,detail:task.action,note:task.note,warning:locations.length>1?'Multiple recorded locations — check the relevant copy. The same task appears at its other locations.':''});
+          }
+          const ordered=[...groups.values()].sort((a,b)=>a.box==='Location not recorded'?1:b.box==='Location not recorded'?-1:a.box.localeCompare(b.box,undefined,{numeric:true,sensitivity:'base'}));
+          const allEntries=new Map(ordered.flatMap(g=>g.entries.map(e=>[e.key,e])));
+          const overview=node('div',{class:'visit-overview'}),progress=node('p',{'aria-live':'polite'}),printScope=node('p');append(overview,node('h2',{},'Your box-by-box checklist'),progress,node('p',{},'Visit '+day+' · Checkmarks and answers save to your workspace. “Pulled” does not mean transferred.'));append(overview,printScope);append(report,overview);
+          const layout=node('div',{class:'visit-layout'}),nav=node('div',{class:'visit-box-nav',role:'navigation','aria-label':'Boxes to visit'}),content=node('div');append(layout,nav,content);append(report,layout);
+          const groupViews=[];
+          const isDone=entry=>entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled;
+          const inScope=(entry,group)=>!person.value||(entry.source==='pick'?entry.person===person.value:group.entries.some(e=>e.source==='pick'&&e.person===person.value));
+          function applyFilters(){
+            const scoped=new Map(),shown=new Set();let locations=0;
+            for(const item of groupViews){let visible=0;for(const entry of item.group.entries)if(inScope(entry,item.group))scoped.set(entry.key,entry);
+              for(const row of item.entries){const match=inScope(row.entry,item.group)&&(view.value==='all'||(view.value==='done'?isDone(row.entry):!isDone(row.entry)));row.line.hidden=!match;if(match){visible++;shown.add(row.entry.key)}}
+              item.box.hidden=!visible;item.button.hidden=!visible;if(visible)locations++;item.updateBox?.();
+            }
+            const done=[...scoped.values()].filter(isDone).length;
+            progress.textContent=done+' of '+scoped.size+' items done · Showing '+shown.size+' '+(view.value==='all'?'':view.value+' ')+(shown.size===1?'item':'items')+' in '+locations+' '+(locations===1?'location':'locations');
+            printScope.textContent='View: '+view.options[view.selectedIndex].text+' · Requested by: '+(person.value||'Everyone')+(person.value?' · Includes checks in their picking boxes':'');
+            const visible=groupViews.filter(g=>!g.box.hidden);visible.forEach((g,i)=>{if(g.next)g.next.textContent=i===visible.length-1?'Back to box list':'Next box →'});if(visible.length&&!visible.some(g=>g.box.open))visible[0].box.open=true;
+            emptyView.hidden=shown.size>0;
+          }
+          const emptyView=node('p',{role:'status'},'No items match this view. Choose All to review saved work, or change the requester.');append(content,emptyView);
+          const updateProgress=()=>applyFilters();
+          const peers=new Map();
+          const updatePeers=key=>{for(const peer of peers.get(key)||[])peer.sync()};
+          const sections=[];
+          ordered.forEach((group,groupIndex)=>{
+            const box=node('details',{class:'visit-box'});if((selectedBox||ordered[0]?.key)===group.key)box.open=true;
+            const summary=node('summary',{},group.box==='Location not recorded'?group.box:'Box '+group.box),boxProgress=node('small');append(summary,boxProgress);append(box,summary);sections.push(box);
+            const boxButton=node('button',{type:'button'},group.box);boxButton.onclick=()=>{box.open=true;selectedBox=group.key;box.scrollIntoView({block:'start',behavior:'smooth'})};append(nav,boxButton);
+            const groupView={group,box,button:boxButton,entries:[]};groupViews.push(groupView);
+            const updateBox=()=>{const entries=group.entries.filter(e=>inScope(e,group)),count=entries.filter(isDone).length;boxProgress.textContent=count+'/'+entries.length+' done';boxButton.textContent=group.box+' · '+count+'/'+entries.length;};groupView.updateBox=updateBox;updateBox();box.addEventListener('toggle',()=>{if(box.open)selectedBox=group.key});
+            group.entries.sort((a,b)=>a.title.localeCompare(b.title)||a.kind.localeCompare(b.kind));
+            for(const entry of group.entries){
+              const line=node('article',{class:'visit-entry'}),badge=node('span',{class:'visit-kind'+(entry.source==='action'?' check':'')},entry.kind);
+              append(line,badge,node('h3',{},entry.title));if(entry.author)append(line,node('p',{class:'visit-meta'},entry.author));append(line,node('p',{class:'visit-detail'},entry.detail));if(entry.warning)append(line,node('p',{class:'notice'},entry.warning));
+              const editor=node('div',{class:'visit-editor'}),label=node('label',{},entry.source==='action'?'Answer / notes':'Pickup notes'),note=node('textarea',{rows:'2',maxlength:'4000','aria-label':(entry.source==='action'?'Answer for ':'Pickup notes for ')+entry.title});
+              const localId=day+'|'+entry.key;let previous=savedEntry(day,entry.key),draft=readLocal().drafts?.[localId];
+              note.value=draft?.note??(entry.source==='action'?entry.note:previous?.note)??previous?.note??'';
+              const doneLabel=node('label',{class:'visit-done'}),done=node('input',{type:'checkbox','aria-label':(entry.source==='action'?'Check complete: ':'Pulled: ')+entry.title});done.checked=draft?.done??(entry.source==='action'?taskNow(entry)?.status==='complete':entry.pulled)??false;done.disabled=!!entry.invalid;
+              append(doneLabel,done,document.createTextNode(entry.source==='action'?'Check complete':'Pulled from storage'));
+              const tools=node('div',{class:'visit-entry-tools'}),save=node('button',{type:'button'},'Save notes'),restore=node('button',{type:'button'},'Use saved version');
+              const message=node('p',{class:'visit-save-status',role:'status','aria-live':'polite'}),printNote=node('p',{class:'visit-print-note'});
+              append(label,note);append(editor,label);append(tools,doneLabel,save,restore);append(line,editor,tools,message,printNote);append(box,line);groupView.entries.push({entry,line});
+              let timer=null,saving=false,draftKept=true,baseSignature=draft?.base??signature(entry,day);
+              const setMessage=(text,error=false)=>{message.textContent=text;message.classList.toggle('error',error)};
+              const sync=()=>{line.classList.toggle('finished',entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled);printNote.textContent='Notes: '+note.value;updateBox();updateProgress()};sync();
+              if(!peers.has(entry.key))peers.set(entry.key,[]);peers.get(entry.key).push({sync:()=>{const pending=readLocal().drafts?.[localId];if(!pending&&!saving){note.value=(entry.source==='action'?taskNow(entry)?.note:savedEntry(day,entry.key)?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled;baseSignature=signature(entry,day);}sync()}});
+              setMessage(draft?'Unsaved draft on this device.':previous?'Saved '+new Date(previous.updated_at).toLocaleTimeString():entry.source==='action'?'Answers save here and in Action Items.':'Check off when this assigned copy has been pulled.');restore.hidden=!draft;
+              const keepDraft=()=>{const local=readLocal();local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};const kept=writeLocal(local);draftKept=kept;restore.hidden=false;setMessage(kept?'Not yet saved. Draft kept on this device.':'Not yet saved. Keep this page open until saved.',!kept);printNote.textContent='Notes: '+note.value;};
+              const persist=()=>{
+                clearTimeout(timer);keepDraft();const values={note:note.value,done:done.checked};
+                saveQueue=saveQueue.catch(()=>{}).then(async()=>{
+                  if(!line.isConnected)return;
+                  saving=true;busy++;save.disabled=true;done.disabled=true;restore.disabled=true;setMessage('Saving…');
+                  try{
+                    if(signature(entry,day)!==baseSignature)throw Error('This item changed elsewhere. Your draft is kept. Copy your answer, then choose Use saved version to review the latest.');
+                    const response=await fetch(base+'/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Workspace-Token':state.token},body:JSON.stringify({kind:'storage_visit',source:entry.source,id:entry.id,fingerprint:entry.fingerprint,submission:entry.submission,reference:entry.reference,slot:entry.slot,visit_date:day,revision:state.revision,...values})});
+                    const result=await response.json();if(!response.ok)throw Error(result.error||'Save failed.');
+                    state=result;workspaceState={...result,connected:true};if(entry.source==='pick'){entry.pulled=values.done;allEntries.get(entry.key).pulled=values.done;}baseSignature=signature(entry,day);
+                    const local=readLocal();if(note.value===values.note&&done.checked===values.done){if(local.drafts)delete local.drafts[localId];restore.hidden=true;setMessage('Saved · '+new Date().toLocaleTimeString());notice.textContent='Saved: '+entry.title+' · '+new Date().toLocaleTimeString()+'. Saved work is shared across devices.';}else{local.drafts=local.drafts||{};local.drafts[localId]={note:note.value,done:done.checked,base:baseSignature};setMessage('New changes waiting to save.');}writeLocal(local);updatePeers(entry.key);
+                  }catch(error){setMessage('Not saved — '+error.message+' Reconnect and Reload latest to retry. '+(draftKept?'Your draft remains on this device.':'Keep this page open; the draft could not be stored on this device.'),true);done.checked=values.done;}
+                  finally{saving=false;busy--;save.disabled=!!entry.invalid;done.disabled=!!entry.invalid;restore.disabled=false;}
+                });
+              };
+              note.oninput=()=>{keepDraft();clearTimeout(timer);timer=setTimeout(persist,900)};
+              done.onchange=persist;save.onclick=persist;save.disabled=!!entry.invalid;
+              restore.onclick=()=>{clearTimeout(timer);const local=readLocal();if(local.drafts)delete local.drafts[localId];writeLocal(local);previous=savedEntry(day,entry.key);note.value=(entry.source==='action'?taskNow(entry)?.note:previous?.note)||'';done.checked=entry.source==='action'?taskNow(entry)?.status==='complete':!!entry.pulled;baseSignature=signature(entry,day);restore.hidden=true;setMessage('Showing the last loaded saved version.');sync()};
+            }
+            const next=node('button',{type:'button',class:'visit-next'},groupIndex===ordered.length-1?'Back to box list':'Next box →');next.onclick=()=>{if(busy){notice.textContent='Wait for your changes to finish saving.';return}const target=sections.slice(groupIndex+1).find(section=>!section.hidden);box.open=false;if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'})}else controls.scrollIntoView({block:'start',behavior:'smooth'})};groupView.next=next;append(box,next);append(content,box);
+          });
+          if(!ordered.length)append(content,node('p',{},'No current picks or open checks for this visit.'));
+          notice.textContent='Saved work is shared across devices. Drafts stay on this device until saved. Use Reload latest when switching devices.';
+          view.onchange=applyFilters;person.onchange=applyFilters;applyFilters();
+          print.disabled=false;
+        };
+        research.onchange=draw;visitDate.onchange=()=>{view.value='remaining';draw()};draw();
+        const openForPrint=()=>report.querySelectorAll('details').forEach(d=>{d.dataset.wasOpen=String(d.open);d.open=true});
+        const closeAfterPrint=()=>report.querySelectorAll('details').forEach(d=>{d.open=d.dataset.wasOpen==='true'});
+        window.addEventListener('beforeprint',openForPrint);window.addEventListener('afterprint',closeAfterPrint);
+      }catch(error){notice.textContent=error.message;notice.setAttribute('role','alert');}
+    }
+
     function renderReports() {
       clear();
+      append(main, routeLink("Storage visit — picks and checks by box", "storage-visit", "button-link"));
       append(main, node("h2", {}, "Catalog reports"), routeLink("Physically inventoried books", "catalog-report/present", "button-link"), routeLink("Historical records", "catalog-report/history", "button-link secondary"), routeLink("All records including history", "catalog-report/all", "button-link secondary"));
       heading("Reports", "Choose a prepared report by what you want to review or share.");
       append(main, node("p", {class: "notice"}, "Every report shown here was registered and checked for this workspace. Other project files are not shown automatically."));
@@ -1971,6 +2194,7 @@ _DOCUMENT = r"""<!doctype html>
     }
     function renderRoute() {
       const [route, id] = currentRoute();
+      if (["library", "book", "home", "explore", "catalog-report"].includes(route)) refreshLibraryRequests();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
           || (["recommendations", "recommendation"].includes(route) && link.dataset.nav === "actions")
@@ -1982,9 +2206,11 @@ _DOCUMENT = r"""<!doctype html>
       if (route === "library" || route === "home" || route === "explore") renderLibrary();
       else if (route === "recommendations" || route === "actions") renderActions(id);
       else if (route === "requests") { main.replaceChildren(); window.dispatchEvent(new Event("owner-requests")); }
+      else if (route === "users") { main.replaceChildren(); window.dispatchEvent(new Event("owner-users")); }
       else if (route === "settings") renderSettings();
       else if (route === "catalog-report") renderLibrary(id || "all");
       else if (route === "reports") renderReports();
+      else if (route === "storage-visit") renderStorageVisit();
       else if (route === "about") renderAbout(id);
       else if (route === "book") renderBook(id);
       else if (route === "holding") renderHolding(id);

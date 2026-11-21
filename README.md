@@ -882,3 +882,12 @@ Reviewed ranges are stored separately from observed listings in
 `data/reviewed_estimates.json`. Exact prices, purchase history and prior estimates
 are retained. Catalog-identity changes prevent an old reviewed range from being
 automatically applied to a different edition.
+
+
+### Owner access and guest administration
+
+Use [the owner workspace](https://library.wearyfather.org/owner/) and its **Users** tab to add a guest, edit their display name, disable or re-enable access, check access status and last visit, and prepare invitation instructions. The family address is [library.wearyfather.org](https://library.wearyfather.org/); the pilot address temporarily redirects. Owner permissions are protected. Email addresses are stable identities: to change an address, disable the old guest and add the new address so earlier requests retain their attribution.
+
+Guest changes coordinate the dedicated Cloudflare email policy with the local user registry. A failed grant remains pending; disabling access takes effect locally immediately even when Cloudflare is unavailable. Retry synchronization from Users. Invitations offer a link, copyable instructions and an email draft; nothing is sent automatically. The private provider token stays on the Mini, outside Git and browser responses. Its expiry is displayed in Users.
+
+Completed request submissions can be archived and restored in **Requests**. Archiving hides them from the normal owner inbox while preserving recipient history, transfer accounting and source records. Explicit test-data cleanup is a separate preview-and-backup operation; it does not erase library or purchase history. See [administration and recovery](docs/OWNER_USERS_AND_ADDRESS.md).

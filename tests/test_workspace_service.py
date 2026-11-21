@@ -297,3 +297,29 @@ def test_migrated_source_cannot_start_or_accept_stale_service_writes(tmp_path):
     with pytest.raises(ValueError, match='Production has moved'):
         store.update(dict(kind='disposition', id='BK000001', value='keep', revision=0))
     assert not store.path.exists()
+
+
+def test_reviewed_remaining_question_preserves_evidence_and_overrides_identity_prompt(tmp_path):
+    from types import SimpleNamespace
+    from valuation.workspace_service import load_book_checks
+    oid='observation-one'
+    model=SimpleNamespace(observations=[SimpleNamespace(inventory_observation_id=oid,title='Book',source_collection_label='Box 1')],
+        completed_inventory=SimpleNamespace(unresolved_observation_ids=[oid]),
+        decisions=[SimpleNamespace(inventory_observation_id=oid,is_current=True,explanation='Original evidence. Steward input needed: Check binding.')])
+    review=dict(schema_version=1,reviews=[dict(inventory_observation_id=oid,status='physical_check_required',title='Book',
+        collection='Box 1',question='Original binding question',bibliographic_evidence='Preserved printed alternatives',
+        remaining_question='Paperback confirmed; identify the correct catalog edition.')])
+    path=tmp_path/'inventory_followup_reviews.json';path.write_text(json.dumps(review))
+    checks=load_book_checks(tmp_path,model)
+    assert checks[0]['question']=='Paperback confirmed; identify the correct catalog edition.'
+    assert checks[0]['bibliographic_evidence']=='Original evidence.'
+    assert json.loads(path.read_text())==review
+
+
+def test_remaining_question_does_not_create_resolved_followup(tmp_path):
+    from types import SimpleNamespace
+    from valuation.workspace_service import load_book_checks
+    path=tmp_path/'inventory_followup_reviews.json'
+    path.write_text(json.dumps(dict(schema_version=1,reviews=[dict(inventory_observation_id='old',status='resolved',remaining_question='Do not reopen')])))
+    model=SimpleNamespace(observations=[],decisions=[],completed_inventory=SimpleNamespace(unresolved_observation_ids=[]))
+    assert load_book_checks(tmp_path,model)==[]
