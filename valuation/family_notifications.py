@@ -45,14 +45,76 @@ def enqueue(db, key, subject, text):
     db.execute('INSERT OR IGNORE INTO notification_outbox(id,subject,text) VALUES(?,?,?)', (key, subject, text))
 
 
-def prepare(db, origin, now):
+
+def owner_book_details(config, db):
+    """Owner-only enrichment; never add private fields to recipient snapshots."""
+    if not config or not config.get('owner_data_dir'):
+        return {}
+    from valuation.workspace_service import load_model
+    from valuation.family_owner import live_facts
+    model = load_model(config['owner_data_dir'], config['owner_output_dir'], family_overlay=False)
+    facts = live_facts(model, config['owner_data_dir'])
+    books = {b.catalog_item_id:b for b in model.books}
+    receipt = Path(config['owner_data_dir'])/'inventory_followup_reviews.json'
+    reviews = json.loads(receipt.read_text()).get('reviews', []) if receipt.exists() else []
+    bindings = {r['inventory_observation_id']:r['confirmed_binding'] for r in reviews
+                if r.get('confirmed_binding') in {'hardcover','paperback'}}
+    holdings = {h.holding_id:h for h in model.holdings}
+    has_decisions = db.execute("SELECT 1 FROM sqlite_master WHERE name='request_decisions' AND type='table'").fetchone()
+    assignments = {r['slot']:r['state'] for r in db.execute(
+        "SELECT slot,state FROM request_decisions WHERE state IN ('approved','collected','transferred')")} if has_decisions else {}
+    for f in facts.values():
+        b = books[f['catalog_item_id']]
+        f.update(publisher=b.publisher, year=b.publication_year)
+        confirmed = []
+        for copy in f['copies']:
+            holding = holdings[copy['holding_id']]
+            binding = bindings.get(holding.latest_inventory_observation_id)
+            if binding:
+                label = binding.capitalize()+' (location '+(copy['location'] or 'not recorded')+')'
+                if label not in confirmed:confirmed.append(label)
+        f['binding'] = '; '.join(confirmed)
+        states = [assignments.get(c['id']) for c in f['copies']]
+        f['availability'] = (str(states.count(None))+' available; '+str(states.count('approved'))+
+                             ' reserved; '+str(sum(s in {'collected','transferred'} for s in states))+' transferred')
+    return facts
+
+
+def request_email(row, origin, details):
+    data = json.loads(row['payload'])
+    sections = []
+    for book in data['books']:
+        f = details.get(book.get('reference'), {})
+        lines = [book['title']]
+        author = f.get('author') or book.get('author')
+        if author:lines.append('Author: '+author)
+        edition = ' · '.join(str(v) for v in (f.get('publisher') or book.get('publisher'),
+                                               f.get('year') or book.get('year')) if v)
+        if edition:lines.append('Publication: '+edition)
+        if f.get('binding'):lines.append('Confirmed binding: '+f['binding'])
+        locations = list(dict.fromkeys(c['location'] for c in f.get('copies',[]) if c.get('location')))
+        if locations:lines.append('Storage location(s): '+', '.join(locations))
+        if f.get('availability'):lines.append('Availability when alert prepared: '+f['availability'])
+        sections.append('\n'.join(lines))
+    return (f"From: {row['email']}\nSubmitted: {row['created']}\nBooks requested: {len(data['books'])}\n\n"+
+            '\n\n'.join(sections)+'\n\nRequester’s message:\n'+(data.get('message') or '(No message)')+
+            '\n\nREVIEW REQUEST\n'+origin+'/owner/#requests'+
+            ('\n\nAvailability can change; confirm before approving.' if details else
+             '\n\nLive inventory details unavailable; check Requests for current availability.'))
+
+def prepare(db, origin, now, config=None):
     """Reconcile committed submissions; restart-safe and no historical request blast."""
     start = db.execute("SELECT value FROM notification_meta WHERE key='started'").fetchone()[0]
-    for row in db.execute('SELECT * FROM submissions WHERE created>=? ORDER BY created', (start,)).fetchall():
-        data = json.loads(row['payload'])
-        titles = '\n'.join('• '+b['title'] for b in data['books'])
-        enqueue(db, 'request/'+row['id'], 'Library: new book request',
-                f"From: {row['email']}\nSubmitted: {row['created']}\n\n{titles}\n\nMessage:\n{data.get('message') or '(No message)'}\n\nReview: {origin}/owner/#requests")
+    rows = db.execute("SELECT * FROM submissions WHERE created>=? AND NOT EXISTS (SELECT 1 FROM notification_outbox WHERE id='request/'||submissions.id) ORDER BY created", (start,)).fetchall()
+    details = {}
+    if rows:
+        try:
+            details = owner_book_details(config, db)
+        except Exception:
+            # Alerts must still arrive if inventory enrichment is temporarily unavailable.
+            pass
+    for row in rows:
+        enqueue(db, 'request/'+row['id'], 'Library: new book request', request_email(row, origin, details))
     local = now.astimezone(ZONE)
     if local.hour < 8:
         return
@@ -133,7 +195,7 @@ def tick(config, now=None, sender=None):
             return
         with closing(connect(path)) as db:
             with db:
-                prepare(db, config['origin'].rstrip('/'), now)
+                prepare(db, config['origin'].rstrip('/'), now, config)
             mail = config.get('email_notifications', {})
             if not mail.get('enabled'):
                 return
