@@ -203,8 +203,12 @@ class App:
                             if path=='/api/search':
                                 if not app.config.get('family_search_enabled'):return self.reply(404,{'error':'Search not enabled'})
                                 return self.reply(200,app.search_preview(body['query'])['hybrid'])
-                            if path=='/api/list':return self.reply(200,store.save(db,email,body['version'],body['books'],body.get('message',''),catalog))
-                            if path=='/api/submit':return self.reply(200,store.submit(db,email,body['version'],body['key'],catalog,snapshot))
+                            if path in {'/api/list','/api/submit'}:
+                                result = (store.save(db,email,body['version'],body['books'],body.get('message',''),catalog) if path=='/api/list' else
+                                          store.submit(db,email,body['version'],body['key'],catalog,snapshot))
+                                from valuation.family_notifications import visit
+                                visit(app.db,email,app.config['owner_email'])
+                                return self.reply(200,result)
                             return self.reply(404,{'error':'Not found'})
                         if path=='/api/topics':
                             from valuation.browse_topics import build
