@@ -79,6 +79,8 @@ class App:
         self.search_lock=threading.Lock();self.search_index=None;self.search_fingerprint=None
         self.db=Path(config['database']);self.db.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         store.connect(self.db).close();os.chmod(self.db,0o600)
+        from valuation.family_notifications import initialize
+        initialize(self.db)
     def raw_catalog(self):
         raw=Path(self.config['snapshot']).read_bytes();records=json.loads(raw)
         from valuation.family_catalog import FIELDS
@@ -149,6 +151,9 @@ class App:
                     from valuation.family_users import allowed
                     if not allowed(app.config,email,touch=True):return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
+                    if not write and path in {'/', '/browse', '/browse/'}:
+                        from valuation.family_notifications import visit
+                        visit(app.db,email,app.config['owner_email'])
                     return_to=owner_return_path(parse_qs(urlsplit(self.path).query).get('owner_return',[''])[0])
                     if not write and path=='/sign-out':return self.reply(200,sign_out_page(email,email==app.config['owner_email'],return_to),'text/html')
                     if not write and path=='/account.js':return self.reply(200,Path(__file__).with_name('account_controls.js').read_text(),'text/javascript')
@@ -159,6 +164,9 @@ class App:
                         body=json.loads(self.rfile.read(length))
                     if path=='/owner' or path.startswith('/owner/'):
                         if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
+                        if path=='/owner/email-notifications' and not write:
+                            from valuation.family_notifications import status_page
+                            return self.reply(200,status_page(app.config),'text/html')
                         if path.startswith('/owner/search-pilot'):
                             if not app.config.get('search_pilot_dir'):return self.reply(404,{'error':'Preview not enabled'})
                             if path=='/owner/search-pilot/query' and write:return self.reply(200,app.search_preview(body['query']))
@@ -243,4 +251,6 @@ class App:
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args();app=App(json.loads(Path(a.config).read_text()))
+    from valuation.family_notifications import run
+    run(app.config)
     ThreadingHTTPServer(('127.0.0.1',8877),app.handler()).serve_forever()

@@ -212,3 +212,21 @@ def test_recipient_sees_pulled_without_private_pickup_notes(server,tmp_path):
  assert json.loads(raw)['submissions'][0]['payload']['books'][0]['request_status']=='pulled'
  assert b'PRIVATE PICKUP NOTE' not in raw
  assert b'copy-1' not in raw
+
+
+def test_notification_status_private_and_visits_ignore_polling(server):
+ from contextlib import closing
+ from valuation.family_requests import connect
+ assert server('/owner/email-notifications')[0]==403
+ code,body=server('/owner/email-notifications',who='owner@example.org')
+ assert code==200 and b'awaiting sender setup' in body
+ assert b'api_key_file' not in body
+ server('/api/me')
+ with closing(connect(server.app.db)) as db:
+  assert db.execute('SELECT count(*) FROM notification_visits').fetchone()[0]==0
+ server('/browse')
+ server('/browse')
+ server('/browse',who='owner@example.org')
+ with closing(connect(server.app.db)) as db:
+  rows=db.execute('SELECT email FROM notification_visits').fetchall()
+  assert [r[0] for r in rows]==['guest@example.org']
