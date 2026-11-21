@@ -113,7 +113,7 @@ def test_validation_honeypot_throttle_and_existing_guest(config):
     with pytest.raises(ValueError):reg.apply(config,body(email='six@example.org'),'same-client')
 
 
-def test_lookup_only_zip_and_international_address(config,monkeypatch):
+def test_lookup_only_zip_and_us_address(config,monkeypatch):
     import requests
     calls=[]
     class Response:
@@ -122,7 +122,11 @@ def test_lookup_only_zip_and_international_address(config,monkeypatch):
     monkeypatch.setattr(requests,'get',lambda url,**kwargs:calls.append(url) or Response())
     assert reg.lookup_zip('00501')['places']==[dict(city='Test City',region='NY')]
     assert calls==['https://api.zippopotam.us/us/00501']
-    reg.apply(config,body(country='United Kingdom',postal='SW1A 1AA',region='',city='London'),'client')
+    with pytest.raises(ValueError,match='U.S.'):
+        reg.apply(config,body(country='United Kingdom',postal='SW1A 1AA',region='',city='London'),'client')
+    domestic=body();domestic.pop('country')
+    reg.apply(config,domestic,'client')
+    assert rows(config,'registration_applications')[0]['address'] and json.loads(rows(config,'registration_applications')[0]['address'])['country']=='US'
     with pytest.raises(ValueError):reg.lookup_zip('../private')
     assert len(calls)==1
 

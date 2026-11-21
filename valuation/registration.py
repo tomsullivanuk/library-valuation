@@ -41,15 +41,14 @@ def text(value, label, limit, required=True):
 
 
 def address(body):
-    country=text(body.get('country','US'),'country',60)
-    result=dict(country=country,street=text(body.get('street',''),'street address',200),
+    if body.get('country','US')!='US':raise ValueError('Registration is limited to U.S. mailing addresses')
+    result=dict(country='US',street=text(body.get('street',''),'street address',200),
                 unit=text(body.get('unit',''),'apartment or unit',100,False),
                 postal=text(body.get('postal',''),'postal code',20),
                 city=text(body.get('city',''),'city',100),region=text(body.get('region',''),'state or region',100,False))
-    if country=='US':
-        if not re.fullmatch(r'\d{5}(-\d{4})?',result['postal']):raise ValueError('Enter a five-digit ZIP or ZIP+4')
-        if not re.fullmatch('[A-Za-z]{2}',result['region']):raise ValueError('Confirm the two-letter mailing state')
-        result['region']=result['region'].upper()
+    if not re.fullmatch(r'\d{5}(-\d{4})?',result['postal']):raise ValueError('Enter a five-digit ZIP or ZIP+4')
+    if not re.fullmatch('[A-Za-z]{2}',result['region']):raise ValueError('Confirm the two-letter mailing state')
+    result['region']=result['region'].upper()
     return result
 
 
@@ -208,19 +207,18 @@ def page(content, script=False):
 
 
 def form_page():
-    return page('''<h1>Request library access</h1><p>Apply to browse the Thomas D Sullivan Library and request books. Tom reviews applications personally.</p>
-<p class="muted">Your name and mailing address are shared only with Tom to review access and arrange book delivery.</p>
+    return page('''<h1>Request library access</h1><p>Apply to browse and request books from the Thomas D Sullivan Library.</p>
+<p class="muted">Your name and mailing address are required to facilitate pickup and delivery. Registration is limited to U.S. mailing addresses.</p>
 <form id="registration"><label>Name<input name="name" autocomplete="name" maxlength="100" required></label><label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
-<label>Country<select name="country"><option value="US">United States</option><option value="other">Another country</option></select></label><label id="country-name" hidden>Country name<input name="other_country" autocomplete="country-name" maxlength="60"></label>
 <label>Street address<input name="street" autocomplete="address-line1" maxlength="200" required></label><label>Apartment / unit (optional)<input name="unit" autocomplete="address-line2" maxlength="100"></label>
-<label id="postal-label">ZIP / postal code<input name="postal" autocomplete="postal-code" maxlength="20" required></label><p id="zip-status" class="muted" role="status">For U.S. addresses, enter your ZIP and we’ll suggest the mailing city and state.</p>
-<label id="place-choice" hidden>Mailing city<select id="places"></select></label><details id="city-details"><summary id="city-summary">City and state — filled from ZIP; open to correct</summary><label>City<input name="city" autocomplete="address-level2" maxlength="100" required></label><label>State / region<input name="region" autocomplete="address-level1" maxlength="100"></label></details>
+<label id="postal-label">ZIP code<input name="postal" autocomplete="postal-code" inputmode="numeric" maxlength="10" required></label><p id="zip-status" class="muted" role="status">Enter your ZIP and we’ll suggest the mailing city and state.</p>
+<label id="place-choice" hidden>Mailing city<select id="places"></select></label><details id="city-details"><summary id="city-summary">City and state — filled from ZIP; open to correct</summary><label>City<input name="city" autocomplete="address-level2" maxlength="100" required></label><label>State<input name="region" autocomplete="address-level1" maxlength="100"></label></details>
 <label class="trap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label><button>Send confirmation email</button><p id="form-status" role="status"></p></form><p><a href="/">Already approved? Sign in to the library</a></p>''',True)
 
 
 def verify_page(config,token):
     with closing(ledger.connect(config['database'])) as db:row=token_row(db,token,datetime.now(timezone.utc))
-    if row['status']!='unverified':return page('<h1>Email confirmed</h1><p>Your application has been submitted. Tom will email you after reviewing it.</p>')
+    if row['status']!='unverified':return page('<h1>Email confirmed</h1><p>Your application has been submitted. You’ll receive an email after it has been reviewed.</p>')
     return page('<h1>Confirm your email</h1><p>Confirm your email to submit your library access application. This does not grant access yet.</p><form id="verify"><input type="hidden" name="token" value="'+html.escape(token,quote=True)+'"><button>Confirm email and submit application</button><p id="form-status" role="status"></p></form>',True)
 
 
