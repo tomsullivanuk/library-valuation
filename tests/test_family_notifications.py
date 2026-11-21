@@ -177,7 +177,7 @@ def test_enriched_request_email_omits_unknowns_and_freezes_details(tmp_path,monk
     with closing(r.connect(cfg['database'])) as db,db:
         payload=json.dumps(dict(books=[dict(reference='ref',title='Geometry',author='An author',publisher='Press',year='1984'),dict(reference='unknown',title='Unknown edition')],message='Please reserve these.'))
         db.execute('INSERT INTO submissions VALUES(?,?,?,?,?)',('new','reader@example.org','new',now.isoformat(),payload))
-    details={'ref':dict(author='An author',publisher='Reviewed Press',year='1984',binding='Paperback (location 15A)',copies=[dict(location='15A')],availability='1 available; 1 reserved; 0 transferred')}
+    details={'ref':dict(author='An author',publisher='Reviewed Press',year='1984',binding='Paperback (location 15A)',copies=[dict(location='15A')],availability='1 available; 1 reserved; 0 transferred',value='$12–$18')}
     calls=[]
     monkeypatch.setattr(n,'owner_book_details',lambda *args:calls.append(1) or details)
     cfg['email_notifications']['enabled']=False
@@ -187,8 +187,8 @@ def test_enriched_request_email_omits_unknowns_and_freezes_details(tmp_path,monk
     assert len(calls)==1
     with closing(r.connect(cfg['database'])) as db:
         text=db.execute('SELECT text FROM notification_outbox').fetchone()[0]
-    for value in ('Author: An author','Publication: Reviewed Press · 1984','Confirmed binding: Paperback (location 15A)','Storage location(s): 15A','1 available; 1 reserved','Please reserve these.','REVIEW REQUEST'):
+    for value in ('Author: An author','Publication: Reviewed Press · 1984','Confirmed binding: Paperback (location 15A)','Storage location(s): 15A','1 available; 1 reserved','Estimated resale value: $12–$18','Please reserve these.','REVIEW REQUEST'):
         assert value in text
     assert 'ISBN' not in text and 'None' not in text
     unknown=text.split('Unknown edition')[1].split('Requester’s message')[0]
-    assert 'Publication:' not in unknown and 'binding:' not in unknown
+    assert 'Publication:' not in unknown and 'binding:' not in unknown and 'Estimated resale value:' not in unknown

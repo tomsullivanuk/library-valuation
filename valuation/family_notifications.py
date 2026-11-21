@@ -95,6 +95,9 @@ def request_email(row, origin, details):
         locations = list(dict.fromkeys(c['location'] for c in f.get('copies',[]) if c.get('location')))
         if locations:lines.append('Storage location(s): '+', '.join(locations))
         if f.get('availability'):lines.append('Availability when alert prepared: '+f['availability'])
+        value = f.get('value', '')
+        if value and value not in {'No usable estimate','No reliable estimate','Not researched','Unavailable'}:
+            lines.append('Estimated resale value: '+value)
         sections.append('\n'.join(lines))
     return (f"From: {row['email']}\nSubmitted: {row['created']}\nBooks requested: {len(data['books'])}\n\n"+
             '\n\n'.join(sections)+'\n\nRequester’s message:\n'+(data.get('message') or '(No message)')+
