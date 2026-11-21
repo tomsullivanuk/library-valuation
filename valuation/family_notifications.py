@@ -1,4 +1,4 @@
-"""Private owner alerts, visitor summaries, and a durable Resend outbox."""
+"""Private owner alerts, visitor summaries, and a durable email outbox."""
 import hashlib
 import json
 import threading
@@ -72,6 +72,55 @@ def prepare(db, origin, now):
         db.execute("UPDATE notification_meta SET value=? WHERE key='digest_day'", (day.isoformat(),))
 
 
+
+class AmbiguousSMTP(Exception):
+    """The server may have accepted DATA; retrying might duplicate the email."""
+
+
+def send_icloud(mail, password, payload, key, first, mark_sending):
+    import smtplib
+    import ssl
+    import requests
+    from email.message import EmailMessage
+    from email.utils import format_datetime
+    message = EmailMessage()
+    message['From'] = payload['sender']
+    message['To'] = RECIPIENT
+    message['Subject'] = payload['subject']
+    message['Date'] = format_datetime(first)
+    message['Message-ID'] = '<'+key+'@wearyfather.org>'
+    message.set_content(payload['text'])
+    # Apple's documented endpoint: mandatory TLS before authenticating. The
+    # username is the full primary @icloud.com address, not the custom alias.
+    smtp = smtplib.SMTP('smtp.mail.me.com', 587, timeout=20)
+    try:
+        smtp.ehlo()
+        smtp.starttls(context=ssl.create_default_context(cafile=requests.certs.where()))
+        smtp.ehlo()
+        smtp.login(mail['smtp_username'], password)
+        mark_sending()
+        try:
+            refused = smtp.send_message(message, from_addr='library@wearyfather.org', to_addrs=[RECIPIENT])
+            if refused:
+                raise smtplib.SMTPRecipientsRefused(refused)
+        except (smtplib.SMTPResponseException, smtplib.SMTPRecipientsRefused):
+            # Explicit rejection is safe to retry. Clear the marker via a
+            # distinct exception caught by the worker below.
+            raise RejectedSMTP() from None
+        except Exception:
+            raise AmbiguousSMTP() from None
+        return str(message['Message-ID'])
+    finally:
+        # A QUIT/disconnect failure after successful DATA must not undo success.
+        try:
+            smtp.close()
+        except Exception:
+            pass
+
+
+class RejectedSMTP(Exception):
+    """SMTP explicitly rejected this message; it was not accepted."""
+
 def tick(config, now=None, sender=None):
     """Single process lock also prevents multiple workers from sending concurrently."""
     import fcntl
@@ -88,18 +137,33 @@ def tick(config, now=None, sender=None):
             mail = config.get('email_notifications', {})
             if not mail.get('enabled'):
                 return
+            provider = mail.get('provider', 'resend')
+            if provider not in {'resend', 'icloud'}:
+                raise ValueError('Unknown email delivery provider')
             # Read credentials before claiming work. Missing setup leaves mail queued.
-            token = Path(mail['api_key_file']).read_text().strip()
-            if not token or not mail.get('from') or '\n' in mail['from']:
+            token = Path(mail['password_file'] if provider == 'icloud' else mail['api_key_file']).read_text().strip()
+            if not token or not mail.get('from') or any(c in mail['from'] for c in '\r\n'):
                 raise ValueError('Email sender is not configured')
+            if provider == 'icloud':
+                from email.utils import parseaddr
+                if parseaddr(mail['from'])[1].lower() != 'library@wearyfather.org' or not mail.get('smtp_username'):
+                    raise ValueError('iCloud requires the library sender and primary iCloud username')
+            # SMTP has no provider idempotency guarantee. Never automatically repeat
+            # a send interrupted after the durable sending marker.
+            with db:
+                db.execute("UPDATE notification_outbox SET state='needs_review',error='Interrupted SMTP send; confirm receipt before resending' WHERE state='sending'")
             for row in db.execute("SELECT * FROM notification_outbox WHERE state='queued' AND (next_attempt IS NULL OR next_attempt<=?) ORDER BY rowid LIMIT 20", (now.isoformat(),)).fetchall():
                 first = datetime.fromisoformat(row['first_attempt']) if row['first_attempt'] else now
-                if now-first >= timedelta(hours=23):
+                if provider == 'resend' and now-first >= timedelta(hours=23):
                     with db:
                         db.execute("UPDATE notification_outbox SET state='needs_review',error='Retry window expired; check provider before resending' WHERE id=?", (row['id'],))
                     continue
                 payload = json.loads(row['payload']) if row['payload'] else dict(
-                    sender=mail['from'], to=[RECIPIENT], subject=row['subject'], text=row['text'])
+                    sender=mail['from'], to=[RECIPIENT], subject=row['subject'], text=row['text'], provider=provider)
+                if payload.get('provider', 'resend') != provider:
+                    with db:
+                        db.execute("UPDATE notification_outbox SET state='needs_review',error='Delivery provider changed; confirm prior delivery before resending' WHERE id=?", (row['id'],))
+                    continue
                 # Persist the exact payload before any network attempt, even across config changes.
                 with db:
                     db.execute('UPDATE notification_outbox SET payload=?,first_attempt=?,attempts=attempts+1 WHERE id=?',
@@ -108,6 +172,11 @@ def tick(config, now=None, sender=None):
                 try:
                     if sender:
                         provider_id = sender(payload, key)
+                    elif provider == 'icloud':
+                        def mark_sending():
+                            with db:
+                                db.execute("UPDATE notification_outbox SET state='sending' WHERE id=?", (row['id'],))
+                        provider_id = send_icloud(mail, token, payload, key, first, mark_sending)
                     else:
                         import requests
                         response = requests.post('https://api.resend.com/emails', json={
@@ -117,11 +186,19 @@ def tick(config, now=None, sender=None):
                         provider_id = response.json()['id']
                     with db:
                         db.execute("UPDATE notification_outbox SET state='sent',provider_id=?,error=NULL WHERE id=?", (provider_id,row['id']))
+                except RejectedSMTP:
+                    delay = min(3600, 60 * 2**min(row['attempts'], 6))
+                    with db:
+                        db.execute("UPDATE notification_outbox SET state='queued',next_attempt=?,error='SMTP rejected message; retry scheduled' WHERE id=?",
+                                   ((now+timedelta(seconds=delay)).isoformat(), row['id']))
+                except AmbiguousSMTP:
+                    with db:
+                        db.execute("UPDATE notification_outbox SET state='needs_review',error='SMTP result uncertain; confirm receipt before resending' WHERE id=?", (row['id'],))
                 except Exception:
                     # Never log credentials, response bodies, or private messages.
                     delay = min(3600, 60 * 2**min(row['attempts'], 6))
                     with db:
-                        db.execute('UPDATE notification_outbox SET next_attempt=?,error=? WHERE id=?',
+                        db.execute("UPDATE notification_outbox SET state=CASE WHEN state='sending' THEN 'needs_review' ELSE state END,next_attempt=?,error=? WHERE id=?",
                                    ((now+timedelta(seconds=delay)).isoformat(), 'Delivery failed; retry scheduled', row['id']))
 
 
@@ -153,6 +230,7 @@ def status_page(config):
             '<p>Queued: '+str(counts.get('queued',0))+' · Accepted by email provider: '+str(counts.get('sent',0))+
             ' · Needs review: '+str(counts.get('needs_review',0))+'</p>'
             '<p>Sender: '+html.escape(mail.get('from','Not configured'))+'</p>'
-            '<p>Setup requires a verified Resend sending domain and a private sending API key on the library server. '
+            '<p>Delivery: '+html.escape(mail.get('provider','resend'))+'</p>'
+            '<p>iCloud setup requires library@wearyfather.org, your primary iCloud Mail username, and a private app-specific password file. Resend remains an alternative with a verified domain and API key. '
             'Messages awaiting setup stay queued. Items needing review must be checked against provider logs before resending. '
-            'Provider acceptance does not confirm inbox delivery; check Resend for bounces.</p></html>')
+            'Provider acceptance does not confirm inbox delivery. Check the receiving inbox and sender mailbox for delivery failures.</p></html>')

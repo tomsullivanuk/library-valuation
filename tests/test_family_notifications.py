@@ -67,3 +67,106 @@ def test_disabled_queue_and_ambiguous_delivery_expiry(tmp_path):
     with closing(r.connect(cfg['database'])) as db:
         row=db.execute('SELECT state,attempts FROM notification_outbox').fetchone()
         assert tuple(row)==('needs_review',1)
+
+
+def icloud_setup(tmp_path):
+    cfg,now=setup(tmp_path)
+    cfg['email_notifications']=dict(enabled=True,provider='icloud',smtp_username='owner@icloud.com',
+        password_file=str(tmp_path/'key'),**{'from':'Library <library@wearyfather.org>'})
+    with closing(r.connect(cfg['database'])) as db, db:
+        n.enqueue(db,'request/smtp','Subject','Private body')
+    return cfg,now
+
+
+def fake_smtp(monkeypatch, failure=None):
+    import smtplib
+    calls=[]
+    class SMTP:
+        def __init__(self,host,port,timeout):calls.append(('connect',host,port))
+        def ehlo(self):calls.append(('ehlo',))
+        def starttls(self,context):
+            import ssl
+            assert context.verify_mode==ssl.CERT_REQUIRED and context.check_hostname
+            calls.append(('tls',))
+        def login(self,user,password):calls.append(('login',user))
+        def send_message(self,msg,from_addr,to_addrs):
+            calls.append(('send',msg,from_addr,to_addrs))
+            if failure:raise failure
+            return {}
+        def close(self):calls.append(('close',))
+    monkeypatch.setattr(smtplib,'SMTP',SMTP)
+    return calls
+
+
+def test_icloud_tls_auth_sender_recipient_and_success(tmp_path,monkeypatch):
+    cfg,now=icloud_setup(tmp_path)
+    calls=fake_smtp(monkeypatch)
+    n.tick(cfg,now)
+    n.tick(cfg,now+timedelta(minutes=1))
+    assert calls[:5]==[('connect','smtp.mail.me.com',587),('ehlo',),('tls',),('ehlo',),('login','owner@icloud.com')]
+    sends=[c for c in calls if c[0]=='send'];assert len(sends)==1
+    msg=sends[0][1]
+    assert str(msg['From'])=='Library <library@wearyfather.org>'
+    assert sends[0][2:]==('library@wearyfather.org',[n.RECIPIENT])
+    assert 'Private body' in msg.get_content()
+    with closing(r.connect(cfg['database'])) as db:
+        assert db.execute('SELECT state FROM notification_outbox').fetchone()[0]=='sent'
+
+
+def test_icloud_ambiguous_timeout_and_interrupted_send_never_retry(tmp_path,monkeypatch):
+    cfg,now=icloud_setup(tmp_path)
+    calls=fake_smtp(monkeypatch,TimeoutError('private detail'))
+    n.tick(cfg,now)
+    n.tick(cfg,now+timedelta(days=2))
+    assert len([c for c in calls if c[0]=='send'])==1
+    with closing(r.connect(cfg['database'])) as db, db:
+        row=db.execute('SELECT state,error FROM notification_outbox').fetchone()
+        assert row['state']=='needs_review' and 'private detail' not in row['error']
+        n.enqueue(db,'request/crash','Subject','Body')
+        db.execute("UPDATE notification_outbox SET state='sending' WHERE id='request/crash'")
+    n.tick(cfg,now+timedelta(days=3))
+    assert len([c for c in calls if c[0]=='send'])==1
+    with closing(r.connect(cfg['database'])) as db:
+        assert db.execute("SELECT state FROM notification_outbox WHERE id='request/crash'").fetchone()[0]=='needs_review'
+
+
+def test_icloud_explicit_rejection_can_retry(tmp_path,monkeypatch):
+    import smtplib
+    cfg,now=icloud_setup(tmp_path)
+    fake_smtp(monkeypatch,smtplib.SMTPDataError(451,b'try later'))
+    n.tick(cfg,now)
+    with closing(r.connect(cfg['database'])) as db:
+        assert db.execute('SELECT state FROM notification_outbox').fetchone()[0]=='queued'
+    calls=fake_smtp(monkeypatch)
+    n.tick(cfg,now+timedelta(minutes=2))
+    assert len([c for c in calls if c[0]=='send'])==1
+
+
+def test_attempted_delivery_cannot_switch_provider(tmp_path,monkeypatch):
+    cfg,now=setup(tmp_path)
+    with closing(r.connect(cfg['database'])) as db,db:n.enqueue(db,'request/test','Title','Body')
+    def fail(*args):raise TimeoutError()
+    n.tick(cfg,now,fail)
+    cfg['email_notifications']=dict(enabled=True,provider='icloud',smtp_username='owner@icloud.com',
+        password_file=str(tmp_path/'key'),**{'from':'Library <library@wearyfather.org>'})
+    calls=fake_smtp(monkeypatch)
+    n.tick(cfg,now+timedelta(minutes=2))
+    assert not calls
+    with closing(r.connect(cfg['database'])) as db:
+        assert db.execute('SELECT state FROM notification_outbox').fetchone()[0]=='needs_review'
+
+
+def test_private_icloud_setup_preserves_config_and_leaves_disabled(tmp_path):
+    import stat
+    from operations.family_access_pilot.configure_email import configure
+    config=tmp_path/'config.json'
+    config.write_text(json.dumps(dict(database='existing.sqlite',origin='https://example.org',user_access={'keep':'private'})))
+    configure(config,'owner@icloud.com','synthetic-app-password')
+    result=json.loads(config.read_text())
+    assert result['database']=='existing.sqlite' and result['user_access']=={'keep':'private'}
+    assert result['email_notifications']['enabled'] is False
+    assert 'synthetic-app-password' not in config.read_text()
+    secret=tmp_path/'library-icloud-password'
+    assert secret.read_text().strip()=='synthetic-app-password'
+    for path in (config,secret,tmp_path/'config.before-icloud.json'):
+        assert stat.S_IMODE(path.stat().st_mode)==0o600
