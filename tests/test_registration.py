@@ -40,6 +40,7 @@ def test_direct_registration_pending_acknowledgment_and_owner_notice_once(config
     out=rows(config,'notification_outbox');assert len(out)==2
     assert out[0]['recipient']=='new@example.org' and out[1]['recipient']==mail.RECIPIENT
     assert 'under review' in out[0]['text'] and 'within 24 hours' in out[0]['text']
+    assert 'Spam or Junk' in out[0]['text']
     assert '/register/verify?' not in out[0]['text'] and 'No action is needed now' in out[0]['text']
     assert '/owner/#users/'+a['id'] in out[1]['text'] and 'verified application' not in out[1]['text']
     reg.apply(config,body(name='Changed by duplicate'),'other')
@@ -54,7 +55,7 @@ def test_approval_verifies_access_before_email_and_stale_decisions(config):
     assert result['applications'][0]['status']=='approved' and users.allowed(config,'new@example.org')
     approval=rows(config,'notification_outbox')[-1]
     assert approval['recipient']=='new@example.org'
-    assert all(s in approval['text'] for s in ['Welcome!','one-time access code','My List','new@example.org'])
+    assert all(s in approval['text'] for s in ['Welcome!','one-time login code','noreply@notify.cloudflare.com','Spam or Junk','My List','new@example.org'])
     with pytest.raises(ledger.Conflict):reg.decide(config,config['owner_email'],dict(id=a['id'],action='decline',version=a['version']),p)
     assert len(rows(config,'notification_outbox'))==3
 

@@ -193,6 +193,7 @@ class App:
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
                             text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"').replace('src="/owner-picks.js"','src="/owner/owner-picks.js"')
+                            text=text.replace('<strong>Library Valuation</strong>','<span style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap"><img src="/register/emblem.png" width="1536" height="1024" alt="Thomas D. Sullivan Library &amp; Archive" style="width:120px;max-width:35vw;height:auto;border-radius:6px"><strong>Library Valuation</strong></span>',1)
                             text=text.replace('</body>','<script src="/account.js" defer></script></body>')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):

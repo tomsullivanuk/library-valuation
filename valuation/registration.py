@@ -85,7 +85,7 @@ def acknowledge_active(db,config,email,now):
     key='registration/already-active/'+hashlib.sha256(email.encode()).hexdigest()+'/'+day
     queue(db,config,key,email,'You’re already registered for the library',
           'You’re already registered for the Thomas D Sullivan Library, and your access is active. No further approval is needed.\n\n'+
-          'Sign in here: '+config['origin']+'/\nUse '+email+' to sign in. Cloudflare will email you a one-time access code; check Spam if it does not arrive.\n\n'+
+          'Sign in here: '+config['origin']+'/\nUse '+email+' to sign in. Cloudflare will email you a one-time access code; check Spam or Junk if it does not arrive.\n\n'+
           'Once signed in, browse the books, add selections to My List, and submit your requests.\n\nIf you need help, contact '+config['owner_email']+'.')
     return True
 
@@ -130,7 +130,7 @@ def submit_for_review(db,config,row,now):
                (row['id'],row['email'],now.isoformat(),'submitted_for_review','No separate email confirmation required'))
     queue(db,config,'registration/received/'+row['id'],row['email'],'Your library registration is under review',
           'Your registration for the Thomas D Sullivan Library is under review. You will receive notification of its approval status within 24 hours.\n\n'+
-          'No action is needed now. If approved, you will receive instructions for signing in and requesting books.\n\n'+
+          'No action is needed now. Please check your Spam or Junk folder while waiting for your approval notification. If approved, you will receive instructions for signing in and requesting books.\n\n'+
           'If you did not register or need help, contact '+config['owner_email']+'.')
     queue(db,config,'registration/owner/'+row['id'],mail.RECIPIENT,'Library access application — '+row['name'],
           'New registration awaiting review\n\nName: '+row['name']+'\nEmail: '+row['email']+'\nAddress: '+format_address(row['address'])+
@@ -183,7 +183,7 @@ def decide(config,actor,body,provider=None):
                 db.execute("UPDATE registration_applications SET status='approved',version=version+1,updated=? WHERE id=?",(stamp,row['id']))
                 queue(db,config,'registration/approved/'+row['id'],row['email'],'Your library access is approved',
                       'Hi '+row['name']+',\n\nYour access to the Thomas D Sullivan Library has been approved.\n\nOpen '+config['origin']+
-                      '/ and sign in using '+row['email']+'. Cloudflare will email a one-time access code to that address. Check Spam if it does not arrive.\n\nBrowse the collection, add books to My List, and submit your requests when ready. Requests are subject to availability and owner confirmation.\n\n'+
+                      '/ and sign in using '+row['email']+'. Cloudflare is our secure sign-in service. It will send your one-time login code from noreply@notify.cloudflare.com, separately from our library emails. Check Spam or Junk if it does not arrive.\n\nBrowse the collection, add books to My List, and submit your requests when ready. Requests are subject to availability and owner confirmation.\n\n'+
                       ('Note from Tom: '+note+'\n\n' if note else '')+'If you need help, contact Tom at '+config['owner_email']+'.')
         else:
             with db:
