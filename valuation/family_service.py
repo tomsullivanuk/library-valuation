@@ -137,7 +137,9 @@ class App:
             def log_message(self,*args):pass
             def reply(self,status,payload,kind='application/json'):
                 data=payload if isinstance(payload,bytes) else payload.encode() if isinstance(payload,str) else json.dumps(payload).encode()
-                self.send_response(status);self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                self.send_response(status)
+                if kind=='text/csv':self.send_header('Content-Disposition','attachment; filename="library-email-history.csv"')
+                self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             def handle_request(self,write=False):
                 try:
                     hostname=self.headers.get('Host')
@@ -170,6 +172,12 @@ class App:
                         body=json.loads(self.rfile.read(length))
                     if path=='/owner' or path.startswith('/owner/'):
                         if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
+                        if path in {'/owner/email-history','/owner/email-history.csv'} and not write:
+                            from valuation import email_history
+                            params={k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()}
+                            if path.endswith('.csv'):
+                                return self.reply(200,email_history.csv_export(email_history.records(app.config,params)),'text/csv')
+                            return self.reply(200,email_history.page(app.config,params),'text/html')
                         if path=='/owner/email-notifications' and not write:
                             from valuation.family_notifications import status_page
                             return self.reply(200,status_page(app.config),'text/html')

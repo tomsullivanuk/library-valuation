@@ -258,3 +258,17 @@ def test_public_registration_is_isolated_and_requires_origin(server,monkeypatch)
   assert row[0]=='pending'
  config['registration']['enabled']=False
  assert server('/register',who='forged')[0]==404
+
+
+def test_email_history_and_csv_owner_only(server):
+ from valuation import family_notifications as n
+ from valuation.family_requests import connect
+ from contextlib import closing
+ with closing(connect(server.app.db)) as db,db:
+  n.enqueue(db,'request/history-test','Private subject','Private message','person@example.org')
+ for path in ('/owner/email-history','/owner/email-history.csv'):
+  assert server(path)[0]==403
+  assert server(path,who='forged')[0]==403
+  code,body=server(path,who='owner@example.org')
+  assert code==200 and b'Private subject' in body and b'Private message' in body
+ assert b'Private message' not in server('/owner/email-history.csv?recipient=absent',who='owner@example.org')[1]

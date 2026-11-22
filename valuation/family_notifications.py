@@ -23,6 +23,9 @@ def schema(db, now):
     ''')
     if 'recipient' not in {r[1] for r in db.execute('PRAGMA table_info(notification_outbox)')}:
         db.execute('ALTER TABLE notification_outbox ADD COLUMN recipient TEXT')
+    for column in ('created','accepted_at'):
+        if column not in {r[1] for r in db.execute('PRAGMA table_info(notification_outbox)')}:
+            db.execute('ALTER TABLE notification_outbox ADD COLUMN '+column+' TEXT')
     with db:
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('started', now.isoformat()))
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('digest_day', now.astimezone(ZONE).date().isoformat()))
@@ -49,7 +52,7 @@ def visit(path, email, owner, now=None):
 def enqueue(db, key, subject, text, recipient=None):
     from valuation.family_users import email
     recipient = email(recipient or RECIPIENT)
-    db.execute('INSERT OR IGNORE INTO notification_outbox(id,subject,text,recipient) VALUES(?,?,?,?)', (key, subject, text, recipient))
+    db.execute('INSERT OR IGNORE INTO notification_outbox(id,subject,text,recipient,created) VALUES(?,?,?,?,?)', (key, subject, text, recipient, datetime.now(timezone.utc).isoformat()))
 
 
 
@@ -297,7 +300,7 @@ def tick(config, now=None, sender=None):
                         response.raise_for_status()
                         provider_id = response.json()['id']
                     with db:
-                        db.execute("UPDATE notification_outbox SET state='sent',provider_id=?,error=NULL WHERE id=?", (provider_id,row['id']))
+                        db.execute("UPDATE notification_outbox SET state='sent',provider_id=?,accepted_at=?,error=NULL WHERE id=?", (provider_id,now.isoformat(),row['id']))
                 except RejectedSMTP:
                     delay = min(3600, 60 * 2**min(row['attempts'], 6))
                     with db:
@@ -335,7 +338,7 @@ def status_page(config):
     enabled = bool(mail.get('enabled'))
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Email notifications</title><style>body{max-width:700px;margin:2rem auto;padding:1rem;font:18px/1.6 system-ui;color:#25372e}a{color:#245d49}</style>'
-            '<a href="/owner/#settings">Back to Settings</a><h1>Email notifications</h1>'
+            '<a href="/owner/#settings">Back to Settings</a><h1>Email notifications</h1><p><a href="/owner/email-history">Email History — messages and CSV export</a></p>'
             '<p>Delivery '+('enabled' if enabled else 'awaiting sender setup')+'. Recipient: '+RECIPIENT+'</p>'
             '<p>New requests and their messages: within about 30 seconds when delivery is enabled. '
             'Visitor summary: daily at 8 a.m. Central for the previous day, skipping quiet days. Your owner activity is excluded.</p>'

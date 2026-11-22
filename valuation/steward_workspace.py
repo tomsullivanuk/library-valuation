@@ -1396,6 +1396,7 @@ _DOCUMENT = r"""<!doctype html>
       append(main, node("p", {}, workspaceState.connected ? "Saving is connected. Dispositions and action statuses are stored with the project and survive workspace regeneration." : "Saving is disconnected. Start the local workspace service to edit decisions."), node("p", {}, "Library browsing defaults to physically inventoried books. Historical and all-record views are available under Reports."), routeLink("About this data", "about"));
       append(main, node("section", {id: "user-connection-settings"}));
       window.dispatchEvent(new Event("owner-user-settings"));
+      if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-history"}, "Email History — messages and CSV export")));
       if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-notifications"}, "Email notifications — setup and delivery status")));
     }
 
