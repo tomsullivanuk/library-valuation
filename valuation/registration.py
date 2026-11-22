@@ -213,13 +213,13 @@ def page(content, script=False):
 
 
 def form_page():
-    return page('''<h1>Request library access</h1><p>Apply to browse and request books from the Thomas D Sullivan Library.</p>
-<p class="muted">Your name and mailing address are required to facilitate pickup and delivery. Registration is limited to U.S. mailing addresses.</p>
+    return page('''<section id="registration-intro"><h1>Request library access</h1><p>Apply to browse and request books from the Thomas D Sullivan Library.</p>
+<p class="muted">Your name and mailing address are required to facilitate pickup and delivery. Registration is limited to U.S. mailing addresses.</p></section>
 <form id="registration"><label>Name<input name="name" autocomplete="name" maxlength="100" required></label><label>Email<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
 <label>Street address<input name="street" autocomplete="address-line1" maxlength="200" required></label><label>Apartment / unit (optional)<input name="unit" autocomplete="address-line2" maxlength="100"></label>
 <label id="postal-label">ZIP code<input name="postal" autocomplete="postal-code" inputmode="numeric" maxlength="10" required></label><p id="zip-status" class="muted" role="status">Enter your ZIP and we’ll suggest the mailing city and state.</p>
 <label id="place-choice" hidden>Mailing city<select id="places"></select></label><details id="city-details"><summary id="city-summary">City and state — filled from ZIP; open to correct</summary><label>City<input name="city" autocomplete="address-level2" maxlength="100" required></label><label>State<input name="region" autocomplete="address-level1" maxlength="100"></label></details>
-<label class="trap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label><button>Submit registration</button><p id="form-status" role="status"></p></form><p><a href="/">Already approved? Sign in to the library</a></p>''',True)
+<label class="trap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label><button>Submit registration</button><p id="form-status" role="status"></p></form><p id="registration-sign-in"><a href="/">Already approved? Sign in to the library</a></p>''',True)
 
 
 def verify_page(config,token):
