@@ -192,3 +192,58 @@ def test_enriched_request_email_omits_unknowns_and_freezes_details(tmp_path,monk
     assert 'ISBN' not in text and 'None' not in text
     unknown=text.split('Unknown edition')[1].split('Requester’s message')[0]
     assert 'Publication:' not in unknown and 'binding:' not in unknown and 'Estimated resale value:' not in unknown
+
+
+def test_book_decisions_group_bulk_preserve_messages_and_recipients(tmp_path):
+    from valuation import family_owner as owner
+    cfg,now=setup(tmp_path)
+    with closing(r.connect(cfg['database'])) as db:
+        owner.schema(db)
+        with db:
+            data=dict(books=[dict(reference='a',title='First book',author='Author'),dict(reference='b',title='Second book',author='Author'),dict(reference='c',title='Third book')],message='')
+            db.execute('INSERT INTO submissions VALUES(?,?,?,?,?)',('batch','reader@example.org','batch',(now-timedelta(days=1)).isoformat(),json.dumps(data)))
+        facts={ref:dict(copies=[dict(id=ref+'-copy')]) for ref in ['a','b','c']}
+        for ref in ['a','b']:
+            owner.update(db,'owner@example.org',dict(submission='batch',reference=ref,state='approved',slot=ref+'-copy',version=0,message='Ready for you.'),facts)
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='c',state='declined',version=0,message='This copy is promised elsewhere.\nPlease choose another.'),facts)
+    cfg['email_notifications']['enabled']=False
+    n.tick(cfg,now)
+    n.tick(cfg,now+timedelta(minutes=1))
+    with closing(r.connect(cfg['database'])) as db:
+        messages=db.execute("SELECT * FROM notification_outbox WHERE id LIKE 'book-decision/%' ORDER BY rowid").fetchall()
+    assert len(messages)==2 and all(m['recipient']=='reader@example.org' for m in messages)
+    approved=messages[0]['text'];declined=messages[1]['text']
+    assert 'First book' in approved and 'Second book' in approved and approved.count('Ready for you.')==1
+    assert 'Thomas will coordinate delivery directly with you.' in approved
+    assert 'This copy is promised elsewhere.\nPlease choose another.' in declined
+    assert 'Third book' in declined and 'coordinate delivery' not in declined
+    assert 'copy' not in approved and 'holding_id' not in approved
+
+
+def test_old_decisions_and_unchanged_edits_do_not_send_and_reversal_is_current(tmp_path):
+    from valuation import family_owner as owner
+    cfg,now=setup(tmp_path)
+    with closing(r.connect(cfg['database'])) as db:
+        owner.schema(db)
+        with db:
+            data=dict(books=[dict(reference='a',title='First book')],message='')
+            db.execute('INSERT INTO submissions VALUES(?,?,?,?,?)',('batch','reader@example.org','batch',(now-timedelta(days=1)).isoformat(),json.dumps(data)))
+        facts=dict(a=dict(copies=[dict(id='copy')]))
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='a',state='approved',slot='copy',version=0,message='Old decision'),facts)
+        with db:db.execute("DELETE FROM notification_meta WHERE key='book_decision_cursor'")
+    n.initialize(cfg['database'],now)
+    cfg['email_notifications']['enabled']=False
+    n.tick(cfg,now)
+    with closing(r.connect(cfg['database'])) as db:
+        assert not db.execute("SELECT 1 FROM notification_outbox WHERE id LIKE 'book-decision/%'").fetchone()
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='a',state='approved',slot='copy',version=1,message='Same approval edited'),facts)
+    n.tick(cfg,now)
+    with closing(r.connect(cfg['database'])) as db:
+        assert not db.execute("SELECT 1 FROM notification_outbox WHERE id LIKE 'book-decision/%'").fetchone()
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='a',state='pending',version=2),facts)
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='a',state='approved',slot='copy',version=3,message='Superseded'),facts)
+        owner.update(db,'owner@example.org',dict(submission='batch',reference='a',state='declined',version=4,message='Current decision'),facts)
+    n.tick(cfg,now)
+    with closing(r.connect(cfg['database'])) as db:
+        messages=db.execute("SELECT * FROM notification_outbox WHERE id LIKE 'book-decision/%'").fetchall()
+        assert len(messages)==1 and 'Current decision' in messages[0]['text'] and 'Superseded' not in messages[0]['text']

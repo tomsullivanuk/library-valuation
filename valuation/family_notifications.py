@@ -26,6 +26,9 @@ def schema(db, now):
     with db:
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('started', now.isoformat()))
         db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('digest_day', now.astimezone(ZONE).date().isoformat()))
+        has_events = db.execute("SELECT 1 FROM sqlite_master WHERE name='request_events' AND type='table'").fetchone()
+        last = db.execute('SELECT coalesce(max(id),0) FROM request_events').fetchone()[0] if has_events else 0
+        db.execute('INSERT OR IGNORE INTO notification_meta VALUES(?,?)', ('book_decision_cursor', str(last)))
 
 
 def initialize(path, now=None):
@@ -109,6 +112,45 @@ def request_email(row, origin, details):
             ('\n\nAvailability can change; confirm before approving.' if details else
              '\n\nLive inventory details unavailable; check Requests for current availability.'))
 
+def prepare_book_decisions(db, origin):
+    """Notify future committed owner decisions, grouping each recipient's batch."""
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE name='request_events' AND type='table'").fetchone():return
+    cursor=int(db.execute("SELECT value FROM notification_meta WHERE key='book_decision_cursor'").fetchone()[0])
+    events=db.execute('SELECT * FROM request_events WHERE id>? ORDER BY id',(cursor,)).fetchall()
+    if not events:return
+    latest={}
+    for event in events:latest[(event['submission'],event['reference'])]=event
+    groups={}
+    for (sid,ref),event in latest.items():
+        decision=json.loads(event['payload'])
+        after=decision['after']['state']
+        before=decision.get('before',{}).get('state')
+        if after not in {'approved','declined'} or before is None or before==after:continue
+        # Discard decisions superseded before preparing this notification.
+        current=db.execute('SELECT state FROM request_decisions WHERE submission=? AND reference=?',(sid,ref)).fetchone()
+        if not current or current['state']!=after:continue
+        submission=db.execute('SELECT email,payload FROM submissions WHERE id=?',(sid,)).fetchone()
+        if not submission:continue
+        book=next((b for b in json.loads(submission['payload'])['books'] if b['reference']==ref),None)
+        if not book:continue
+        label=book['title']+(' — '+book['author'] if book.get('author') else '')
+        groups.setdefault((submission['email'],after),[]).append(dict(id=event['id'],label=label,message=decision.get('message','')))
+    for (recipient,state),items in groups.items():
+        lines=['Your book request'+('s have' if len(items)>1 else ' has')+' been '+state+'.',
+               '\n'+'\n'.join('• '+item['label'] for item in items)]
+        notes={}
+        for item in items:
+            if item['message'].strip():notes.setdefault(item['message'],[]).append(item['label'])
+        if len(notes)==1:lines.append('Message from Thomas:\n'+next(iter(notes)))
+        elif notes:
+            lines.append('Messages from Thomas:\n\n'+'\n\n'.join('\n'.join(labels)+'\n'+note for note,labels in notes.items()))
+        if state=='approved':lines.append('Thomas will coordinate delivery directly with you.')
+        lines.append('View your requests:\n'+origin+'/browse')
+        key='book-decision/'+hashlib.sha256(','.join(str(i['id']) for i in items).encode()).hexdigest()
+        enqueue(db,key,'Library book request'+('s' if len(items)>1 else '')+' '+state,'\n\n'.join(lines),recipient=recipient)
+    db.execute("UPDATE notification_meta SET value=? WHERE key='book_decision_cursor'",(str(events[-1]['id']),))
+
+
 def prepare(db, origin, now, config=None):
     """Reconcile committed submissions; restart-safe and no historical request blast."""
     start = db.execute("SELECT value FROM notification_meta WHERE key='started'").fetchone()[0]
@@ -122,6 +164,7 @@ def prepare(db, origin, now, config=None):
             pass
     for row in rows:
         enqueue(db, 'request/'+row['id'], 'Library: new book request', request_email(row, origin, details))
+    prepare_book_decisions(db, origin)
     local = now.astimezone(ZONE)
     if local.hour < 8:
         return
@@ -296,6 +339,7 @@ def status_page(config):
             '<p>Delivery '+('enabled' if enabled else 'awaiting sender setup')+'. Recipient: '+RECIPIENT+'</p>'
             '<p>New requests and their messages: within about 30 seconds when delivery is enabled. '
             'Visitor summary: daily at 8 a.m. Central for the previous day, skipping quiet days. Your owner activity is excluded.</p>'
+            '<p>Saved book approval/decline decisions also email the requester. Registration acknowledgments and access decisions email the applicant.</p>'
             '<p>Queued: '+str(counts.get('queued',0))+' · Accepted by email provider: '+str(counts.get('sent',0))+
             ' · Needs review: '+str(counts.get('needs_review',0))+'</p>'
             '<p>Sender: '+html.escape(mail.get('from','Not configured'))+'</p>'

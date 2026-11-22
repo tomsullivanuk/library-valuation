@@ -255,6 +255,6 @@ def test_public_registration_is_isolated_and_requires_origin(server,monkeypatch)
  assert server('/register/submit',who='forged',data=form,registration=True)[0]==200
  with closing(connect(config['database'])) as db:
   row=db.execute('SELECT status FROM registration_applications').fetchone()
-  assert row[0]=='unverified'
+  assert row[0]=='pending'
  config['registration']['enabled']=False
  assert server('/register',who='forged')[0]==404

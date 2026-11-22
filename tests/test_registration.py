@@ -1,7 +1,6 @@
 from contextlib import closing
 from datetime import datetime,timedelta,timezone
 import json
-from urllib.parse import urlsplit,parse_qs
 import pytest
 from valuation import registration as reg, family_notifications as mail, family_requests as ledger, family_users as users
 
@@ -21,15 +20,8 @@ def rows(c,table):
     with closing(ledger.connect(c['database'])) as db:return [dict(r) for r in db.execute('SELECT * FROM '+table)]
 
 
-def token(c):
-    message=rows(c,'notification_outbox')[-1]['text']
-    url=next(line for line in message.splitlines() if '/register/verify?' in line)
-    return parse_qs(urlsplit(url).query)['token'][0]
-
-
-def confirmed(c):
+def submitted(c):
     reg.apply(c,body(),'client')
-    value=token(c);reg.verify(c,value)
     return reg.state(c)[0]
 
 
@@ -40,25 +32,23 @@ class Provider:
         if self.fail:raise users.SyncFailed('Provider not ready')
 
 
-def test_verification_no_get_side_effects_no_access_and_owner_notice_once(config):
+def test_direct_registration_pending_acknowledgment_and_owner_notice_once(config):
     reg.apply(config,body(),'client')
-    t=token(config)
-    assert not reg.state(config)
-    assert 'Confirm your email' in reg.verify_page(config,t)
-    assert not reg.state(config) and len(rows(config,'notification_outbox'))==1
-    assert not users.allowed(config,'new@example.org')
-    reg.verify(config,t);reg.verify(config,t)
     a=reg.state(config)[0]
-    assert a['status']=='pending' and a['address']['postal']=='00501'
+    assert a['status']=='pending' and a['address']['postal']=='00501' and a['verified'] is None
     assert 'token_hash' not in a and 'expires' not in a
     out=rows(config,'notification_outbox');assert len(out)==2
     assert out[0]['recipient']=='new@example.org' and out[1]['recipient']==mail.RECIPIENT
-    assert '/owner/#users/'+a['id'] in out[1]['text']
+    assert 'under review' in out[0]['text'] and 'within 24 hours' in out[0]['text']
+    assert '/register/verify?' not in out[0]['text'] and 'No action is needed now' in out[0]['text']
+    assert '/owner/#users/'+a['id'] in out[1]['text'] and 'verified application' not in out[1]['text']
+    reg.apply(config,body(name='Changed by duplicate'),'other')
+    assert len(rows(config,'notification_outbox'))==2 and reg.state(config)[0]['name']=='New Reader'
     assert not users.allowed(config,'new@example.org')
 
 
 def test_approval_verifies_access_before_email_and_stale_decisions(config):
-    a=confirmed(config)
+    a=submitted(config)
     with pytest.raises(PermissionError):reg.decide(config,'other@example.org',dict(id=a['id'],action='approve',version=a['version']))
     p=Provider();result=reg.decide(config,config['owner_email'],dict(id=a['id'],action='approve',version=a['version'],note='Welcome!'),p)
     assert result['applications'][0]['status']=='approved' and users.allowed(config,'new@example.org')
@@ -70,7 +60,7 @@ def test_approval_verifies_access_before_email_and_stale_decisions(config):
 
 
 def test_provider_failure_then_retry_sends_one_approval(config):
-    a=confirmed(config)
+    a=submitted(config)
     result=reg.decide(config,config['owner_email'],dict(id=a['id'],action='approve',version=a['version']),Provider(True))
     assert result['notice'] and result['applications'][0]['status']=='approving'
     assert not users.allowed(config,'new@example.org') and len(rows(config,'notification_outbox'))==2
@@ -81,7 +71,7 @@ def test_provider_failure_then_retry_sends_one_approval(config):
 
 
 def test_decline_preserves_address_and_contacts_owner_without_grant(config):
-    a=confirmed(config)
+    a=submitted(config)
     reg.decide(config,config['owner_email'],dict(id=a['id'],action='decline',version=a['version'],note='Please call me.'))
     assert not users.allowed(config,'new@example.org')
     assert reg.state(config)[0]['address']['street']=='100 Example St'
@@ -89,18 +79,22 @@ def test_decline_preserves_address_and_contacts_owner_without_grant(config):
     assert notice['recipient']=='new@example.org' and 'contact Tom directly at owner@example.org' in notice['text'] and 'Please call me.' in notice['text']
 
 
-def test_bad_expired_tokens_and_duplicate_application(config):
-    now=datetime.now(timezone.utc)
-    reg.apply(config,body(),'client',now)
-    t=token(config)
-    reg.apply(config,body(name='Changed by duplicate'),'other',now)
-    assert len(rows(config,'notification_outbox'))==1
-    with pytest.raises(ValueError):reg.verify(config,t+'x',now)
-    with pytest.raises(ValueError):reg.verify(config,t,now+timedelta(hours=25))
-    reg.apply(config,body(),'client',now+timedelta(hours=25))
-    with pytest.raises(ValueError):reg.verify(config,t,now+timedelta(hours=25))
-    reg.verify(config,token(config),now+timedelta(hours=25))
-    assert reg.state(config)[0]['name']=='New Reader'
+def test_legacy_unverified_applications_move_to_review_without_duplicate_mail(config):
+    now=datetime.now(timezone.utc).isoformat()
+    with closing(ledger.connect(config['database'])) as db,db:
+        db.execute('INSERT INTO registration_applications(id,email,name,address,status,version,created,updated,token_hash,expires) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                   ('legacy','legacy@example.org','Existing Reader',json.dumps(reg.address(body())),'unverified',0,now,now,'old-hash',now))
+        mail.enqueue(db,'registration/verify/old-hash','Old verification','Old link',recipient='legacy@example.org')
+    reg.initialize(config);reg.initialize(config)
+    a=reg.state(config)[0]
+    assert a['status']=='pending' and a['name']=='Existing Reader' and a['address']['street']=='100 Example St'
+    out=rows(config,'notification_outbox')
+    assert len(out)==3 and out[0]['state']=='cancelled'
+    assert len([r for r in out if r['id'].startswith('registration/received/')])==1
+    assert len(rows(config,'registration_events'))==1
+    assert not users.allowed(config,'legacy@example.org')
+    assert 'No email confirmation needed' in reg.verify_page(config,'old-token')
+    assert reg.state(config)[0]['status']=='pending'
 
 
 def test_validation_honeypot_throttle_and_existing_guest(config):
@@ -139,4 +133,6 @@ def test_registration_outbox_delivers_to_applicant_not_owner(config,tmp_path,mon
     calls=fake_smtp(monkeypatch)
     mail.tick(config)
     sent=[r for r in calls if r[0]=='send']
-    assert len(sent)==1 and sent[0][3]==['new@example.org'] and str(sent[0][1]['To'])=='new@example.org'
+    assert len(sent)==2
+    assert sent[0][3]==['new@example.org'] and str(sent[0][1]['To'])=='new@example.org'
+    assert sent[1][3]==[mail.RECIPIENT]

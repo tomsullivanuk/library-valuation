@@ -1,8 +1,7 @@
 'use strict';
 (()=>{
- const form=document.querySelector('#registration'),verify=document.querySelector('#verify'),status=document.querySelector('#form-status');
+ const form=document.querySelector('#registration'),status=document.querySelector('#form-status');
  async function post(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Registration':'1'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||'Unable to submit. Please try again.');return data}
- if(verify)verify.onsubmit=async event=>{event.preventDefault();const button=verify.querySelector('button');button.disabled=true;try{await post('/register/confirm',{token:verify.elements.token.value});status.textContent='Email confirmed. Your application is awaiting review. You will receive an email with the decision.';history.replaceState(null,'','/register/verify');}catch(e){status.textContent=e.message;button.disabled=false}};
  if(!form)return;
  const field=name=>form.elements[name],details=document.querySelector('#city-details'),summary=document.querySelector('#city-summary'),zipStatus=document.querySelector('#zip-status'),placeLabel=document.querySelector('#place-choice'),places=document.querySelector('#places');let lookup=0,lastPostal='';
  function updateSummary(){summary.textContent=field('city').value?field('city').value+', '+field('region').value+' — confirm or correct':'City and state — open to enter';}
@@ -11,5 +10,5 @@
  field('postal').addEventListener('input',zipLookup);field('postal').addEventListener('blur',zipLookup);places.onchange=()=>setPlace(JSON.parse(places.value));field('city').oninput=updateSummary;field('region').oninput=updateSummary;
  // Required fields inside a collapsed details element must be visible for validation.
  form.addEventListener('invalid',()=>{details.open=true;},true);
- form.onsubmit=async event=>{event.preventDefault();const b=form.querySelector('button');b.disabled=true;status.textContent='Submitting…';try{const body=Object.fromEntries(new FormData(form));await post('/register/submit',body);form.replaceChildren();status.textContent='';const p=document.createElement('p');p.setAttribute('role','status');p.textContent='If this address is eligible for a new application, a confirmation email is on its way. Check your inbox and Spam, then open the link and confirm. If you already have access or need help with an earlier application, contact the library directly.';form.append(p);}catch(e){status.textContent=e.message;b.disabled=false;}};
+ form.onsubmit=async event=>{event.preventDefault();const b=form.querySelector('button');b.disabled=true;status.textContent='Submitting…';try{const body=Object.fromEntries(new FormData(form));await post('/register/submit',body);form.replaceChildren();status.textContent='';const p=document.createElement('p');p.setAttribute('role','status');p.textContent='Thank you. New registrations go directly to review, and an acknowledgment email is on its way. You will receive notification of the approval status within 24 hours. No email confirmation is needed. If you already have access or need help with an earlier application, contact the library directly.';form.append(p);}catch(e){status.textContent=e.message;b.disabled=false;}};
 })();

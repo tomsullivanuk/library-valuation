@@ -7,7 +7,6 @@ import html
 import json
 from pathlib import Path
 import re
-import secrets
 import uuid
 
 from valuation import family_requests as ledger, family_users as users
@@ -30,6 +29,11 @@ def initialize(config):
         schema(db)
         if config.get('owner_email'):
             users.schema(db,dict(config,allowed_emails=config.get('allowed_emails',[])))
+        with db:
+            db.execute('BEGIN IMMEDIATE')
+            for row in db.execute("SELECT * FROM registration_applications WHERE status='unverified'").fetchall():
+                submit_for_review(db,config,row,datetime.now(timezone.utc))
+            db.execute("UPDATE notification_outbox SET state='cancelled',error='Email confirmation step retired' WHERE id LIKE 'registration/verify/%' AND state='queued'")
 
 
 def text(value, label, limit, required=True):
@@ -87,30 +91,16 @@ def apply(config, body, identity, now=None):
             throttle(db,'global',now,30)
             throttle(db,'email:'+hashlib.sha256(email.encode()).hexdigest(),now,2)
             existing=db.execute('SELECT * FROM registration_applications WHERE email=?',(email,)).fetchone()
-            if existing and (existing['status']!='unverified' or existing['expires']>stamp):return
-            # Existing guests use their current access; submitting a form never enables/re-enables them.
-            if email==config['owner_email'] or db.execute('SELECT 1 FROM family_users WHERE email=?',(email,)).fetchone():return
-            ident=existing['id'] if existing else str(uuid.uuid4())
-            token=secrets.token_urlsafe(32)
-            digest=hashlib.sha256(token.encode()).hexdigest()
-            expires=(now+timedelta(hours=24)).isoformat()
             if existing:
-                db.execute("UPDATE registration_applications SET name=?,address=?,version=version+1,created=?,updated=?,token_hash=?,expires=? WHERE id=?",
-                           (name,json.dumps(postal),stamp,stamp,digest,expires,ident))
-            else:
-                db.execute('INSERT INTO registration_applications(id,email,name,address,status,version,created,updated,token_hash,expires) VALUES(?,?,?,?,?,?,?,?,?,?)',
-                           (ident,email,name,json.dumps(postal),'unverified',0,stamp,stamp,digest,expires))
-            queue(db,config,'registration/verify/'+digest,email,'Confirm your library registration',
-                  'Please confirm your email address to submit your application for access to the Thomas D Sullivan Library.\n\n'+
-                  config['origin']+'/register/verify?token='+token+
-                  '\n\nThis link expires in 24 hours. Confirming your email does not grant access; Tom will review your application. If you did not apply, ignore this email.')
-
-
-def token_row(db, token, now):
-    if not isinstance(token,str) or not re.fullmatch(r'[A-Za-z0-9_-]{40,100}',token):raise ValueError('This confirmation link is invalid or expired. Please register again.')
-    row=db.execute('SELECT * FROM registration_applications WHERE token_hash=?',(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
-    if not row or row['expires']<now.isoformat():raise ValueError('This confirmation link is invalid or expired. Please register again.')
-    return row
+                if existing['status']=='unverified':submit_for_review(db,config,existing,now)
+                return
+            # Existing guests use their current access; registration never enables/re-enables them.
+            if email==config['owner_email'] or db.execute('SELECT 1 FROM family_users WHERE email=?',(email,)).fetchone():return
+            ident=str(uuid.uuid4())
+            db.execute('INSERT INTO registration_applications(id,email,name,address,status,version,created,updated,token_hash,expires) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                       (ident,email,name,json.dumps(postal),'pending',0,stamp,stamp,'',''))
+            row=db.execute('SELECT * FROM registration_applications WHERE id=?',(ident,)).fetchone()
+            submit_for_review(db,config,row,now)
 
 
 def format_address(value):
@@ -118,18 +108,20 @@ def format_address(value):
     return ', '.join(v for v in (a['street'],a.get('unit'),a['city'],a.get('region'),a['postal'],a['country']) if v)
 
 
-def verify(config, token, now=None):
-    now=now or datetime.now(timezone.utc)
-    with closing(ledger.connect(config['database'])) as db,db:
-        db.execute('BEGIN IMMEDIATE')
-        row=token_row(db,token,now)
-        if row['status']!='unverified':return
-        db.execute("UPDATE registration_applications SET status='pending',version=version+1,verified=?,updated=? WHERE id=?",(now.isoformat(),now.isoformat(),row['id']))
-        db.execute('INSERT INTO registration_events(application,actor,created,action,note) VALUES(?,?,?,?,?)',(row['id'],row['email'],now.isoformat(),'email_verified',''))
-        queue(db,config,'registration/owner/'+row['id'],mail.RECIPIENT,'Library access application — '+row['name'],
-              'New verified application\n\nName: '+row['name']+'\nEmail: '+row['email']+'\nAddress: '+format_address(row['address'])+
-              '\n\nReview application (Owner sign-in required):\n'+config['origin']+'/owner/#users/'+row['id']+
-              '\n\nOpening this link does not approve or decline access. Review the details and confirm your decision on the Users page.')
+def submit_for_review(db,config,row,now):
+    """An application enters owner review without claiming email ownership."""
+    if row['status']=='unverified':
+        db.execute("UPDATE registration_applications SET status='pending',version=version+1,updated=? WHERE id=?",(now.isoformat(),row['id']))
+    db.execute('INSERT INTO registration_events(application,actor,created,action,note) VALUES(?,?,?,?,?)',
+               (row['id'],row['email'],now.isoformat(),'submitted_for_review','No separate email confirmation required'))
+    queue(db,config,'registration/received/'+row['id'],row['email'],'Your library registration is under review',
+          'Your registration for the Thomas D Sullivan Library is under review. You will receive notification of its approval status within 24 hours.\n\n'+
+          'No action is needed now. If approved, you will receive instructions for signing in and requesting books.\n\n'+
+          'If you did not register or need help, contact '+config['owner_email']+'.')
+    queue(db,config,'registration/owner/'+row['id'],mail.RECIPIENT,'Library access application — '+row['name'],
+          'New registration awaiting review\n\nName: '+row['name']+'\nEmail: '+row['email']+'\nAddress: '+format_address(row['address'])+
+          '\n\nThe applicant has been told to expect an approval-status email within 24 hours.\n\nReview application (Owner sign-in required):\n'+config['origin']+'/owner/#users/'+row['id']+
+          '\n\nOpening this link does not approve or decline access. Review the details and confirm your decision on the Users page.')
 
 
 def state(config):
@@ -213,13 +205,12 @@ def form_page():
 <label>Street address<input name="street" autocomplete="address-line1" maxlength="200" required></label><label>Apartment / unit (optional)<input name="unit" autocomplete="address-line2" maxlength="100"></label>
 <label id="postal-label">ZIP code<input name="postal" autocomplete="postal-code" inputmode="numeric" maxlength="10" required></label><p id="zip-status" class="muted" role="status">Enter your ZIP and we’ll suggest the mailing city and state.</p>
 <label id="place-choice" hidden>Mailing city<select id="places"></select></label><details id="city-details"><summary id="city-summary">City and state — filled from ZIP; open to correct</summary><label>City<input name="city" autocomplete="address-level2" maxlength="100" required></label><label>State<input name="region" autocomplete="address-level1" maxlength="100"></label></details>
-<label class="trap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label><button>Send confirmation email</button><p id="form-status" role="status"></p></form><p><a href="/">Already approved? Sign in to the library</a></p>''',True)
+<label class="trap" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label><button>Submit registration</button><p id="form-status" role="status"></p></form><p><a href="/">Already approved? Sign in to the library</a></p>''',True)
 
 
 def verify_page(config,token):
-    with closing(ledger.connect(config['database'])) as db:row=token_row(db,token,datetime.now(timezone.utc))
-    if row['status']!='unverified':return page('<h1>Email confirmed</h1><p>Your application has been submitted. You’ll receive an email after it has been reviewed.</p>')
-    return page('<h1>Confirm your email</h1><p>Confirm your email to submit your library access application. This does not grant access yet.</p><form id="verify"><input type="hidden" name="token" value="'+html.escape(token,quote=True)+'"><button>Confirm email and submit application</button><p id="form-status" role="status"></p></form>',True)
+    # Older emailed links remain harmless and need no confirmation action.
+    return page('<h1>No email confirmation needed</h1><p>Registration now goes directly to review. You do not need to confirm your email here. You’ll receive an email with the approval decision.</p><a href="/register">Return to registration</a>')
 
 
 def public_request(config, handler, path, write):
@@ -241,7 +232,7 @@ def public_request(config, handler, path, write):
                 throttle(db,'zip:'+client_identity(config,handler.headers.get('CF-Connecting-IP') or handler.client_address[0]),datetime.now(timezone.utc),60)
             return handler.reply(200,lookup_zip(parse_qs(urlsplit(handler.path).query).get('postal',[''])[0]))
         return handler.reply(404,{'error':'Not found'})
-    if path not in {'/register/submit','/register/confirm'}:return handler.reply(404,{'error':'Not found'})
+    if path!='/register/submit':return handler.reply(404,{'error':'Not found'})
     if handler.headers.get('Origin')!=config['origin'] or handler.headers.get('Content-Type')!='application/json' or handler.headers.get('X-Registration')!='1':
         return handler.reply(403,{'error':'Open the registration page before submitting'})
     length=int(handler.headers.get('Content-Length','0'))
@@ -249,9 +240,5 @@ def public_request(config, handler, path, write):
     body=json.loads(handler.rfile.read(length))
     if not isinstance(body,dict):raise ValueError('Invalid application')
     identity=client_identity(config,handler.headers.get('CF-Connecting-IP') or handler.client_address[0])
-    if path=='/register/submit':apply(config,body,identity)
-    else:
-        with closing(ledger.connect(config['database'])) as db,db:
-            db.execute('BEGIN IMMEDIATE');throttle(db,'verify:'+identity,datetime.now(timezone.utc),30)
-        verify(config,body.get('token'))
+    apply(config,body,identity)
     return handler.reply(200,dict(ok=True))

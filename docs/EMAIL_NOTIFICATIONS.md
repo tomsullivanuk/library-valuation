@@ -4,6 +4,12 @@ The family gateway reconciles new, committed requests into a private SQLite outb
 
 Guest visits to authenticated library pages are recorded once per person per local calendar day, with first/last visit times. API polling and owner activity are excluded. This measures visits, not fresh Cloudflare logins. At 8 a.m. America/Chicago, a summary covers the previous calendar day. Quiet days produce no email. Restarts catch up missed days. Initialization starts tracking now, without importing historical last-seen values or sending old request alerts.
 
+## Book approval and decline notices
+
+New saved owner approval/decline decisions automatically email the requester. Approval identifies the books, includes any owner message, and says “Thomas will coordinate delivery directly with you.” Decline identifies the books and includes the owner's decision message verbatim; no reason is invented when the message is blank. Only title/author and the decision note are included, not owner inventory locations or resale values.
+
+Decisions prepared in the same worker cycle are grouped by requester and approval/decline status, reducing bulk-operation email volume. Different notes remain associated with their books; a shared note is printed once. Unchanged status edits and internal owner-pick creation events do not create notices. Later changes superseding a decision before preparation are respected. A durable event cursor and the outbox commit together; restarts do not repeat notifications. Initialization starts at the latest existing event so historical decisions are not emailed retroactively. The normal SMTP retry/uncertainty safeguards apply.
+
 ## iCloud setup (selected delivery option)
 
 The existing domain receives mail through iCloud, while Cloudflare hosts DNS. No DNS or existing mailbox changes are needed to add an address to that established iCloud custom domain.
@@ -39,7 +45,7 @@ Apple's endpoint is fixed to `smtp.mail.me.com:587`, using verified STARTTLS bef
 
 Resend remains supported for existing installations. Verify a sending domain using its supplied DNS records; create a scoped sending-only API key and store it in a private file. Configure `provider: "resend"`, `from`, and `api_key_file` in the private `email_notifications` object. Omitting provider preserves the original Resend behavior. Never replace unrelated mail records. Attempted emails are pinned to their original delivery provider; switching an attempted item requires manual review to avoid duplicates.
 
-Owner request alerts and visitor reports go to `tomsullivanuk@gmail.com`. The registration workflow also sends verification and decision emails to the applicant’s address; see REGISTRATION.md. If the object is absent or enabled is false, tracking and queuing continue but nothing is sent. Restart the family service after changing configuration. Check Owner → Settings → Email notifications for queue counts, then submit a controlled request and confirm its receipt. A queue collected before setup will be delivered when enabled; inspect it before enabling if setup was delayed.
+Owner request alerts and visitor reports go to `tomsullivanuk@gmail.com`. Book decision notices go to the corresponding requester. The registration workflow also sends under-review acknowledgments and decision emails to the applicant’s address; see REGISTRATION.md. If the object is absent or enabled is false, tracking and queuing continue but nothing is sent. Restart the family service after changing configuration. Check Owner → Settings → Email notifications for queue counts, then submit a controlled request and confirm its receipt. A queue collected before setup will be delivered when enabled; inspect it before enabling if setup was delayed.
 
 The existing persistent family service runs the worker; no additional scheduler is needed. The Mac mini must be awake and the service running. Notifications delayed by downtime catch up after restart.
 
