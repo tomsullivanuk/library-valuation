@@ -101,7 +101,7 @@ def test_validation_honeypot_throttle_and_existing_guest(config):
     for patch in [dict(postal='123'),dict(region='Not a state'),dict(email='bad'),dict(street=''),dict(name='x\nInjected')]:
         with pytest.raises(ValueError):reg.apply(config,body(**patch),'client')
     reg.apply(config,body(website='spam'),'client')
-    reg.apply(config,body(email='existing@example.org'),'client')
+    assert reg.apply(config,body(email='existing@example.org'),'client') =='active'
     assert not rows(config,'registration_applications')
     out=rows(config,'notification_outbox')
     assert len(out)==1 and out[0]['recipient']=='existing@example.org' and 'already registered' in out[0]['subject']
@@ -143,8 +143,8 @@ def test_registration_outbox_delivers_to_applicant_not_owner(config,tmp_path,mon
 def test_active_guest_acknowledged_once_without_application_or_access_changes(config):
     before=users.state(config)
     now=datetime.now(timezone.utc)
-    reg.apply(config,body(email='existing@example.org'),'client',now)
-    reg.apply(config,body(email='existing@example.org'),'client',now)
+    assert reg.apply(config,body(email='existing@example.org'),'client',now)=='active'
+    assert reg.apply(config,body(email='existing@example.org'),'client',now)=='active'
     assert users.state(config)==before
     assert not rows(config,'registration_applications')
     out=rows(config,'notification_outbox')
@@ -166,5 +166,5 @@ def test_active_guest_with_prior_approved_application_still_gets_acknowledgment(
 def test_disabled_guest_is_not_told_access_is_active(config):
     u=next(u for u in users.state(config)['users'] if u['email']=='existing@example.org')
     users.update(config,config['owner_email'],dict(action='disable',email=u['email'],version=u['version']),Provider())
-    reg.apply(config,body(email='existing@example.org'),'client')
+    assert reg.apply(config,body(email='existing@example.org'),'client') is None
     assert not rows(config,'notification_outbox') and not users.allowed(config,'existing@example.org')

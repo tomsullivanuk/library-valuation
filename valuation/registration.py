@@ -103,7 +103,7 @@ def apply(config, body, identity, now=None):
             throttle(db,identity,now)
             throttle(db,'global',now,30)
             throttle(db,'email:'+hashlib.sha256(email.encode()).hexdigest(),now,2)
-            if acknowledge_active(db,config,email,now):return
+            if acknowledge_active(db,config,email,now):return "active"
             existing=db.execute('SELECT * FROM registration_applications WHERE email=?',(email,)).fetchone()
             if existing:
                 if existing['status']=='unverified':submit_for_review(db,config,existing,now)
@@ -205,7 +205,7 @@ def lookup_zip(postal):
         return dict(places=[],notice='City and state could not be filled in. Please enter them below.')
 
 
-STYLE='body{max-width:680px;margin:2rem auto;padding:1rem;font:18px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}label{display:block;margin:.8rem 0}input,select,button,textarea{box-sizing:border-box;font:inherit;padding:.65rem;max-width:100%;width:100%}button{background:#245d49;color:white;border:0;border-radius:6px;margin-top:1rem;min-height:44px}.muted{color:#5d6a62}.trap{position:absolute;left:-9999px}[hidden]{display:none!important}.registration-brand{margin:0 0 1.5rem;text-align:center}.registration-brand img{display:block;width:min(100%,380px);height:auto;margin:0 auto;border-radius:8px}@media(max-width:480px){body{margin:.75rem auto}.registration-brand{margin-bottom:1rem}.registration-brand img{max-width:280px}}'
+STYLE='body{max-width:680px;margin:2rem auto;padding:1rem;font:18px/1.5 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}label{display:block;margin:.8rem 0}input,select,button,textarea{box-sizing:border-box;font:inherit;padding:.65rem;max-width:100%;width:100%}button,.sign-in-button{background:#245d49;color:white;border:0;border-radius:6px;margin-top:1rem;min-height:44px}.sign-in-button{display:inline-block;padding:.65rem 1rem;text-decoration:none;box-sizing:border-box}.muted{color:#5d6a62}.trap{position:absolute;left:-9999px}[hidden]{display:none!important}.registration-brand{margin:0 0 1.5rem;text-align:center}.registration-brand img{display:block;width:min(100%,380px);height:auto;margin:0 auto;border-radius:8px}@media(max-width:480px){body{margin:.75rem auto}.registration-brand{margin-bottom:1rem}.registration-brand img{max-width:280px}}'
 
 
 def page(content, script=False):
@@ -254,5 +254,5 @@ def public_request(config, handler, path, write):
     body=json.loads(handler.rfile.read(length))
     if not isinstance(body,dict):raise ValueError('Invalid application')
     identity=client_identity(config,handler.headers.get('CF-Connecting-IP') or handler.client_address[0])
-    apply(config,body,identity)
-    return handler.reply(200,dict(ok=True))
+    result=apply(config,body,identity)
+    return handler.reply(200,dict(ok=True,already_active=result=="active"))
