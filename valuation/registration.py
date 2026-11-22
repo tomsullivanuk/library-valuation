@@ -77,6 +77,19 @@ def queue(db, config, key, recipient, subject, body):
     mail.enqueue(db,key,subject,body,recipient=recipient)
 
 
+def acknowledge_active(db,config,email,now):
+    """Send a bounded sign-in reminder without changing membership or applications."""
+    account=db.execute('SELECT active,sync FROM family_users WHERE email=?',(email,)).fetchone()
+    if email!=config['owner_email'] and not (account and account['active'] and account['sync']=='synced'):return False
+    day=now.astimezone(mail.ZONE).date().isoformat()
+    key='registration/already-active/'+hashlib.sha256(email.encode()).hexdigest()+'/'+day
+    queue(db,config,key,email,'You’re already registered for the library',
+          'You’re already registered for the Thomas D Sullivan Library, and your access is active. No further approval is needed.\n\n'+
+          'Sign in here: '+config['origin']+'/\nUse '+email+' to sign in. Cloudflare will email you a one-time access code; check Spam if it does not arrive.\n\n'+
+          'Once signed in, browse the books, add selections to My List, and submit your requests.\n\nIf you need help, contact '+config['owner_email']+'.')
+    return True
+
+
 def apply(config, body, identity, now=None):
     now=now or datetime.now(timezone.utc)
     email=users.email(body.get('email',''))
@@ -90,6 +103,7 @@ def apply(config, body, identity, now=None):
             throttle(db,identity,now)
             throttle(db,'global',now,30)
             throttle(db,'email:'+hashlib.sha256(email.encode()).hexdigest(),now,2)
+            if acknowledge_active(db,config,email,now):return
             existing=db.execute('SELECT * FROM registration_applications WHERE email=?',(email,)).fetchone()
             if existing:
                 if existing['status']=='unverified':submit_for_review(db,config,existing,now)

@@ -102,7 +102,9 @@ def test_validation_honeypot_throttle_and_existing_guest(config):
         with pytest.raises(ValueError):reg.apply(config,body(**patch),'client')
     reg.apply(config,body(website='spam'),'client')
     reg.apply(config,body(email='existing@example.org'),'client')
-    assert not rows(config,'registration_applications') and not rows(config,'notification_outbox')
+    assert not rows(config,'registration_applications')
+    out=rows(config,'notification_outbox')
+    assert len(out)==1 and out[0]['recipient']=='existing@example.org' and 'already registered' in out[0]['subject']
     for i in range(5):reg.apply(config,body(email=f'reader{i}@example.org'),'same-client')
     with pytest.raises(ValueError):reg.apply(config,body(email='six@example.org'),'same-client')
 
@@ -136,3 +138,33 @@ def test_registration_outbox_delivers_to_applicant_not_owner(config,tmp_path,mon
     assert len(sent)==2
     assert sent[0][3]==['new@example.org'] and str(sent[0][1]['To'])=='new@example.org'
     assert sent[1][3]==[mail.RECIPIENT]
+
+
+def test_active_guest_acknowledged_once_without_application_or_access_changes(config):
+    before=users.state(config)
+    now=datetime.now(timezone.utc)
+    reg.apply(config,body(email='existing@example.org'),'client',now)
+    reg.apply(config,body(email='existing@example.org'),'client',now)
+    assert users.state(config)==before
+    assert not rows(config,'registration_applications')
+    out=rows(config,'notification_outbox')
+    assert len(out)==1 and out[0]['recipient']=='existing@example.org'
+    assert 'No further approval is needed' in out[0]['text'] and config['origin'] in out[0]['text']
+    assert 'one-time access code' in out[0]['text'] and 'My List' in out[0]['text']
+    assert not any(r['recipient']==mail.RECIPIENT for r in out)
+
+
+def test_active_guest_with_prior_approved_application_still_gets_acknowledgment(config):
+    a=submitted(config)
+    reg.decide(config,config['owner_email'],dict(id=a['id'],action='approve',version=a['version']),Provider())
+    reg.apply(config,body(),'client-two')
+    out=rows(config,'notification_outbox')
+    assert len([r for r in out if r['id'].startswith('registration/already-active/')])==1
+    assert reg.state(config)[0]['status']=='approved'
+
+
+def test_disabled_guest_is_not_told_access_is_active(config):
+    u=next(u for u in users.state(config)['users'] if u['email']=='existing@example.org')
+    users.update(config,config['owner_email'],dict(action='disable',email=u['email'],version=u['version']),Provider())
+    reg.apply(config,body(email='existing@example.org'),'client')
+    assert not rows(config,'notification_outbox') and not users.allowed(config,'existing@example.org')
