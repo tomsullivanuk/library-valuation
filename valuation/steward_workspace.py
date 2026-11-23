@@ -308,30 +308,17 @@ def build_report_groups(
     return tuple(groups)
 
 
+# Stable placement by registered report identity; unfamiliar saved exports stay in Other.
+REPORT_CATEGORIES = {
+    **dict.fromkeys(('inventory_review', 'physical_book_checks', 'inventory_followup_resolutions',
+                     'inventory_review_workbook', 'inventory_audit_summary', 'completed_inventory_workbook',
+                     'inventory_review_needs_input', 'inventory_review_decisions', 'inventory_review_followups'), 'inventory_audit'),
+    'collection_research': 'catalog_research',
+}
+
+
 def _report_category(report: ReportView) -> str:
-    text = " ".join(
-        (
-            report.report_key,
-            report.name,
-            report.purpose,
-            report.producing_workflow,
-        )
-    ).casefold()
-    categories = (
-        ("inventory_audit", ("inventory", "audit", "holding", "reconciliation")),
-        ("market_evidence", ("market", "valuation", "price", "comparable")),
-        ("catalog_research", ("catalog", "research", "bibliographic", "metadata")),
-        ("family_external", ("family", "external", "dealer", "prospectus", "communication")),
-        ("steward_review", ("steward", "review", "priority", "decision")),
-    )
-    return next(
-        (
-            category
-            for category, keywords in categories
-            if any(keyword in text for keyword in keywords)
-        ),
-        "other",
-    )
+    return REPORT_CATEGORIES.get(report.report_key, 'other')
 
 
 def query_explore(
@@ -1392,17 +1379,24 @@ _DOCUMENT = r"""<!doctype html>
       }
     }
     function renderSettings() {
-      clear(); heading("Settings", "Your workspace and saved decisions");
-      append(main, node("p", {}, workspaceState.connected ? "Saving is connected. Dispositions and action statuses are stored with the project and survive workspace regeneration." : "Saving is disconnected. Start the local workspace service to edit decisions."), node("p", {}, "Library browsing defaults to physically inventoried books. Historical and all-record views are available under Reports."), routeLink("About this data", "about"));
-      append(main, node("section", {id: "user-connection-settings"}));
+      clear(); heading("Settings", "Connections and workspace configuration");
+      if (location.pathname.startsWith("/owner")) {
+        const email = node("section", {class:"panel"});
+        append(email, node("h2", {}, "Email delivery"), node("p", {}, "Review the sender, delivery connection, and items needing attention."), node("a", {href:"/owner/email-notifications",class:"button-link"}, "Open email delivery settings"));
+        append(main,email);
+      }
+      append(main, node("section", {id: "user-connection-settings",class:"panel"}));
       window.dispatchEvent(new Event("owner-user-settings"));
-      if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-history"}, "Email History — messages and CSV export")));
-      if (location.pathname.startsWith("/owner")) append(main, node("p", {}, node("a", {href: "/owner/email-notifications"}, "Email notifications — setup and delivery status")));
+      const workspace=node("section",{class:"panel"});
+      append(workspace,node("h2",{},"Workspace & data"),node("p",{},workspaceState.connected?"Saving is connected. Your decisions are saved.":"Saving is disconnected. Start the workspace service to edit decisions."));
+      const technical=node("div");append(technical,node("p",{},"Saved decisions survive workspace regeneration. Acquisition history and inventory evidence are preserved."),routeLink("About this data","about"));append(workspace,detailSection("About this data / Technical details",technical));
+      append(main,workspace);
     }
 
     function renderLibrary(reportScope = "") {
       libraryState.scope = reportScope || (completedInventory.completed ? "present" : "");
       clear();
+      if(reportScope) { append(main,routeLink("← Back to Reports","reports")); heading("Library catalog","Review current inventory and historical records."); }
       const controls = node("form", {class: "library-controls", role: "search"});
       const searchRow = node("div", {class: "search-row"});
       const searchLabel = node("label", {for: "library-search"}, "Search");
@@ -1915,42 +1909,26 @@ _DOCUMENT = r"""<!doctype html>
       ])));
       append(main, node("p", {class: "notice"}, "This workspace does not save acceptance, dismissal, notes, or decisions."));
     }
+    function reportName(row) {
+      return ({physical_book_checks:"Saved physical-check list",inventory_followup_resolutions:"Completed check history",inventory_review_workbook:"Inventory workbook"})[row.report_key] || row.name || row.report_key;
+    }
+    function reportPurpose(row) {
+      return ({physical_book_checks:"A saved list of physical checks. Use Action Items or Storage visit for current work.",inventory_followup_resolutions:"Saved answers and evidence from completed book checks.",inventory_review_workbook:"Download inventory, locations, and review evidence in one workbook."})[row.report_key] || row.purpose || "Saved collection report.";
+    }
     function reportCard(row) {
-      const card = node("article", {class: "card"});
-      append(
-        card,
-        node("h3", {}, row.name || row.report_key),
-        badge("Status", row.status, {
-          current: "Ready for this workspace",
-          stale: "Available, but may be out of date",
-          missing: "File not found",
-          incompatible: "File cannot be used safely",
-          unavailable: "Not available"
-        }[row.status] || statusLabel(row.status)),
-        node("p", {}, row.purpose || "No purpose was supplied."),
-        definitionList([
-          ["Prepared for", row.audience],
-          ["File type", row.format.toUpperCase()],
-          ["Prepared", row.generated_at]
-        ])
-      );
-      if (row.limitations) append(card, node("p", {class: "notice"}, `Keep in mind: ${row.limitations}`));
-      const actions = node("div", {class: "card-actions"});
-      append(actions, routeLink("About this report", `report/${encodeURIComponent(row.report_key)}`, "button-link secondary", `About ${row.name || row.report_key}`));
-      if (row.can_open) {
-        append(
-          actions,
-          node("a", {href: row.public_path, class: "button-link", target: "_blank", rel: "noopener", "aria-label": `Open ${row.name || row.report_key}`}, "Open report"),
-          node("a", {href: row.public_path, class: "button-link secondary", download: "", "aria-label": `Download ${row.name || row.report_key}`}, "Download a copy")
-        );
-      } else {
-        append(actions, node("span", {class: "muted"}, "This report cannot be opened from the current workspace."));
-      }
-      append(card, actions);
+      const card=node("article",{class:"card"});
+      append(card,node("h3",{},reportName(row)),node("p",{},reportPurpose(row)),node("p",{class:"muted"},`${row.format.toUpperCase()} · Saved ${row.generated_at || "date not recorded"}`));
+      if(row.status!=="current") append(card,badge("Status",row.status,{stale:"Saved snapshot — may be out of date",missing:"File not found",incompatible:"File cannot be opened safely",unavailable:"Not available"}[row.status] || statusLabel(row.status)));
+      if(row.can_open) append(card,node("a",{href:row.public_path,class:"button-link",download:"","aria-label":`Download ${reportName(row)}`},"Download"));
+      else append(card,node("p",{class:"muted"},"This saved file is not available to open."));
+      const details=node("div");
+      if(row.limitations) append(details,node("p",{},row.limitations));
+      append(details,routeLink("About this report",`report/${encodeURIComponent(row.report_key)}`));
+      append(card,detailSection("Details",details));
       return card;
     }
     async function renderStorageVisit() {
-      clear(); heading("Storage visit", "Pull books and answer checks, one box at a time.");
+      clear(); append(main,routeLink("← Back to Reports","reports")); heading("Storage visit", "Pull books and answer checks, one box at a time.");
       const base=location.pathname.startsWith('/owner')?'/owner':'';
       const controls=node('div',{class:'visit-controls'}), dateLabel=node('label',{},'Visit date'),visitDate=node('input',{type:'date'});
       const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);visitDate.value=tomorrow.toLocaleDateString('en-CA',{timeZone:'America/Chicago'});
@@ -2088,27 +2066,28 @@ _DOCUMENT = r"""<!doctype html>
     }
 
     function renderReports() {
-      clear();
-      append(main, routeLink("Storage visit — picks and checks by box", "storage-visit", "button-link"));
-      append(main, node("h2", {}, "Catalog reports"), routeLink("Physically inventoried books", "catalog-report/present", "button-link"), routeLink("Historical records", "catalog-report/history", "button-link secondary"), routeLink("All records including history", "catalog-report/all", "button-link secondary"));
-      heading("Reports", "Choose a prepared report by what you want to review or share.");
-      append(main, node("p", {class: "notice"}, "Every report shown here was registered and checked for this workspace. Other project files are not shown automatically."));
-      append(main, sourceMessages());
-      if (!REPORT_GROUPS.length) {
-        append(main, node("p", {class: "empty"}, "No reports were prepared for this workspace. Other reports may still be available through their established workflows."));
-        return;
+      clear(); heading("Reports", "Plan a storage visit, review the collection, or check library communications.");
+      const section=(title,description)=>{const box=node("section",{class:"panel"});append(box,node("h2",{},title),node("p",{},description));append(main,box);return box;};
+      const visit=section("Storage visit","Pull requested books and complete physical checks, one box at a time.");
+      append(visit,routeLink("Open picks and checks","storage-visit","button-link"));
+      const library=section("Library & inventory","Browse the current collection or review historical catalog records.");
+      const catalog=node("article",{class:"card"}),label=node("label",{for:"report-catalog-scope"},"Catalog scope"),scope=node("select",{id:"report-catalog-scope"});
+      for(const [value,title] of [["present","Current inventory"],["history","Historical records"],["all","All records"]])append(scope,node("option",{value},title));
+      const open=routeLink("Open library catalog","catalog-report/present","button-link");scope.onchange=()=>{open.href="#catalog-report/"+scope.value;};
+      append(catalog,node("h3",{},"Library catalog"),node("p",{},"Current inventory shows physically inventoried books. Historical records preserve earlier catalog information."),label,scope,open);append(library,catalog);
+      const all=REPORT_GROUPS.flatMap(group=>group.reports),primary=all.filter(row=>row.report_key==="inventory_review_workbook" && row.status==="current" && row.can_open);
+      for(const row of primary)append(library,reportCard(row));
+      if(location.pathname.startsWith("/owner")) {
+        const communications=section("Communications","Review emails sent by the library application and export their sending history.");
+        append(communications,node("a",{href:"/owner/email-history",class:"button-link"},"Open Email History"));
       }
-      for (const group of REPORT_GROUPS) {
-        const section = node("section", {class: "panel"});
-        append(
-          section,
-          node("h2", {}, group.title),
-          node("p", {class: "muted"}, `${group.purpose} ${group.reports.length} ${group.reports.length === 1 ? "report" : "reports"}.`)
-        );
-        const rows = node("div", {class: "result-list"});
-        for (const row of group.reports) append(rows, reportCard(row));
-        append(section, rows);
-        append(main, section);
+      const saved=all.filter(row=>!primary.includes(row));
+      if(saved.length){
+        const content=node("div"),available=saved.filter(row=>row.status==="current" && row.can_open),archive=saved.filter(row=>row.status!=="current" || !row.can_open);
+        append(content,node("p",{},"Saved snapshots and exports. For current checks, use Action Items or Storage visit."));
+        for(const row of available)append(content,reportCard(row));
+        if(archive.length){const old=node("div");for(const row of archive)append(old,reportCard(row));append(content,detailSection(`Archive (${archive.length})`,old));}
+        append(main,detailSection(`Saved reports & exports (${saved.length})`,content));
       }
     }
     function renderReport(id) {
@@ -2116,7 +2095,7 @@ _DOCUMENT = r"""<!doctype html>
       if (!row) return renderNotFound("report", id);
       clear();
       append(main, routeLink("← Back to Reports", "reports"));
-      heading(row.name || row.report_key, row.purpose);
+      heading(reportName(row), reportPurpose(row));
       append(main, badge("Status", row.status, {
         current: "Ready for this workspace",
         stale: "Available, but may be out of date",
@@ -2198,8 +2177,9 @@ _DOCUMENT = r"""<!doctype html>
       if (["library", "book", "home", "explore", "catalog-report"].includes(route)) refreshLibraryRequests();
       document.querySelectorAll("[data-nav]").forEach(link => {
         const active = link.dataset.nav === route
+          || (["report", "storage-visit", "catalog-report"].includes(route) && link.dataset.nav === "reports")
           || (["recommendations", "recommendation"].includes(route) && link.dataset.nav === "actions")
-          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision", "recommendation", "report"].includes(route) && link.dataset.nav === "library")
+          || (["book", "holding", "acquisition", "assessment", "review", "market", "observation", "decision", "recommendation"].includes(route) && link.dataset.nav === "library")
           || (["home", "explore"].includes(route) && link.dataset.nav === "library");
         if (active) link.setAttribute("aria-current", "page");
         else link.removeAttribute("aria-current");

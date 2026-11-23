@@ -337,8 +337,8 @@ def status_page(config):
         counts = dict(db.execute('SELECT state,count(*) FROM notification_outbox GROUP BY state').fetchall())
     enabled = bool(mail.get('enabled'))
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            '<title>Email notifications</title><style>body{max-width:700px;margin:2rem auto;padding:1rem;font:18px/1.6 system-ui;color:#25372e}a{color:#245d49}</style>'
-            '<a href="/owner/#settings">Back to Settings</a><h1>Email notifications</h1><p><a href="/owner/email-history">Email History — messages and CSV export</a></p>'
+            '<title>Email delivery</title><style>body{max-width:700px;margin:2rem auto;padding:1rem;font:18px/1.6 system-ui;color:#25372e}a{color:#245d49}</style>'
+            '<a href="/owner/#settings">Back to Settings</a><h1>Email delivery</h1><p><a href="/owner/email-history">Email History — messages and CSV export</a></p>'
             '<p>Delivery '+('enabled' if enabled else 'awaiting sender setup')+'. Recipient: '+RECIPIENT+'</p>'
             '<p>New requests and their messages: within about 30 seconds when delivery is enabled. '
             'Visitor summary: daily at 8 a.m. Central for the previous day, skipping quiet days. Your owner activity is excluded.</p>'

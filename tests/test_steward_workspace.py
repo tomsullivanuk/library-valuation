@@ -834,7 +834,10 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert "About this report" in html
     assert "Open report" in html
     assert "Download a copy" in html
-    assert "Every report shown here was registered and checked for this workspace." in html
+    assert "Every report shown here was registered and checked for this workspace." not in html
+    assert "Saved reports & exports" in html
+    assert "Library & inventory" in html
+    assert "Communications" in html
     assert 'detailSection("Technical details"' in html
     assert "Some information is not included or may need review." in html
     assert "What information is affected" in html

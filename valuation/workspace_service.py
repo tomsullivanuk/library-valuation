@@ -57,12 +57,12 @@ def load_model(data_dir, output_dir, *, family_overlay=True):
     if (data_dir / "production_moved.json").exists():
         raise ValueError("Production has moved to the Mac Mini. Use the remote Library; this local copy is archived.")
     reports = []
-    for key, label, fmt in [("physical_book_checks", "Physical book checks", "csv"),
-                            ("inventory_followup_resolutions", "Follow-up review evidence", "csv"),
-                            ("inventory_review_workbook", "Inventory review workbook", "xlsx")]:
+    for key, label, fmt in [("physical_book_checks", "Saved physical-check list", "csv"),
+                            ("inventory_followup_resolutions", "Completed check history", "csv"),
+                            ("inventory_review_workbook", "Inventory workbook", "xlsx")]:
         path = output_dir / (key + "." + fmt)
         if path.exists():
-            reports.append(RegisteredReport(key, label, "Inventory review", "Steward", fmt,
+            reports.append(RegisteredReport(key, label, {"physical_book_checks":"Saved physical checks; use Action Items for current work.","inventory_followup_resolutions":"Answers and evidence from completed book checks.","inventory_review_workbook":"Inventory, locations, and review evidence in one workbook."}[key], "Steward", fmt,
                 path, path.name, "workspace-service", catalog_snapshot_sha256=hashlib.sha256((data_dir / "catalog_items.csv").read_bytes()).hexdigest()))
     market = output_dir / "libib_inventory_20261020/combined_market_evidence_summary.csv"
     # The evidence is a historical snapshot; validate catalog identity before reuse.
