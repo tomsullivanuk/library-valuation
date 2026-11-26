@@ -272,3 +272,17 @@ def test_email_history_and_csv_owner_only(server):
   code,body=server(path,who='owner@example.org')
   assert code==200 and b'Private subject' in body and b'Private message' in body
  assert b'Private message' not in server('/owner/email-history.csv?recipient=absent',who='owner@example.org')[1]
+
+
+def test_draft_metadata_preserves_title_and_current_availability(server,monkeypatch):
+ from valuation.family_requests import connect,save
+ from contextlib import closing
+ original,_=server.app.raw_catalog()
+ with closing(connect(server.app.db)) as db:
+  save(db,'guest@example.org',0,['ref'],'Notes',original)
+ monkeypatch.setattr(server.app,'catalog',lambda:({},'snapshot'))
+ code,body=server('/api/me');data=json.loads(body)
+ assert code==200 and data['draft_books']['ref']['title']=='Title'
+ assert data['draft_books']['ref']['available'] is False
+ assert json.loads(server('/api/me',who='owner@example.org')[1])['draft_books']=={}
+ assert server('/api/list',data=dict(version=1,books=[],message='Notes'))[0]==200

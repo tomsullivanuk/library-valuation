@@ -237,7 +237,10 @@ class App:
                                 for book in row['payload']['books']:
                                     book['request_status']=request_status(db,owner.decision(db,row['id'],book['reference']),pickups)
                                     book['owner_messages']=owner.recipient_messages(db,row['id'],book['reference'])
-                            return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=own))
+                            draft=store.draft(db,email)
+                            raw,_=app.raw_catalog()
+                            draft_books={ref:dict(raw.get(ref,dict(reference=ref,title='Book no longer available',author='')),available=ref in catalog) for ref in draft['books']}
+                            return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=draft,draft_books=draft_books,submissions=own))
                         if path=='/api/inbox':
                             if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
                             return self.reply(200,store.submissions(db))
