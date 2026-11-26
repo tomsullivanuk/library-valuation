@@ -1,4 +1,4 @@
-"""Loopback family service behind Cloudflare Access; no steward routes."""
+"""Authenticated family browsing and owner gateway behind Cloudflare Access."""
 from contextlib import closing
 from datetime import datetime, timezone
 import argparse
@@ -15,14 +15,50 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 import jwt
 from valuation import family_requests as store
 from valuation.family_catalog import render
 
-def owner_badge(email):
+def owner_return_path(value):
+    """Only return to the owner workspace, never an arbitrary redirect target."""
+    if not isinstance(value, str) or len(value) > 1000 or any(ord(c) < 32 for c in value):
+        return '/owner/'
+    try:
+        target = urlsplit(value)
+    except ValueError:
+        return '/owner/'
+    if target.scheme or target.netloc or target.path not in ('/owner', '/owner/') or target.query:
+        return '/owner/'
+    return '/owner/' + ('#' + target.fragment if target.fragment else '')
+
+
+def account_controls(email, is_owner, *, family_view=False, return_to='/owner/'):
     import html
-    return '<span style="font-size:.9rem">Signed in as '+html.escape(email,quote=True)+' · Owner</span>'
+    esc = lambda value:html.escape(value, quote=True)
+    links = ''
+    if is_owner:
+        links = ('<a href="'+esc(return_to)+'">Return to Owner workspace</a>' if family_view else
+                 '<a href="/browse" data-family-view>Family browsing</a>')
+    return ('<div class="account-controls" style="display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;font:400 .9rem system-ui">'
+            '<span>Signed in as '+esc(email)+(' · Owner' if is_owner else '')+'</span>'
+            +links+'<a href="/sign-out" data-sign-out>Sign out / Switch account</a></div>').replace('<a ', '<a style="display:inline-flex;align-items:center;min-height:44px;color:#245d49" ')
+
+
+def owner_badge(email):
+    return account_controls(email, True)
+
+
+def sign_out_page(email, is_owner, return_to):
+    import html
+    back = owner_return_path(return_to) if is_owner else '/'
+    return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>Sign out — Thomas D Sullivan Library</title><style>body{max-width:650px;margin:2rem auto;padding:1rem;font:17px/1.6 system-ui;color:#25372e;background:#faf9f5}h1,a{color:#245d49}.actions{display:flex;gap:1rem;align-items:center;flex-wrap:wrap}.button{display:inline-block;background:#245d49;color:white;border-radius:6px;padding:.7rem 1rem;text-decoration:none}</style>'
+            '<h1>Sign out / Switch account</h1><p>Signed in as <strong>'+html.escape(email,quote=True)+'</strong>'+(' · Owner' if is_owner else '')+'</p>'
+            '<p>Your saved book lists, requests and storage checklist progress will be kept. Make sure your latest changes say <strong>Saved</strong> before signing out. Unsaved storage drafts stay on this device.</p>'
+            '<p>To use a different account, sign out below, reopen the library, and sign in with that email address. Owner tools require your designated owner email.</p>'
+            '<p>This ends your Cloudflare Access session and may sign you out of other protected applications in the same account.</p>'
+            '<div class="actions"><a class="button" href="/cdn-cgi/access/logout">Sign out and switch account</a><a href="'+html.escape(back,quote=True)+'">Keep browsing</a></div></html>')
 
 class Identity:
     def __init__(self,config):
@@ -33,7 +69,8 @@ class Identity:
         key=self.keys.get_signing_key_from_jwt(token)
         c=jwt.decode(token,key.key,algorithms=['RS256'],audience=self.config['audience'],issuer=self.config['issuer'],options={'require':['exp','iat','sub','email','aud','iss']})
         email=c['email'].lower()
-        if email not in self.config['allowed_emails']:raise ValueError('Not authorized')
+        from valuation.family_users import allowed
+        if not (allowed(self.config,email) if self.config.get('database') else email in self.config['allowed_emails']):raise ValueError('Not authorized')
         return email
 
 class App:
@@ -42,6 +79,10 @@ class App:
         self.search_lock=threading.Lock();self.search_index=None;self.search_fingerprint=None
         self.db=Path(config['database']);self.db.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         store.connect(self.db).close();os.chmod(self.db,0o600)
+        from valuation.family_notifications import initialize
+        initialize(self.db)
+        from valuation import registration
+        registration.initialize(config)
     def raw_catalog(self):
         raw=Path(self.config['snapshot']).read_bytes();records=json.loads(raw)
         from valuation.family_catalog import FIELDS
@@ -96,17 +137,34 @@ class App:
             def log_message(self,*args):pass
             def reply(self,status,payload,kind='application/json'):
                 data=payload if isinstance(payload,bytes) else payload.encode() if isinstance(payload,str) else json.dumps(payload).encode()
-                self.send_response(status);self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+                self.send_response(status)
+                if kind=='text/csv':self.send_header('Content-Disposition','attachment; filename="library-email-history.csv"')
+                self.send_header('Content-Type',kind+'; charset=utf-8');self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer');self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
             def handle_request(self,write=False):
                 try:
-                    if self.headers.get('Host')!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
+                    hostname=self.headers.get('Host')
+                    if hostname in app.config.get('redirect_hosts',[]):
+                        if write:return self.reply(409,{'error':'Open the new library address before saving'})
+                        self.send_response(302);self.send_header('Location',app.config['origin']+self.path);self.send_header('Cache-Control','no-store');self.send_header('Content-Length','0');self.end_headers();return
+                    if hostname!=urlsplit(app.config['origin']).netloc:return self.reply(403,{'error':'Invalid host'})
+                    public_path=urlsplit(self.path).path
+                    if public_path=='/register' or public_path.startswith('/register/'):
+                        from valuation.registration import public_request
+                        return public_request(app.config,self,public_path,write)
                     try:email=app.identity(self.headers.get('Cf-Access-Jwt-Assertion',''))
                     except jwt.PyJWKClientConnectionError:
                         return self.reply(503,'<!doctype html><html lang="en"><title>Sign-in temporarily unavailable</title><h1>Sign-in temporarily unavailable</h1><p>We could not verify your sign-in right now. Please try again shortly.</p><a href="/">Try again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(503,{'error':'Sign-in verification temporarily unavailable. Please retry.'})
                     except Exception:
                         return self.reply(403,'<!doctype html><html lang="en"><title>Sign in required</title><h1>Sign in required</h1><p>Please sign in using one of the invited email addresses.</p><a href="/cdn-cgi/access/logout">Sign in again</a></html>','text/html') if urlsplit(self.path).path=='/' else self.reply(403,{'error':'Sign in with an invited email address.'})
-                    if email not in app.config['allowed_emails']:return self.reply(403,{'error':'Not authorized'})
+                    from valuation.family_users import allowed
+                    if not allowed(app.config,email,touch=True):return self.reply(403,{'error':'Not authorized'})
                     path=urlsplit(self.path).path
+                    if not write and path in {'/', '/browse', '/browse/'}:
+                        from valuation.family_notifications import visit
+                        visit(app.db,email,app.config['owner_email'])
+                    return_to=owner_return_path(parse_qs(urlsplit(self.path).query).get('owner_return',[''])[0])
+                    if not write and path=='/sign-out':return self.reply(200,sign_out_page(email,email==app.config['owner_email'],return_to),'text/html')
+                    if not write and path=='/account.js':return self.reply(200,Path(__file__).with_name('account_controls.js').read_text(),'text/javascript')
                     if write:
                         if self.headers.get('Origin')!=app.config['origin'] or self.headers.get('Content-Type')!='application/json' or (not path.startswith('/owner/') and self.headers.get('X-Family-Request')!='1'):return self.reply(403,{'error':'Invalid request origin'})
                         length=int(self.headers.get('Content-Length','0'))
@@ -114,6 +172,15 @@ class App:
                         body=json.loads(self.rfile.read(length))
                     if path=='/owner' or path.startswith('/owner/'):
                         if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
+                        if path in {'/owner/email-history','/owner/email-history.csv'} and not write:
+                            from valuation import email_history
+                            params={k:v[0] for k,v in parse_qs(urlsplit(self.path).query).items()}
+                            if path.endswith('.csv'):
+                                return self.reply(200,email_history.csv_export(email_history.records(app.config,params)),'text/csv')
+                            return self.reply(200,email_history.page(app.config,params),'text/html')
+                        if path=='/owner/email-notifications' and not write:
+                            from valuation.family_notifications import status_page
+                            return self.reply(200,status_page(app.config),'text/html')
                         if path.startswith('/owner/search-pilot'):
                             if not app.config.get('search_pilot_dir'):return self.reply(404,{'error':'Preview not enabled'})
                             if path=='/owner/search-pilot/query' and write:return self.reply(200,app.search_preview(body['query']))
@@ -122,7 +189,7 @@ class App:
                             if path=='/owner/search-pilot' and not write:
                                 return self.reply(200,'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Private search preview</title><style>body{font:17px system-ui;color:#25372e;max-width:1200px;margin:2rem auto;padding:1rem}h1,h2,h3{color:#245d49}input,button{font:inherit;padding:.6rem}input{width:70%}.columns{display:grid;grid-template-columns:1fr 1fr;gap:2rem}article{border-bottom:1px solid #ccc;padding:1rem 0}small{color:#606c65}@media(max-width:700px){.columns{display:block}}</style><div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap"><a href="/owner/">Owner workspace</a>'+owner_badge(email)+'</div><h1>Private search preview</h1><p>Compare ranked keywords with local AI. Only family-visible metadata and descriptions are indexed. Related-topic suggestions may be imperfect.</p><a href="/owner/search-pilot/report">42-query comparison report</a><form><label for="query">Find books</label><p><input id="query" maxlength="500" required placeholder="Try a title, ISBN or topic"><button>Compare</button></p></form><p id="notice" role="status"></p><div class="columns"><section id="keyword"></section><section id="hybrid"></section></div><script src="/owner/search-pilot.js" defer></script></html>','text/html')
                             return self.reply(404,{'error':'Not found'})
-                        local=path[len('/owner'):] or '/'
+                        local=(path[len('/owner'):] or '/')+('?' + urlsplit(self.path).query if urlsplit(self.path).query else '')
                         headers={'Origin':'http://127.0.0.1:8765'}
                         payload=None
                         if write:
@@ -133,7 +200,9 @@ class App:
                         except HTTPError as exc:r=exc
                         output=r.read();kind=r.headers.get('Content-Type','application/json').split(';')[0]
                         if kind=='text/html':
-                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"')
+                            text=output.decode().replace('"/api/','"/owner/api/').replace('src="/requests.js"','src="/owner/requests.js"').replace('src="/users.js"','src="/owner/users.js"').replace('src="/owner-picks.js"','src="/owner/owner-picks.js"')
+                            text=text.replace('<strong>Library Valuation</strong>','<span style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap"><img src="/register/emblem.png" width="1536" height="1024" alt="Thomas D. Sullivan Library &amp; Archive" style="width:120px;max-width:35vw;height:auto;border-radius:6px"><strong>Library Valuation</strong></span>',1)
+                            text=text.replace('</body>','<script src="/account.js" defer></script></body>')
                             text=text.replace('<div class="brand">','<div class="brand" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">').replace('<strong>Library Valuation</strong>','<strong>Library Valuation</strong>'+owner_badge(email))
                             if app.config.get('search_pilot_dir'):
                                 text=text.replace('</header>','<p style="margin:.4rem 0"><a href="/owner/search-pilot">Try the AI search preview</a> · Library search combines keywords and local AI.</p></header>',1)
@@ -149,25 +218,41 @@ class App:
                             if path=='/api/search':
                                 if not app.config.get('family_search_enabled'):return self.reply(404,{'error':'Search not enabled'})
                                 return self.reply(200,app.search_preview(body['query'])['hybrid'])
-                            if path=='/api/list':return self.reply(200,store.save(db,email,body['version'],body['books'],body.get('message',''),catalog))
-                            if path=='/api/submit':return self.reply(200,store.submit(db,email,body['version'],body['key'],catalog,snapshot))
+                            if path in {'/api/list','/api/submit'}:
+                                result = (store.save(db,email,body['version'],body['books'],body.get('message',''),catalog) if path=='/api/list' else
+                                          store.submit(db,email,body['version'],body['key'],catalog,snapshot))
+                                from valuation.family_notifications import visit
+                                visit(app.db,email,app.config['owner_email'])
+                                return self.reply(200,result)
                             return self.reply(404,{'error':'Not found'})
+                        if path=='/api/topics':
+                            from valuation.browse_topics import build
+                            return self.reply(200,build(catalog,app.config.get('owner_output_dir')))
                         if path=='/api/me':
                             from valuation import family_owner as owner
                             owner.schema(db);own=store.submissions(db,email)
+                            from valuation.storage_visit import pickup_records,request_status
+                            pickups=pickup_records(app.config.get('owner_data_dir'))
                             for row in own:
                                 for book in row['payload']['books']:
-                                    book['request_status']=owner.decision(db,row['id'],book['reference'])['state']
+                                    book['request_status']=request_status(db,owner.decision(db,row['id'],book['reference']),pickups)
                                     book['owner_messages']=owner.recipient_messages(db,row['id'],book['reference'])
-                            return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=store.draft(db,email),submissions=own))
+                            draft=store.draft(db,email)
+                            raw,_=app.raw_catalog()
+                            draft_books={ref:dict(raw.get(ref,dict(reference=ref,title='Book no longer available',author='')),available=ref in catalog) for ref in draft['books']}
+                            return self.reply(200,dict(email=email,owner=email==app.config['owner_email'],draft=draft,draft_books=draft_books,submissions=own))
                         if path=='/api/inbox':
                             if email!=app.config['owner_email']:return self.reply(403,{'error':'Owner access required'})
                             return self.reply(200,store.submissions(db))
                         if path=='/app.js':return self.reply(200,Path(__file__).with_name('family_app.js').read_text(),'text/javascript')
-                        if path=='/':
+                        if path in {'/','/browse','/browse/'}:
                             updated=datetime.fromtimestamp(Path(app.config['snapshot']).stat().st_mtime,timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
                             page=render(list(catalog.values()),updated)
-                            page=page[:page.index('<script>')]+ '<script src="/app.js" defer></script></html>'
+                            page=page[:page.index('<script>')]+ '<script src="/app.js" defer></script><script src="/account.js" defer></script></html>'
+                            controls=account_controls(email,email==app.config['owner_email'],family_view=True,return_to=return_to)
+                            page=page.replace('<p id="signed-in" role="status">Checking sign-in…</p>','<div>'+controls+'<span id="signed-in" role="status" hidden></span></div>')
+                            if email==app.config['owner_email']:
+                                page=page.replace('<div id="browse-intro">','<p style="padding:.7rem;background:#edf3ef;border-left:4px solid #245d49">Family browsing · You are still signed in as Owner. My List and requests here belong to you.</p><div id="browse-intro">')
                             page=page.replace('This is a read-only catalog.','You can save a personal list and submit requests to Tom.')
                             page=page.replace('<main>','<nav class="family-nav" aria-label="Library views"><button id="browse">Browse</button> <button id="mine">My List</button> <button id="inbox" hidden>Owner inbox</button></nav><p id="saved" role="status"></p><section id="panel" hidden></section><main>')
                             # Stable references supplied as escaped HTML attributes, never private catalog IDs.
@@ -188,4 +273,6 @@ class App:
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--config',required=True);a=p.parse_args();app=App(json.loads(Path(a.config).read_text()))
+    from valuation.family_notifications import run
+    run(app.config)
     ThreadingHTTPServer(('127.0.0.1',8877),app.handler()).serve_forever()

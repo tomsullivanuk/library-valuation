@@ -1,7 +1,7 @@
 """Loopback-only workspace with durable, explicit steward decisions.
 
 Generated HTML remains an offline read-only fallback. The service keeps decisions
-in project repositories, never in browser storage or the generated HTML.
+in project repositories. Browser storage holds unsaved visit drafts only.
 """
 from __future__ import annotations
 
@@ -57,12 +57,12 @@ def load_model(data_dir, output_dir, *, family_overlay=True):
     if (data_dir / "production_moved.json").exists():
         raise ValueError("Production has moved to the Mac Mini. Use the remote Library; this local copy is archived.")
     reports = []
-    for key, label, fmt in [("physical_book_checks", "Physical book checks", "csv"),
-                            ("inventory_followup_resolutions", "Follow-up review evidence", "csv"),
-                            ("inventory_review_workbook", "Inventory review workbook", "xlsx")]:
+    for key, label, fmt in [("physical_book_checks", "Saved physical-check list", "csv"),
+                            ("inventory_followup_resolutions", "Completed check history", "csv"),
+                            ("inventory_review_workbook", "Inventory workbook", "xlsx")]:
         path = output_dir / (key + "." + fmt)
         if path.exists():
-            reports.append(RegisteredReport(key, label, "Inventory review", "Steward", fmt,
+            reports.append(RegisteredReport(key, label, {"physical_book_checks":"Saved physical checks; use Action Items for current work.","inventory_followup_resolutions":"Answers and evidence from completed book checks.","inventory_review_workbook":"Inventory, locations, and review evidence in one workbook."}[key], "Steward", fmt,
                 path, path.name, "workspace-service", catalog_snapshot_sha256=hashlib.sha256((data_dir / "catalog_items.csv").read_bytes()).hexdigest()))
     market = output_dir / "libib_inventory_20261020/combined_market_evidence_summary.csv"
     # The evidence is a historical snapshot; validate catalog identity before reuse.
@@ -212,6 +212,7 @@ def load_book_checks(data_dir, model):
     data_dir = Path(data_dir)
     checks = {}
     receipt = data_dir / "inventory_followup_reviews.json"
+    saved = {"reviews": []}
     if receipt.exists():
         saved = json.loads(receipt.read_text())
         if saved.get("schema_version") != 1:
@@ -232,6 +233,14 @@ def load_book_checks(data_dir, model):
             checks[oid] = dict(inventory_observation_id=oid, title=observation.title,
                 question=question.strip(), collection=observation.source_collection_label,
                 bibliographic_evidence=evidence.strip())
+    # Reviewed answers may narrow a remaining question without rewriting its source evidence.
+    for row in saved["reviews"]:
+        oid = row["inventory_observation_id"]
+        remaining = row.get("remaining_question")
+        if row["status"] == "physical_check_required" and oid in checks and remaining:
+            if not isinstance(remaining, str) or len(remaining) > 4000:
+                raise ValueError("Invalid reviewed follow-up question")
+            checks[oid]["question"] = remaining
     import re
     return sorted(checks.values(), key=lambda row:(
         tuple((0, int(part)) if part.isdigit() else (1, part.casefold())
@@ -287,6 +296,7 @@ class WorkspaceStore:
             return dict(workspace_id=workspace_id(self.data_dir), revision=state["revision"], token=self.token, actions=actions,
                 dispositions={r["catalog_item_id"]: ("gift_donate" if r["disposition"] in {"gift", "donate"} else r["disposition"]) for r in reviews},
                 disposition_choices=list(DISPOSITIONS), distinct_titles=len(titles),
+                storage_visits=state.get("storage_visits", {}),
                 estimate_currencies=list(estimate_reviews.CURRENCIES),
                 estimate_history={cid:[{key:row.get(key, "") for key in (
                     "review_id","low","high","currency","researched_on","note","source_urls","saved_at","supersedes","title")}
@@ -310,6 +320,28 @@ class WorkspaceStore:
                 yield
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def visit_pick(self, request):
+        """Validate the assigned copy without changing its reservation or inventory."""
+        from valuation import family_owner as family
+        config = family.settings()
+        if not config:
+            raise ValueError("Requests are unavailable. Reload before saving this pickup.")
+        facts = family.live_facts(load_model(self.data_dir, self.output_dir, family_overlay=False), self.data_dir)
+        from contextlib import closing
+        with closing(family.requests.connect(config['database'])) as db:
+            rows = family.inbox(db, facts)
+        for row in rows:
+            if row['id'] != request.get('submission'):
+                continue
+            for item in row['items']:
+                if item['reference'] != request.get('reference'):
+                    continue
+                review = row['payload'].get('owner_pick') == 'review' and item['decision']['state'] == 'pending'
+                slot = item['decision'].get('slot') or row['payload'].get('owner_pick_slots', {}).get(item['reference'])
+                if (item['decision']['state'] == 'approved' or review) and slot and slot == request.get('slot'):
+                    return dict(submission=row['id'], reference=item['reference'], slot=slot, title=item['title'])
+        raise ValueError("This reservation changed or is no longer active. Reload before checking it off.")
 
     def update(self, request):
         with self.write_lock():
@@ -341,6 +373,9 @@ class WorkspaceStore:
                     fingerprint=task["fingerprint"], updated_at=stamp)
                 state["actions"][task["id"]] = value
                 event = dict(kind=kind, id=task["id"], **value)
+            elif kind == "storage_visit":
+                from valuation.storage_visit import save_entry
+                event = save_entry(state, request, self.all_tasks(state), stamp, self.visit_pick)
             elif kind == "estimate":
                 task = self.all_tasks(state).get(request.get("id"))
                 if not task or task["category"] != "Estimate research" or task["fingerprint"] != request.get("fingerprint"):
@@ -419,6 +454,15 @@ def make_server(store, port=8765):
             if not self.local_request():
                 return self.send(403, b'{"error":"Local workspace requests only"}')
             path = unquote(urlsplit(self.path).path)
+            if path == "/owner-picks.js":
+                return self.send(200, Path(__file__).with_name("owner_picks.js").read_bytes(), "text/javascript")
+            if path == "/users.js":
+                return self.send(200, Path(__file__).with_name("owner_users.js").read_bytes(), "text/javascript")
+            if path == "/api/users":
+                from valuation import family_users, family_owner
+                config = family_owner.settings()
+                if not config: return self.send(503,b'{"error":"Family access is not configured"}')
+                return self.send(200,json.dumps(family_users.state(config)).encode())
             if path == "/requests.js":
                 return self.send(200, Path(__file__).with_name("owner_requests.js").read_bytes(), "text/javascript")
             if path == "/api/family-requests":
@@ -429,7 +473,8 @@ def make_server(store, port=8765):
                     if not config: return self.send(200,b'[]')
                     facts=family.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
                     with closing(family.requests.connect(config['database'])) as db:
-                        return self.send(200,json.dumps(family.inbox(db,facts)).encode())
+                        from valuation.storage_visit import pickup_records
+                        return self.send(200,json.dumps(family.inbox(db,facts,include_archived="archived=1" in self.path,pickups=pickup_records(store.data_dir))).encode())
                 except Exception:
                     return self.send(503,b'{"error":"Request inbox unavailable; please retry"}')
             if path == "/api/state":
@@ -452,6 +497,50 @@ def make_server(store, port=8765):
         def do_POST(self):
             if not self.local_request() or self.headers.get("X-Workspace-Token") != store.token:
                 return self.send(403, b'{"error":"Reload the local workspace before saving"}')
+            if self.path == "/api/owner-picks" and self.headers.get("Content-Type") == "application/json":
+                from valuation import owner_picks, family_owner, family_users
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 300000: raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length)); config=family_owner.settings()
+                    if not config: raise ValueError("Family access is not configured")
+                    users=family_users.state(config)['users']
+                    allowed={u['email'] for u in users if u['active']}
+                    allowed.add(config['owner_email'])
+                    with store.lock:
+                        facts=family_owner.live_facts(load_model(store.data_dir,store.output_dir,family_overlay=False),store.data_dir)
+                        with family_owner.requests.connect(config['database']) as db:
+                            if body.get('action') == 'preview':
+                                ids=body.get('ids',[])
+                                if not isinstance(ids,list) or len(ids)>3000: raise ValueError("Invalid selection")
+                                family_owner.schema(db)
+                                used={r['slot'] for r in db.execute("SELECT slot FROM request_decisions WHERE state IN ('approved','collected','transferred')")}
+                                result=dict(owner=config['owner_email'],users=[dict(email=u['email'],name=u['name']) for u in users if u['email'] in allowed],books=[dict(f,copies=[dict(c,unavailable=c['id'] in used) for c in f['copies']]) for f in facts.values() if f['catalog_item_id'] in ids])
+                            else: result=owner_picks.create(db,config['owner_email'],body,facts,allowed)
+                    return self.send(200,json.dumps(result).encode())
+                except family_owner.requests.Conflict as e: return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e: return self.send(400,json.dumps(dict(error=str(e))).encode())
+            if self.path == "/api/applications" and self.headers.get("Content-Type") == "application/json":
+                from valuation import registration, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 8192:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    return self.send(200,json.dumps(registration.decide(config,config['owner_email'],body)).encode())
+                except registration.ledger.Conflict as exc:return self.send(409,json.dumps(dict(error=str(exc))).encode())
+                except (ValueError,KeyError,TypeError) as exc:return self.send(400,json.dumps(dict(error=str(exc))).encode())
+            if self.path == "/api/users" and self.headers.get("Content-Type") == "application/json":
+                from valuation import family_users, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 16384:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    result=family_users.update(config,config['owner_email'],body)
+                    return self.send(200,json.dumps(result).encode())
+                except family_users.ledger.Conflict as e:return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e:return self.send(400,json.dumps(dict(error=str(e))).encode())
             if self.path == "/api/search" and self.headers.get("Content-Type") == "application/json":
                 try:
                     from valuation import family_owner as family
@@ -467,6 +556,18 @@ def make_server(store, port=8765):
                     return self.send(200,json.dumps(result).encode())
                 except (ValueError,KeyError,TypeError):return self.send(400,b'{"error":"Invalid search request"}')
                 except Exception:return self.send(503,b'{"error":"Enhanced search unavailable"}')
+            if self.path == "/api/request-archive" and self.headers.get("Content-Type") == "application/json":
+                from valuation import request_maintenance, family_owner
+                try:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if not 0 < length <= 16384:raise ValueError("Invalid size")
+                    body=json.loads(self.rfile.read(length));config=family_owner.settings()
+                    if not config:raise ValueError("Family access is not configured")
+                    with family_owner.requests.connect(config['database']) as db:
+                        result=request_maintenance.archive(db,config['owner_email'],body['submission'],body['archived'])
+                    return self.send(200,json.dumps(result).encode())
+                except family_owner.requests.Conflict as e:return self.send(409,json.dumps(dict(error=str(e))).encode())
+                except (ValueError,KeyError,TypeError) as e:return self.send(400,json.dumps(dict(error=str(e))).encode())
             if self.path == "/api/family-requests" and self.headers.get("Content-Type") == "application/json":
                 try:
                     from valuation import family_owner as family

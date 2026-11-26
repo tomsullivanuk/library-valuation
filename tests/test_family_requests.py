@@ -54,3 +54,20 @@ def test_failed_submission_keeps_draft(db):
  with pytest.raises(ValueError):s.submit(db,'a',1,'key',{},'hash')
  assert s.draft(db,'a')==dict(version=1,books=['ref'],message='keep this')
  assert s.submissions(db,'a')==[]
+
+
+def test_remove_unavailable_books_incrementally_without_losing_other_choices(db):
+ catalog={r:dict(reference=r,title=r,author='Author') for r in ['reserved-one','reserved-two','available']}
+ s.save(db,'nate',0,list(catalog),'Keep these notes',catalog)
+ current={'available':catalog['available']}
+ # A draft may retain old unavailable choices while its owner removes them one at a time.
+ d=s.save(db,'nate',1,['reserved-two','available'],'Keep these notes',current)
+ assert d['books']==['reserved-two','available']
+ with pytest.raises(ValueError):s.submit(db,'nate',2,'blocked',current,'snapshot')
+ assert s.draft(db,'nate')['books']==['reserved-two','available']
+ with pytest.raises(ValueError):s.save(db,'nate',2,['reserved-two','available','invented'],'',current)
+ d=s.save(db,'nate',2,['available'],'Keep these notes',current)
+ result=s.submit(db,'nate',d['version'],'remaining',current,'snapshot')
+ assert result['payload']['message']=='Keep these notes'
+ assert [b['reference'] for b in result['payload']['books']]==['available']
+ assert s.draft(db,'nate')['books']==[]

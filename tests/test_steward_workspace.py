@@ -110,7 +110,9 @@ def test_html_is_deterministic_self_contained_and_script_safe(tmp_path):
     assert b"https://" not in first
     assert b"http://127.0.0.1:8765" in first
     assert b'fetch("/api/state"' in first
-    assert b"localStorage" not in first
+    # Device-local storage is limited to unsaved visit drafts; saved decisions stay on the server.
+    outside_visit = first.split(b"    async function renderStorageVisit()", 1)[0] + first.split(b"    function renderReports()", 1)[1]
+    assert b"localStorage" not in outside_visit
     assert b"sessionStorage" not in first
 
 
@@ -134,7 +136,8 @@ def test_catalog_only_workspace_opens_on_library_with_read_only_primary_navigati
     assert '"Acquired"' in html
     assert "offline view" in html
     assert "Open the local workspace to save" in html
-    assert "localStorage" not in html
+    outside_visit = html.split("    async function renderStorageVisit()", 1)[0] + html.split("    function renderReports()", 1)[1]
+    assert "localStorage" not in outside_visit
     assert "sessionStorage" not in html
     assert 'node("button", {type:"submit"}, "Save")' in html
     assert "Export filtered XLSX" not in html
@@ -831,7 +834,10 @@ def test_steward_facing_language_hides_internal_statuses_until_detail(tmp_path):
     assert "About this report" in html
     assert "Open report" in html
     assert "Download a copy" in html
-    assert "Every report shown here was registered and checked for this workspace." in html
+    assert "Every report shown here was registered and checked for this workspace." not in html
+    assert "Saved reports & exports" in html
+    assert "Library & inventory" in html
+    assert "Communications" in html
     assert 'detailSection("Technical details"' in html
     assert "Some information is not included or may need review." in html
     assert "What information is affected" in html
@@ -981,3 +987,15 @@ def test_book_details_replace_legacy_priority_with_actionable_next_steps(tmp_pat
     assert 'book.usable_market_estimate ? "Action items" : "Next steps"' in detail
     assert '["Why", task.reason]' in html and '["Next step", task.next_step]' in html
     assert 'task.search_links' in html
+
+
+def test_live_request_paths_survive_public_owner_html_rewrite(tmp_path):
+    """The gateway rewrites root API literals; dynamic owner paths must stay intact."""
+    page = render_steward_workspace(model_for(tmp_path, [catalog_row()])).decode()
+    public = page.replace('"/api/', '"/owner/api/')
+    loader = public.split('async function refreshLibraryRequests()', 1)[1].split('function requestCopyDetails', 1)[0]
+    paths = re.findall(r"fetch\(base \+ ['\"]([^'\"]+)['\"]", loader)
+    assert paths == ['/api/family-requests?archived=1', '/api/users']
+    assert ['/owner' + path for path in paths] == [
+        '/owner/api/family-requests?archived=1', '/owner/api/users'
+    ]

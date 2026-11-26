@@ -19,11 +19,13 @@ def draft(db,email):
 
 def save(db,email,version,books,message,catalog):
     if type(version) is not int or not isinstance(books,list) or len(books)>3000 or not isinstance(message,str) or len(message)>2000:raise ValueError('Invalid list')
-    if any(not isinstance(x,str) or x not in catalog for x in books) or len(set(books))!=len(books):raise ValueError('A selected book is no longer in this catalog. Refresh before saving.')
+    if any(not isinstance(x,str) for x in books) or len(set(books))!=len(books):raise ValueError('A selected book is no longer in this catalog. Refresh before saving.')
     with db:
         db.execute('BEGIN IMMEDIATE')
         old=draft(db,email)
         if old['version']!=version:raise Conflict('Your list changed in another window. Reload before editing.')
+        if any(ref not in catalog and ref not in old['books'] for ref in books):
+            raise ValueError('A selected book is no longer available. You can remove it from My List.')
         db.execute('INSERT OR REPLACE INTO drafts VALUES(?,?,?)',(email,version+1,json.dumps(dict(books=books,message=message))))
     return draft(db,email)
 
@@ -35,7 +37,7 @@ def submit(db,email,version,key,catalog,snapshot):
         if old:return dict(old)|dict(payload=json.loads(old['payload']))
         d=draft(db,email)
         if d['version']!=version:raise Conflict('Your list changed. Review it again before submitting.')
-        if not d['books'] or any(ref not in catalog for ref in d['books']):raise ValueError('Review your list against the current catalog before submitting.')
+        if not d['books'] or any(ref not in catalog for ref in d['books']):raise ValueError('Some books are no longer available. Remove those titles from My List, then submit the remaining books.')
         payload=dict(books=[catalog[r] for r in d['books']],message=d['message'],catalog_snapshot=snapshot,draft_version=version)
         id=str(uuid.uuid4());created=datetime.now(timezone.utc).isoformat()
         db.execute('INSERT INTO submissions VALUES(?,?,?,?,?)',(id,email,key,created,json.dumps(payload)))
@@ -44,6 +46,8 @@ def submit(db,email,version,key,catalog,snapshot):
         db.execute('INSERT OR REPLACE INTO drafts VALUES(?,?,?)',(email,version+1,json.dumps(dict(books=[],message=''))))
     return dict(id=id,created=created,payload=payload)
 
-def submissions(db,email=None):
-    rows=db.execute('SELECT id,email,created,payload FROM submissions '+('WHERE email=? ' if email else '')+'ORDER BY created DESC', (email,) if email else ()).fetchall()
+def submissions(db,email=None,include_archived=False):
+    has_archive=db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='request_archives'").fetchone()
+    where='WHERE email=? ' if email else ('WHERE id NOT IN (SELECT submission FROM request_archives) ' if has_archive and not include_archived else '')
+    rows=db.execute('SELECT id,email,created,payload FROM submissions '+where+'ORDER BY created DESC', (email,) if email else ()).fetchall()
     return [dict(r)|dict(payload=json.loads(r['payload'])) for r in rows]
